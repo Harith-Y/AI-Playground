@@ -5,7 +5,10 @@
 Before starting, ensure you have the following installed:
 - **Python 3.11+** (for backend)
 - **Node.js 18+** and **npm/yarn** (for frontend)
-- **PostgreSQL 15+** (database)
+- **Database** (choose one):
+  - **Neon** (recommended - serverless PostgreSQL, free tier available)
+  - **PostgreSQL 15+** (self-hosted)
+  - **Supabase** (not recommended for this project - too many extra features)
 - **Redis 7+** (caching & task queue)
 - **Docker & Docker Compose** (optional, for containerized setup)
 - **Git** (version control)
@@ -113,7 +116,26 @@ npm run dev
 # Or for CRA: npm start
 ```
 
-#### **3. Database Setup (PostgreSQL)**
+#### **3. Database Setup**
+
+##### **Option A: Neon (Recommended)**
+
+```powershell
+# 1. Sign up at https://neon.tech (free tier available)
+# 2. Create a new project named "AI-Playground"
+# 3. Copy the connection string from the dashboard
+# 4. Paste it in your backend/.env file:
+#    DATABASE_URL=postgresql://[user]:[password]@[host]/[database]?sslmode=require
+
+# That's it! No local installation needed.
+# Neon automatically handles:
+# - Database creation
+# - Autoscaling
+# - Backups
+# - SSL connections
+```
+
+##### **Option B: Local PostgreSQL**
 
 ```powershell
 # Start PostgreSQL service (Windows)
@@ -307,8 +329,11 @@ docker-compose exec backend alembic revision --autogenerate -m "Initial migratio
 ### Backend `.env` Configuration
 
 ```env
-# Database
-DATABASE_URL=postgresql://aiplayground_user:your_password@localhost:5432/aiplayground
+# Database (Neon - recommended)
+DATABASE_URL=postgresql://[user]:[password]@[host]/[database]?sslmode=require
+
+# OR Database (Local PostgreSQL)
+# DATABASE_URL=postgresql://aiplayground_user:your_password@localhost:5432/aiplayground
 
 # Redis
 REDIS_URL=redis://localhost:6379/0
@@ -526,7 +551,9 @@ After initialization:
 - Check port 5173/3000 is not in use
 
 **Database connection failed:**
-- Verify PostgreSQL service is running
+- **If using Neon:** Check connection string includes `?sslmode=require`
+- **If using Neon:** Verify your IP is not blocked (Neon allows all IPs by default)
+- **If using local PostgreSQL:** Verify PostgreSQL service is running
 - Check database credentials
 - Ensure database exists
 

@@ -67,4 +67,17 @@ docker-compose build
 docker-compose up -d
 ```
 
-Check [SETUP.md](SETUP.md) for complete details including database setup, environment configuration, testing setup, and troubleshooting!
+Check [SETUP.md](SETUP.md) for complete details including database setup (Neon recommended), environment configuration, testing setup, and troubleshooting!
+
+## 🗄️ Database: Why Neon?
+
+This project uses **[Neon](https://neon.tech)** (serverless PostgreSQL) as the recommended database:
+
+✅ **Instant Setup** - No local installation, get started in 30 seconds
+✅ **Autoscaling** - Scales automatically with your workload
+✅ **Branching** - Create dev/staging/prod branches instantly
+✅ **Free Tier** - Generous free tier for development
+✅ **ML-Optimized** - Great performance for large datasets
+✅ **Zero Config** - Just copy connection string and go
+
+**Alternative:** You can also use local PostgreSQL if you prefer (see [SETUP.md](SETUP.md))
