@@ -176,10 +176,10 @@ cd backend
 .\venv\Scripts\Activate
 
 # Start Celery worker
-celery -A app.tasks worker --loglevel=info
+celery -A celery_worker.celery_app worker --loglevel=info --pool=solo
 
 # Optional: Start Celery Beat (for scheduled tasks)
-# celery -A app.tasks beat --loglevel=info
+# celery -A celery_worker.celery_app beat --loglevel=info
 ```
 
 ---
@@ -473,7 +473,7 @@ npm run dev
 # Terminal 3: Celery Worker
 cd backend
 .\venv\Scripts\Activate
-celery -A app.tasks worker --loglevel=info
+celery -A celery_worker.celery_app worker --loglevel=info --pool=solo
 
 # Terminal 4: Redis (if not running as service)
 redis-server
@@ -561,6 +561,7 @@ After initialization:
 - Check if Redis is running
 - Verify CELERY_BROKER_URL in .env
 - Check worker logs for errors
+- **Windows users:** Must use `--pool=solo` flag with Celery worker
 
 **Docker issues:**
 - Restart Docker Desktop
