@@ -1,1 +1,4 @@
-# Root .gitignore
+venv/
+
+.env.*
+.env
