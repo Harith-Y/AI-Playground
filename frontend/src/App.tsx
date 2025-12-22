@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/common/Layout'
+import ErrorBoundary from './components/common/ErrorBoundary'
 import HomePage from './pages/HomePage'
 import DatasetUploadPage from './pages/DatasetUploadPage'
 import PreprocessingPage from './pages/PreprocessingPage'
@@ -12,19 +13,21 @@ import './App.css'
 
 function App() {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/dataset-upload" element={<DatasetUploadPage />} />
-        <Route path="/exploration" element={<ExplorationPage />} />
-        <Route path="/preprocessing" element={<PreprocessingPage />} />
-        <Route path="/features" element={<FeatureEngineeringPage />} />
-        <Route path="/modeling" element={<ModelingPage />} />
-        <Route path="/evaluation" element={<ExplorationPage />} />
-        <Route path="/tuning" element={<TuningPage />} />
-        <Route path="/code-generation" element={<CodeGenerationPage />} />
-      </Routes>
-    </Layout>
+    <ErrorBoundary>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/dataset-upload" element={<DatasetUploadPage />} />
+          <Route path="/exploration" element={<ExplorationPage />} />
+          <Route path="/preprocessing" element={<PreprocessingPage />} />
+          <Route path="/features" element={<FeatureEngineeringPage />} />
+          <Route path="/modeling" element={<ModelingPage />} />
+          <Route path="/evaluation" element={<ExplorationPage />} />
+          <Route path="/tuning" element={<TuningPage />} />
+          <Route path="/code-generation" element={<CodeGenerationPage />} />
+        </Routes>
+      </Layout>
+    </ErrorBoundary>
   )
 }
 
