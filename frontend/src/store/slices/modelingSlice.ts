@@ -1,5 +1,6 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { Model, TrainingMetrics, Hyperparameters } from '../../types/model';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import type { Model, TrainingMetrics, Hyperparameters } from '../../types/model';
 
 interface ModelingState {
   selectedModel: string | null;

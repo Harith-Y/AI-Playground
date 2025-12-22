@@ -1,5 +1,6 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { Dataset, DatasetStats, ColumnInfo } from '../../types/dataset';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import type { Dataset, DatasetStats, ColumnInfo } from '../../types/dataset';
 import { datasetService } from '../../services/datasetService';
 
 interface DatasetState {

@@ -1,5 +1,3 @@
-// API response types
-
 export interface ApiResponse<T = any> {
   data: T;
   message?: string;
@@ -26,7 +24,6 @@ export interface UploadProgress {
   percentage: number;
 }
 
-// Request/Response types for specific endpoints
 export interface LoginRequest {
   email: string;
   password: string;
