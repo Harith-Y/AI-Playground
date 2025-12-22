@@ -27,9 +27,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
       position="fixed"
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
-        backgroundColor: 'background.paper',
-        borderBottom: '1px solid #334155',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
         boxShadow: 'none',
+        color: 'text.primary',
       }}
     >      <Toolbar>
         <IconButton
@@ -64,7 +67,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             sx={{
               textTransform: 'none',
               '&:hover': {
-                backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                backgroundColor: (theme) => theme.palette.primary.light + '20',
+                color: 'primary.main',
               },
             }}
           >
@@ -76,7 +80,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             sx={{
               textTransform: 'none',
               '&:hover': {
-                backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                backgroundColor: (theme) => theme.palette.primary.light + '20',
+                color: 'primary.main',
               },
             }}
           >
@@ -88,7 +93,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             sx={{
               textTransform: 'none',
               '&:hover': {
-                backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                backgroundColor: (theme) => theme.palette.primary.light + '20',
+                color: 'primary.main',
               },
             }}
           >

@@ -2,47 +2,48 @@ import { createTheme } from '@mui/material/styles';
 
 export const theme = createTheme({
   palette: {
-    mode: 'dark',
+    mode: 'light',
     primary: {
-      main: '#60a5fa',
-      light: '#93c5fd',
-      dark: '#3b82f6',
-      contrastText: '#0f172a',
+      main: '#2563EB', // Royal Blue
+      light: '#60A5FA',
+      dark: '#1D4ED8',
+      contrastText: '#ffffff',
     },
     secondary: {
-      main: '#a78bfa',
-      light: '#c4b5fd',
-      dark: '#8b5cf6',
-      contrastText: '#0f172a',
+      main: '#7C3AED', // Violet
+      light: '#A78BFA',
+      dark: '#5B21B6',
+      contrastText: '#ffffff',
     },
     success: {
-      main: '#34d399',
-      light: '#6ee7b7',
-      dark: '#10b981',
+      main: '#10B981', // Emerald
+      light: '#34D399',
+      dark: '#059669',
     },
     error: {
-      main: '#f87171',
-      light: '#fca5a5',
-      dark: '#ef4444',
+      main: '#EF4444', // Red
+      light: '#F87171',
+      dark: '#DC2626',
     },
     warning: {
-      main: '#fbbf24',
-      light: '#fcd34d',
-      dark: '#f59e0b',
+      main: '#F59E0B', // Amber
+      light: '#FBBF24',
+      dark: '#D97706',
     },
     info: {
-      main: '#60a5fa',
-      light: '#93c5fd',
-      dark: '#3b82f6',
+      main: '#3B82F6', // Blue
+      light: '#60A5FA',
+      dark: '#2563EB',
     },
     background: {
-      default: '#0f172a',
-      paper: '#1e293b',
+      default: '#F8FAFC', // Slate 50
+      paper: '#FFFFFF',
     },
     text: {
-      primary: '#f1f5f9',
-      secondary: '#cbd5e1',
+      primary: '#1E293B', // Slate 800
+      secondary: '#64748B', // Slate 500
     },
+    divider: '#E2E8F0', // Slate 200
   },
   typography: {
     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -50,28 +51,34 @@ export const theme = createTheme({
       fontSize: '2.5rem',
       fontWeight: 700,
       letterSpacing: '-0.02em',
+      color: '#1E293B',
     },
     h2: {
       fontSize: '2rem',
       fontWeight: 700,
       letterSpacing: '-0.01em',
+      color: '#1E293B',
     },
     h3: {
       fontSize: '1.75rem',
       fontWeight: 600,
       letterSpacing: '-0.01em',
+      color: '#1E293B',
     },
     h4: {
       fontSize: '1.5rem',
       fontWeight: 600,
+      color: '#1E293B',
     },
     h5: {
       fontSize: '1.25rem',
       fontWeight: 600,
+      color: '#1E293B',
     },
     h6: {
       fontSize: '1rem',
       fontWeight: 600,
+      color: '#1E293B',
     },
   },
   shape: {
@@ -82,9 +89,16 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
-          fontWeight: 500,
+          fontWeight: 600,
           borderRadius: 8,
-          padding: '8px 16px',
+          padding: '8px 20px',
+          boxShadow: 'none',
+          '&:hover': {
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          },
+        },
+        containedPrimary: {
+          background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
         },
       },
     },
@@ -92,8 +106,9 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          backgroundColor: '#1e293b',
-          border: '1px solid #334155',
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
         },
       },
     },

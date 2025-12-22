@@ -208,13 +208,18 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'permanent' 
       open={open}
       onClose={onClose}
       sx={{
-        width: DRAWER_WIDTH,
+        width: variant === 'temporary' ? undefined : (open ? DRAWER_WIDTH : 0),
         flexShrink: 0,
+        transition: (theme) => theme.transitions.create('width', {
+          easing: theme.transitions.easing.sharp,
+          duration: theme.transitions.duration.enteringScreen,
+        }),
         '& .MuiDrawer-paper': {
           width: DRAWER_WIDTH,
           boxSizing: 'border-box',
           backgroundColor: 'background.paper',
-          borderRight: '1px solid #334155',
+          borderRight: '1px solid',
+          borderColor: 'divider',
         },
       }}
     >

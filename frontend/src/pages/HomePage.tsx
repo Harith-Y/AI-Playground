@@ -75,17 +75,37 @@ const HomePage: React.FC = () => {
   ];
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom fontWeight={600}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        minHeight: 'calc(100vh - 64px)',
+        width: '100%',
+      }}
+    >
+      <Container maxWidth="lg">
+        <Box sx={{ py: 6, textAlign: 'center' }}>
+        <Typography
+          variant="h3"
+          component="h1"
+          gutterBottom
+          fontWeight={700}
+          sx={{
+            background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            mb: 2,
+          }}
+        >
           Welcome to AI Playground
         </Typography>
-        <Typography variant="h6" color="text.secondary" paragraph>
+        <Typography variant="h6" color="text.secondary" paragraph sx={{ mb: 6 }}>
           Build and experiment with machine learning models using your own datasets
         </Typography>
 
-        <Box sx={{ my: 4 }}>
-          <Typography variant="h5" gutterBottom fontWeight={500}>
+        <Box sx={{ mb: 5 }}>
+          <Typography variant="h5" gutterBottom fontWeight={600} color="text.primary">
             Get Started with Your ML Journey
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph>
@@ -93,7 +113,7 @@ const HomePage: React.FC = () => {
           </Typography>
         </Box>
 
-        <Grid container spacing={3}>
+        <Grid container spacing={3} justifyContent="center">
           {steps.map((step, index) => (
             <Grid item xs={12} sm={6} md={4} key={index}>
               <Card
@@ -101,33 +121,48 @@ const HomePage: React.FC = () => {
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  transition: 'all 0.3s ease-in-out',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 3,
+                  position: 'relative',
+                  overflow: 'hidden',
                   '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4,
+                    transform: 'translateY(-8px)',
+                    boxShadow: '0 12px 24px -4px rgba(0, 0, 0, 0.1)',
+                    borderColor: step.color,
+                    '& .icon-box': {
+                      backgroundColor: step.color,
+                      color: 'white',
+                      transform: 'scale(1.1) rotate(5deg)',
+                    }
                   },
                   cursor: 'pointer',
                 }}
                 onClick={() => navigate(step.path)}
               >
-                <CardContent sx={{ flexGrow: 1 }}>
+                <CardContent sx={{ flexGrow: 1, p: 3, textAlign: 'left' }}>
                   <Box
+                    className="icon-box"
                     sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      mb: 2,
+                      display: 'inline-flex',
+                      p: 1.5,
+                      borderRadius: 2,
+                      backgroundColor: `${step.color}15`,
                       color: step.color,
+                      mb: 2,
+                      transition: 'all 0.3s ease-in-out',
                     }}
                   >
                     {step.icon}
-                    <Typography
-                      variant="h6"
-                      component="div"
-                      sx={{ ml: 1, fontWeight: 600 }}
-                    >
-                      {index + 1}. {step.title}
-                    </Typography>
                   </Box>
+                  <Typography
+                    variant="h6"
+                    component="div"
+                    sx={{ mb: 1, fontWeight: 700, color: 'text.primary' }}
+                  >
+                    {index + 1}. {step.title}
+                  </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {step.description}
                   </Typography>
@@ -137,30 +172,33 @@ const HomePage: React.FC = () => {
           ))}
         </Grid>
 
-        <Box sx={{ mt: 6, textAlign: 'center' }}>
+        <Box sx={{ mt: 6 }}>
           <Button
             variant="contained"
             size="large"
             startIcon={<CloudUpload />}
             onClick={() => navigate('/dataset-upload')}
             sx={{
-              px: 4,
+              px: 5,
               py: 1.5,
               fontSize: '1.1rem',
-              background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
               '&:hover': {
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
                 transform: 'translateY(-2px)',
-                boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.4)',
+                boxShadow: '0 10px 20px -5px rgba(37, 99, 235, 0.5)',
               },
               transition: 'all 0.2s',
+              textTransform: 'none',
             }}
           >
             Start with Dataset Upload
           </Button>
         </Box>
       </Box>
-    </Container>
+      </Container>
+    </Box>
   );
 };
 

@@ -22,7 +22,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: 'background.default' }}>
+    <Box sx={{ 
+      display: 'flex', 
+      minHeight: '100vh', 
+      background: 'linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)' 
+    }}>
       {/* Header */}
       <Header onMenuClick={handleDrawerToggle} />
 
@@ -48,15 +52,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           flexGrow: 1,
           p: 0,
           mt: 8,
-          ml: {
-            xs: 0,
-            md: desktopOpen ? `${DRAWER_WIDTH}px` : 0,
-          },
-          transition: theme.transitions.create(['margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
-          backgroundColor: 'background.default',
+          width: '100%',
+          // backgroundColor: 'background.default',
           minHeight: '100vh',
         }}
       >
