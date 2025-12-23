@@ -1,27 +1,4 @@
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: aiplayground-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: aiplayground
-      POSTGRES_PASSWORD: aiplayground_dev_password
-      POSTGRES_DB: aiplayground
-      PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aiplayground -d aiplayground"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - aiplayground-network
-
   # Redis Cache & Message Broker
   redis:
     image: redis:7-alpine
@@ -49,8 +26,8 @@ services:
     container_name: aiplayground-backend
     restart: unless-stopped
     environment:
-      # Database
-      DATABASE_URL: postgresql://aiplayground:aiplayground_dev_password@postgres:5432/aiplayground
+      # Database (set Neon connection string via .env or shell before compose)
+      DATABASE_URL: ${DATABASE_URL}
       
       # Redis
       REDIS_URL: redis://redis:6379/0
@@ -87,8 +64,6 @@ services:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -117,8 +92,8 @@ services:
     container_name: aiplayground-celery-worker
     restart: unless-stopped
     environment:
-      # Database
-      DATABASE_URL: postgresql://aiplayground:aiplayground_dev_password@postgres:5432/aiplayground
+      # Database (set Neon connection string via .env or shell before compose)
+      DATABASE_URL: ${DATABASE_URL}
       
       # Redis
       REDIS_URL: redis://redis:6379/0
@@ -153,8 +128,6 @@ services:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       backend:
@@ -189,8 +162,6 @@ services:
 
 # Named Volumes
 volumes:
-  postgres_data:
-    driver: local
   redis_data:
     driver: local
   backend_uploads:
