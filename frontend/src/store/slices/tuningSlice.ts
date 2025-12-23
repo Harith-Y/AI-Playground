@@ -47,7 +47,7 @@ const initialState: TuningState = {
 export const startTuning = createAsyncThunk(
   'tuning/startTuning',
   async (
-    params: {
+    _params: {
       modelType: string;
       datasetId: string;
       config: TuningConfig;
@@ -65,7 +65,7 @@ export const startTuning = createAsyncThunk(
 
 export const fetchTuningResults = createAsyncThunk(
   'tuning/fetchResults',
-  async (jobId: string, { rejectWithValue }) => {
+  async (_jobId: string, { rejectWithValue }) => {
     try {
       // TODO: Implement API call
       return { results: [], bestResult: null };
@@ -77,7 +77,7 @@ export const fetchTuningResults = createAsyncThunk(
 
 export const stopTuning = createAsyncThunk(
   'tuning/stopTuning',
-  async (jobId: string, { rejectWithValue }) => {
+  async (_jobId: string, { rejectWithValue }) => {
     try {
       // TODO: Implement API call
       return { success: true };
@@ -136,7 +136,7 @@ const tuningSlice = createSlice({
         state.results = [];
         state.bestResult = null;
       })
-      .addCase(startTuning.fulfilled, (state) => {
+      .addCase(startTuning.fulfilled, (_state) => {
         // Tuning started successfully, keep isTuning true
       })
       .addCase(startTuning.rejected, (state, action) => {

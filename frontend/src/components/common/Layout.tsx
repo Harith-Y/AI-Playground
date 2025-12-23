@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, useMediaQuery, useTheme } from '@mui/material';
 import Header from './Header';
-import Sidebar, { DRAWER_WIDTH } from './Sidebar';
+import Sidebar from './Sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;

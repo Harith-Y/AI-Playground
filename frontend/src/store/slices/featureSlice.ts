@@ -32,7 +32,7 @@ const initialState: FeatureState = {
 // Async thunks
 export const fetchFeatureImportance = createAsyncThunk(
   'feature/fetchImportance',
-  async (datasetId: string, { rejectWithValue }) => {
+  async (_datasetId: string, { rejectWithValue }) => {
     try {
       // TODO: Implement API call
       return [];
@@ -44,7 +44,7 @@ export const fetchFeatureImportance = createAsyncThunk(
 
 export const fetchCorrelationMatrix = createAsyncThunk(
   'feature/fetchCorrelation',
-  async (datasetId: string, { rejectWithValue }) => {
+  async (_datasetId: string, { rejectWithValue }) => {
     try {
       // TODO: Implement API call
       return { features: [], matrix: [] };
@@ -56,7 +56,7 @@ export const fetchCorrelationMatrix = createAsyncThunk(
 
 export const performFeatureSelection = createAsyncThunk(
   'feature/selectFeatures',
-  async (params: { datasetId: string; method: string; threshold?: number }, { rejectWithValue }) => {
+  async (_params: { datasetId: string; method: string; threshold?: number }, { rejectWithValue }) => {
     try {
       // TODO: Implement API call
       return [];

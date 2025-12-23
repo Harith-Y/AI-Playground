@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Typography, Box, Paper } from '@mui/material';
+import { Typography, Box, Paper } from '@mui/material';
 import { TrendingUp } from '@mui/icons-material';
 
 const FeatureEngineeringPage: React.FC = () => {
