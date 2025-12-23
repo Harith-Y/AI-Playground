@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+
+    # Logging
+    LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    LOG_DIR: str = "./backend/logs"  # Relative to project root by default
     
     class Config:
         env_file = str(ENV_FILE)

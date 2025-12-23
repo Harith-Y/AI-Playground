@@ -118,7 +118,7 @@ AI-Playground/
 │   │   │
 │   │   └── utils/           # Utility Functions
 │   │       ├── file_handler.py  # File operations
-│   │       └── logger.py        # Logging configuration
+    │           └── logger.py        # Logging configuration
 │   │
 │   └── tests/               # Backend Tests
 │
