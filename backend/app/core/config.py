@@ -57,7 +57,7 @@ settings = Settings()
 
 # Verify .env was loaded (optional - for debugging)
 if not ENV_FILE.exists():
-    print(f"⚠️  Warning: .env file not found at {ENV_FILE}")
-    print(f"   Using default configuration values")
+    print(f"Warning: .env file not found at {ENV_FILE}")
+    print(f"Using default configuration values")
 else:
-    print(f"✅ Configuration loaded from {ENV_FILE}")
+    print(f"Configuration loaded from {ENV_FILE}")

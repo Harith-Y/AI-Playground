@@ -6,6 +6,7 @@ from uuid import uuid4
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.utils.logger import get_logger, set_correlation_id
+from app.api.v1.api import api_router
 
 
 def create_app() -> FastAPI:
@@ -45,6 +46,9 @@ def create_app() -> FastAPI:
 
 	# Register exception handlers
 	register_exception_handlers(app, logger)
+
+	# Register API v1 router
+	app.include_router(api_router, prefix="/api/v1")
 
 	# Basic health endpoint
 	@app.get("/health")
