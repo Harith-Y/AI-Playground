@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional, Union, Dict
 
-from app.preprocessing.base import PreprocessingStep
+from app.ml_engine.preprocessing.base import PreprocessingStep
 
 
 class MedianImputer(PreprocessingStep):
