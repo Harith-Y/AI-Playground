@@ -236,3 +236,229 @@ class StandardScaler(PreprocessingStep):
             "means": self.means_.copy(),
             "stds": self.stds_.copy()
         }
+
+
+class MinMaxScaler(PreprocessingStep):
+    """
+    Scales features to a specified range (default [0, 1]) using min-max normalization.
+
+    The transformation is calculated as:
+        X_scaled = (X - X_min) / (X_max - X_min) * (max - min) + min
+
+    This scaler is useful when you need features within a bounded range,
+    particularly for neural networks and algorithms sensitive to feature magnitude.
+
+    Example:
+        data: [1, 2, 3, 4, 5]
+        min: 1, max: 5
+        scaled to [0, 1]: [0, 0.25, 0.5, 0.75, 1]
+
+    Attributes:
+        mins_: Minimum values for each column (learned during fit)
+        maxs_: Maximum values for each column (learned during fit)
+        feature_range: Desired range of transformed data (min, max)
+    """
+
+    def __init__(
+        self,
+        columns: Optional[List[str]] = None,
+        feature_range: tuple = (0, 1),
+        name: Optional[str] = None
+    ):
+        """
+        Initialize MinMaxScaler.
+
+        Args:
+            columns: List of columns to scale.
+                     If None, all numeric columns are used.
+            feature_range: Desired range of transformed data as (min, max).
+                          Default is (0, 1).
+            name: Optional custom name for this preprocessing step.
+
+        Raises:
+            ValueError: If feature_range is invalid (min >= max)
+        """
+        if len(feature_range) != 2:
+            raise ValueError("feature_range must be a tuple of (min, max)")
+
+        if feature_range[0] >= feature_range[1]:
+            raise ValueError("feature_range min must be less than max")
+
+        super().__init__(
+            name=name,
+            columns=columns,
+            feature_range=feature_range
+        )
+        self.mins_: Dict[str, float] = {}
+        self.maxs_: Dict[str, float] = {}
+
+    def fit(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        y: Optional[Union[pd.Series, np.ndarray]] = None
+    ) -> "MinMaxScaler":
+        """
+        Compute the minimum and maximum for each column from training data.
+
+        Args:
+            X: Training features (must be a pandas DataFrame)
+            y: Optional training labels (not used, present for API consistency)
+
+        Returns:
+            Self (for method chaining)
+
+        Raises:
+            TypeError: If X is not a pandas DataFrame
+        """
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("MinMaxScaler expects a pandas DataFrame")
+
+        columns = self.params["columns"]
+
+        # Auto-detect numeric columns if not specified
+        if columns is None:
+            columns = X.select_dtypes(include=[np.number]).columns.tolist()
+            logger.debug(f"Auto-detected numeric columns: {columns}")
+
+        if not columns:
+            logger.warning("No numeric columns found or specified for scaling")
+            self.fitted = True
+            return self
+
+        # Learn min and max for each column
+        self.mins_ = {}
+        self.maxs_ = {}
+
+        for col in columns:
+            if col not in X.columns:
+                raise ValueError(f"Column '{col}' not found in DataFrame")
+
+            min_val = X[col].min()
+            max_val = X[col].max()
+
+            # Handle constant columns (min == max)
+            if min_val == max_val:
+                logger.warning(
+                    f"Column '{col}' has constant value {min_val}. "
+                    f"Scaling will result in constant output."
+                )
+
+            self.mins_[col] = min_val
+            self.maxs_[col] = max_val
+
+        logger.debug(f"Fitted MinMaxScaler on {len(columns)} columns")
+        logger.debug(f"Learned min/max ranges for columns: {list(self.mins_.keys())}")
+
+        self.fitted = True
+        return self
+
+    def transform(
+        self,
+        X: Union[pd.DataFrame, np.ndarray]
+    ) -> pd.DataFrame:
+        """
+        Scale features to the specified range.
+
+        Args:
+            X: Data to transform (must be a pandas DataFrame)
+
+        Returns:
+            Transformed DataFrame with scaled numeric columns in feature_range
+
+        Raises:
+            TypeError: If X is not a pandas DataFrame
+            RuntimeError: If scaler has not been fitted
+        """
+        self._check_fitted()
+
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("MinMaxScaler expects a pandas DataFrame")
+
+        # If no columns were fitted, return copy unchanged
+        if not self.mins_:
+            return X.copy()
+
+        X = X.copy()
+        feature_range = self.params["feature_range"]
+        range_min, range_max = feature_range
+
+        for col in self.mins_.keys():
+            if col not in X.columns:
+                raise ValueError(f"Column '{col}' not found in DataFrame during transform")
+
+            data_min = self.mins_[col]
+            data_max = self.maxs_[col]
+
+            # Handle constant columns
+            if data_min == data_max:
+                # Set to the middle of the feature range
+                X[col] = (range_min + range_max) / 2
+            else:
+                # Apply min-max scaling
+                # Formula: X_scaled = (X - X_min) / (X_max - X_min) * (max - min) + min
+                X[col] = ((X[col] - data_min) / (data_max - data_min)) * (range_max - range_min) + range_min
+
+        return X
+
+    def inverse_transform(
+        self,
+        X: Union[pd.DataFrame, np.ndarray]
+    ) -> pd.DataFrame:
+        """
+        Scale data back to original representation.
+
+        Args:
+            X: Data to inverse transform (must be a pandas DataFrame)
+
+        Returns:
+            DataFrame with values scaled back to original range
+
+        Raises:
+            TypeError: If X is not a pandas DataFrame
+            RuntimeError: If scaler has not been fitted
+        """
+        self._check_fitted()
+
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("MinMaxScaler expects a pandas DataFrame")
+
+        # If no columns were fitted, return copy unchanged
+        if not self.mins_:
+            return X.copy()
+
+        X = X.copy()
+        feature_range = self.params["feature_range"]
+        range_min, range_max = feature_range
+
+        for col in self.mins_.keys():
+            if col not in X.columns:
+                raise ValueError(f"Column '{col}' not found in DataFrame during inverse_transform")
+
+            data_min = self.mins_[col]
+            data_max = self.maxs_[col]
+
+            # Handle constant columns
+            if data_min == data_max:
+                X[col] = data_min
+            else:
+                # Apply inverse transformation
+                # X_original = (X_scaled - min) / (max - min) * (X_max - X_min) + X_min
+                X[col] = ((X[col] - range_min) / (range_max - range_min)) * (data_max - data_min) + data_min
+
+        return X
+
+    def get_data_range(self) -> Dict[str, Dict[str, float]]:
+        """
+        Get the learned minimum and maximum values for each column.
+
+        Returns:
+            Dictionary with 'mins' and 'maxs' keys containing column ranges
+
+        Raises:
+            RuntimeError: If scaler has not been fitted
+        """
+        self._check_fitted()
+        return {
+            "mins": self.mins_.copy(),
+            "maxs": self.maxs_.copy()
+        }
