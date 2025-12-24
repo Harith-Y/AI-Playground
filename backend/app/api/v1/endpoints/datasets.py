@@ -11,7 +11,12 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.dataset import Dataset
-from app.schemas.dataset import DatasetRead
+from app.schemas.dataset import (
+    DatasetRead,
+    DatasetPreviewResponse,
+    DatasetStatsResponse,
+    ColumnInfo,
+)
 
 router = APIRouter()
 
@@ -207,3 +212,185 @@ async def delete_dataset(
     db.commit()
 
     return None
+
+
+@router.get("/{dataset_id}/preview", response_model=DatasetPreviewResponse)
+async def get_dataset_preview(
+    dataset_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+    rows: int = 10
+):
+    """
+    Get a preview of the dataset with sample rows.
+
+    - Returns first N rows (default 10)
+    - Includes column metadata
+    - Returns 404 if dataset not found or doesn't belong to user
+    """
+    # Get dataset from database
+    dataset = db.query(Dataset).filter(
+        Dataset.id == dataset_id,
+        Dataset.user_id == user_id
+    ).first()
+
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset {dataset_id} not found"
+        )
+
+    # Load file
+    file_path = Path(dataset.file_path)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dataset file not found on disk"
+        )
+
+    try:
+        # Read file based on extension
+        file_ext = file_path.suffix.lower()
+        if file_ext == ".csv":
+            df = pd.read_csv(file_path, nrows=rows)
+            df_full = pd.read_csv(file_path)
+        elif file_ext in [".xlsx", ".xls"]:
+            df = pd.read_excel(file_path, nrows=rows)
+            df_full = pd.read_excel(file_path)
+        elif file_ext == ".json":
+            df = pd.read_json(file_path)
+            df_full = df.copy()
+            df = df.head(rows)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file format: {file_ext}"
+            )
+
+        # Extract column information
+        columns = []
+        for col in df_full.columns:
+            col_data = df_full[col]
+            columns.append(
+                ColumnInfo(
+                    name=col,
+                    dataType=str(col_data.dtype),
+                    nullCount=int(col_data.isna().sum()),
+                    uniqueCount=int(col_data.nunique()),
+                    sampleValues=col_data.dropna().head(5).tolist()
+                )
+            )
+
+        # Convert dataframe to 2D array
+        preview_data = df.values.tolist()
+
+        return DatasetPreviewResponse(
+            preview=preview_data,
+            columns=columns,
+            totalRows=len(df_full),
+            displayedRows=len(df)
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read dataset: {str(e)}"
+        )
+
+
+@router.get("/{dataset_id}/stats", response_model=DatasetStatsResponse)
+async def get_dataset_stats(
+    dataset_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get comprehensive statistics for the dataset.
+
+    - Returns column count, row count, data types, missing values, etc.
+    - Returns 404 if dataset not found or doesn't belong to user
+    """
+    # Get dataset from database
+    dataset = db.query(Dataset).filter(
+        Dataset.id == dataset_id,
+        Dataset.user_id == user_id
+    ).first()
+
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset {dataset_id} not found"
+        )
+
+    # Load file
+    file_path = Path(dataset.file_path)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dataset file not found on disk"
+        )
+
+    try:
+        # Read file based on extension
+        file_ext = file_path.suffix.lower()
+        if file_ext == ".csv":
+            df = pd.read_csv(file_path)
+        elif file_ext in [".xlsx", ".xls"]:
+            df = pd.read_excel(file_path)
+        elif file_ext == ".json":
+            df = pd.read_json(file_path)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file format: {file_ext}"
+            )
+
+        # Calculate statistics
+        row_count = len(df)
+        column_count = len(df.columns)
+
+        # Count numeric and categorical columns
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+        numeric_count = len(numeric_cols)
+        categorical_count = len(categorical_cols)
+
+        # Missing values
+        total_missing = int(df.isna().sum().sum())
+
+        # Duplicate rows
+        duplicate_count = int(df.duplicated().sum())
+
+        # Memory usage (in bytes)
+        memory_usage = int(df.memory_usage(deep=True).sum())
+
+        # Extract column information
+        columns = []
+        for col in df.columns:
+            col_data = df[col]
+            columns.append(
+                ColumnInfo(
+                    name=col,
+                    dataType=str(col_data.dtype),
+                    nullCount=int(col_data.isna().sum()),
+                    uniqueCount=int(col_data.nunique()),
+                    sampleValues=col_data.dropna().head(5).tolist()
+                )
+            )
+
+        return DatasetStatsResponse(
+            rowCount=row_count,
+            columnCount=column_count,
+            numericColumns=numeric_count,
+            categoricalColumns=categorical_count,
+            missingValues=total_missing,
+            duplicateRows=duplicate_count,
+            memoryUsage=memory_usage,
+            columns=columns
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read dataset: {str(e)}"
+        )
