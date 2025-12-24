@@ -26,19 +26,87 @@ def get_current_user_id() -> str:
     return "00000000-0000-0000-0000-000000000001"
 
 
-@router.post("/upload", response_model=DatasetRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/upload",
+    response_model=DatasetRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload a dataset file",
+    description="Upload a dataset file (CSV, XLSX, XLS, JSON) and extract metadata",
+    responses={
+        201: {
+            "description": "Dataset uploaded successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "user_id": "00000000-0000-0000-0000-000000000001",
+                        "name": "sales_data",
+                        "file_path": "/uploads/user123/dataset456/sales_data.csv",
+                        "rows": 1000,
+                        "cols": 5,
+                        "dtypes": {
+                            "date": "object",
+                            "product": "object",
+                            "quantity": "int64",
+                            "price": "float64",
+                            "total": "float64"
+                        },
+                        "missing_values": {
+                            "date": 0,
+                            "product": 2,
+                            "quantity": 1,
+                            "price": 0,
+                            "total": 1
+                        },
+                        "uploaded_at": "2025-01-15T10:30:00Z"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Bad request - Invalid file type or corrupted file",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "File type .txt not supported. Allowed: .csv, .xlsx, .xls, .json"}
+                }
+            }
+        },
+        413: {
+            "description": "File size exceeds maximum allowed size",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "File size exceeds maximum allowed size of 100MB"}
+                }
+            }
+        }
+    }
+)
 async def upload_dataset(
-    file: UploadFile = File(...),
+    file: UploadFile = File(..., description="Dataset file to upload (CSV, XLSX, XLS, or JSON format)"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    Upload a dataset file (CSV, XLSX, XLS, JSON).
+    Upload a dataset file and extract metadata.
 
-    - Validates file type and size
-    - Extracts metadata (rows, columns, dtypes, missing values)
-    - Saves file to uploads/{user_id}/{dataset_id}/
-    - Creates database record
+    This endpoint accepts dataset files in multiple formats and performs the following operations:
+
+    - **Validates** file type (must be CSV, XLSX, XLS, or JSON)
+    - **Validates** file size (must be under configured limit, default 100MB)
+    - **Extracts metadata** including row count, column count, data types, and missing values
+    - **Saves** file to persistent storage in user-specific directory
+    - **Creates** database record with all metadata
+
+    **Supported Formats:**
+    - CSV (.csv)
+    - Excel (.xlsx, .xls)
+    - JSON (.json)
+
+    **Returns:**
+    - Dataset ID for use in other endpoints
+    - Complete metadata including row/column counts
+    - Data types for each column
+    - Missing value counts per column
     """
 
     # Validate file extension
@@ -122,7 +190,34 @@ async def upload_dataset(
     return dataset
 
 
-@router.get("/", response_model=List[DatasetRead])
+@router.get(
+    "/",
+    response_model=List[DatasetRead],
+    summary="List all datasets",
+    description="Get a paginated list of all datasets for the current user",
+    responses={
+        200: {
+            "description": "List of datasets retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "id": "123e4567-e89b-12d3-a456-426614174000",
+                            "user_id": "00000000-0000-0000-0000-000000000001",
+                            "name": "sales_data",
+                            "file_path": "/uploads/user123/dataset456/sales_data.csv",
+                            "rows": 1000,
+                            "cols": 5,
+                            "dtypes": {"product": "object", "quantity": "int64"},
+                            "missing_values": {"product": 2, "quantity": 1},
+                            "uploaded_at": "2025-01-15T10:30:00Z"
+                        }
+                    ]
+                }
+            }
+        }
+    }
+)
 async def list_datasets(
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
@@ -130,10 +225,13 @@ async def list_datasets(
     limit: int = 100
 ):
     """
-    List all datasets for the current user.
+    List all datasets for the current user with pagination.
 
-    - Supports pagination with skip and limit
-    - Returns datasets ordered by created_at (newest first)
+    Returns datasets ordered by upload date (newest first).
+
+    **Query Parameters:**
+    - **skip**: Number of records to skip (default: 0)
+    - **limit**: Maximum number of records to return (default: 100, max: 100)
     """
     datasets = db.query(Dataset).filter(
         Dataset.user_id == user_id
@@ -144,16 +242,54 @@ async def list_datasets(
     return datasets
 
 
-@router.get("/{dataset_id}", response_model=DatasetRead)
+@router.get(
+    "/{dataset_id}",
+    response_model=DatasetRead,
+    summary="Get dataset by ID",
+    description="Retrieve detailed information about a specific dataset",
+    responses={
+        200: {
+            "description": "Dataset retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "user_id": "00000000-0000-0000-0000-000000000001",
+                        "name": "sales_data",
+                        "file_path": "/uploads/user123/dataset456/sales_data.csv",
+                        "rows": 1000,
+                        "cols": 5,
+                        "dtypes": {"product": "object", "quantity": "int64", "price": "float64"},
+                        "missing_values": {"product": 2, "quantity": 1, "price": 0},
+                        "uploaded_at": "2025-01-15T10:30:00Z"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Dataset not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Dataset 123e4567-e89b-12d3-a456-426614174000 not found"}
+                }
+            }
+        }
+    }
+)
 async def get_dataset(
     dataset_id: str,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    Get a specific dataset by ID.
+    Get detailed information about a specific dataset.
 
-    - Returns 404 if dataset not found or doesn't belong to user
+    **Path Parameters:**
+    - **dataset_id**: UUID of the dataset
+
+    **Returns:**
+    - Complete dataset metadata including file path, dimensions, data types, and missing values
+    - Returns 404 if dataset not found or doesn't belong to the authenticated user
     """
     dataset = db.query(Dataset).filter(
         Dataset.id == dataset_id,
@@ -169,18 +305,44 @@ async def get_dataset(
     return dataset
 
 
-@router.delete("/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{dataset_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a dataset",
+    description="Delete a dataset and its associated file from storage",
+    responses={
+        204: {
+            "description": "Dataset deleted successfully"
+        },
+        404: {
+            "description": "Dataset not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Dataset 123e4567-e89b-12d3-a456-426614174000 not found"}
+                }
+            }
+        }
+    }
+)
 async def delete_dataset(
     dataset_id: str,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    Delete a dataset.
+    Delete a dataset and remove its file from storage.
 
-    - Removes database record
-    - Deletes file from storage
-    - Returns 404 if dataset not found or doesn't belong to user
+    This operation is irreversible and will:
+    - Remove the dataset record from the database
+    - Delete the associated file from disk storage
+    - Clean up empty directories
+
+    **Path Parameters:**
+    - **dataset_id**: UUID of the dataset to delete
+
+    **Returns:**
+    - 204 No Content on successful deletion
+    - 404 if dataset not found or doesn't belong to the authenticated user
     """
     dataset = db.query(Dataset).filter(
         Dataset.id == dataset_id,
@@ -214,7 +376,62 @@ async def delete_dataset(
     return None
 
 
-@router.get("/{dataset_id}/preview", response_model=DatasetPreviewResponse)
+@router.get(
+    "/{dataset_id}/preview",
+    response_model=DatasetPreviewResponse,
+    summary="Get dataset preview",
+    description="Get a preview of the dataset with sample rows and column metadata",
+    responses={
+        200: {
+            "description": "Dataset preview retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "preview": [
+                            ["John Doe", 30, "New York", 75000],
+                            ["Jane Smith", 25, "San Francisco", 85000],
+                            ["Bob Johnson", 35, "Chicago", 65000]
+                        ],
+                        "columns": [
+                            {
+                                "name": "name",
+                                "dataType": "object",
+                                "nullCount": 0,
+                                "uniqueCount": 3,
+                                "sampleValues": ["John Doe", "Jane Smith", "Bob Johnson"]
+                            },
+                            {
+                                "name": "age",
+                                "dataType": "int64",
+                                "nullCount": 0,
+                                "uniqueCount": 3,
+                                "sampleValues": [30, 25, 35]
+                            }
+                        ],
+                        "totalRows": 1000,
+                        "displayedRows": 3
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Dataset not found or file not found on disk",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Dataset file not found on disk"}
+                }
+            }
+        },
+        500: {
+            "description": "Failed to read dataset file",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Failed to read dataset: UnicodeDecodeError"}
+                }
+            }
+        }
+    }
+)
 async def get_dataset_preview(
     dataset_id: str,
     db: Session = Depends(get_db),
@@ -222,11 +439,27 @@ async def get_dataset_preview(
     rows: int = 10
 ):
     """
-    Get a preview of the dataset with sample rows.
+    Get a preview of the dataset with sample rows and detailed column metadata.
 
-    - Returns first N rows (default 10)
-    - Includes column metadata
-    - Returns 404 if dataset not found or doesn't belong to user
+    Returns the first N rows of the dataset along with comprehensive column information
+    including data types, null counts, unique values, and sample data.
+
+    **Path Parameters:**
+    - **dataset_id**: UUID of the dataset
+
+    **Query Parameters:**
+    - **rows**: Number of rows to preview (default: 10, max: 100)
+
+    **Returns:**
+    - **preview**: 2D array of values (rows x columns)
+    - **columns**: Array of column metadata objects with:
+      - name: Column name
+      - dataType: Pandas data type (int64, float64, object, etc.)
+      - nullCount: Number of missing values
+      - uniqueCount: Number of unique values
+      - sampleValues: First 5 non-null sample values
+    - **totalRows**: Total number of rows in dataset
+    - **displayedRows**: Number of rows in preview (may be less than requested if dataset is smaller)
     """
     # Get dataset from database
     dataset = db.query(Dataset).filter(
@@ -298,17 +531,95 @@ async def get_dataset_preview(
         )
 
 
-@router.get("/{dataset_id}/stats", response_model=DatasetStatsResponse)
+@router.get(
+    "/{dataset_id}/stats",
+    response_model=DatasetStatsResponse,
+    summary="Get dataset statistics",
+    description="Get comprehensive statistical summary of the dataset",
+    responses={
+        200: {
+            "description": "Dataset statistics retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "rowCount": 1000,
+                        "columnCount": 5,
+                        "numericColumns": 3,
+                        "categoricalColumns": 2,
+                        "missingValues": 15,
+                        "duplicateRows": 3,
+                        "memoryUsage": 82400,
+                        "columns": [
+                            {
+                                "name": "age",
+                                "dataType": "int64",
+                                "nullCount": 2,
+                                "uniqueCount": 45,
+                                "sampleValues": [30, 25, 35, 28, 42]
+                            },
+                            {
+                                "name": "salary",
+                                "dataType": "float64",
+                                "nullCount": 5,
+                                "uniqueCount": 897,
+                                "sampleValues": [75000.0, 85000.0, 65000.0, 72000.0, 78000.0]
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Dataset not found or file not found on disk",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Dataset file not found on disk"}
+                }
+            }
+        },
+        500: {
+            "description": "Failed to read dataset file",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Failed to read dataset: MemoryError"}
+                }
+            }
+        }
+    }
+)
 async def get_dataset_stats(
     dataset_id: str,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    Get comprehensive statistics for the dataset.
+    Get comprehensive statistical summary of the dataset.
 
-    - Returns column count, row count, data types, missing values, etc.
-    - Returns 404 if dataset not found or doesn't belong to user
+    Analyzes the entire dataset and returns detailed statistics including:
+    - Dataset dimensions (rows, columns)
+    - Column type breakdown (numeric vs categorical)
+    - Data quality metrics (missing values, duplicates)
+    - Memory usage estimation
+    - Per-column metadata
+
+    **Path Parameters:**
+    - **dataset_id**: UUID of the dataset
+
+    **Returns:**
+    - **rowCount**: Total number of rows
+    - **columnCount**: Total number of columns
+    - **numericColumns**: Count of numeric columns (int, float)
+    - **categoricalColumns**: Count of categorical columns (object, string)
+    - **missingValues**: Total number of missing values across all columns
+    - **duplicateRows**: Number of duplicate rows
+    - **memoryUsage**: Estimated memory usage in bytes
+    - **columns**: Array of column metadata (same as preview endpoint)
+
+    **Use Cases:**
+    - Data quality assessment
+    - Feature engineering decisions
+    - Memory optimization planning
+    - Dataset understanding before preprocessing
     """
     # Get dataset from database
     dataset = db.query(Dataset).filter(
