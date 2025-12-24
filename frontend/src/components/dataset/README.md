@@ -4,7 +4,7 @@ This directory contains reusable components for dataset management.
 
 ## Components
 
-### DatasetUpload
+### 1. DatasetUpload
 
 A drag-and-drop file upload component with validation and progress tracking.
 
@@ -51,7 +51,7 @@ function MyPage() {
 }
 ```
 
-### DatasetPreview
+### 2. DatasetPreview
 
 A table component for previewing dataset contents with column information.
 
@@ -109,9 +109,73 @@ function MyPage() {
 }
 ```
 
+### 3. DatasetStats
+
+A comprehensive statistics component with visual stat cards and data quality indicators.
+
+**Props:**
+- `stats?: DatasetStats` - Dataset statistics object
+- `columns?: ColumnInfo[]` - Array of column metadata
+- `isLoading?: boolean` - Loading state (default: false)
+- `error?: string | null` - Error message (default: null)
+
+**DatasetStats Interface:**
+```typescript
+{
+  rowCount: number;
+  columnCount: number;
+  numericColumns: number;
+  categoricalColumns: number;
+  missingValues: number;
+  duplicateRows: number;
+  memoryUsage: number; // in bytes
+}
+```
+
+**Features:**
+- 7 color-coded stat cards with icons
+- Total rows and columns
+- Numeric vs categorical column breakdown
+- Missing values with percentage
+- Duplicate rows detection
+- Memory usage display
+- Column types breakdown with chips
+- Data quality score with progress bar
+- Responsive grid layout
+- Loading and error states
+
+**Example:**
+```tsx
+import DatasetStats from '../components/dataset/DatasetStats';
+
+function MyPage() {
+  const stats = {
+    rowCount: 1000,
+    columnCount: 10,
+    numericColumns: 5,
+    categoricalColumns: 3,
+    missingValues: 15,
+    duplicateRows: 2,
+    memoryUsage: 80000,
+  };
+
+  const columns = [
+    { name: 'age', dataType: 'int64', nullCount: 0, uniqueCount: 50, sampleValues: [25, 30, 35] },
+    { name: 'name', dataType: 'object', nullCount: 2, uniqueCount: 98, sampleValues: ['John', 'Jane'] },
+  ];
+
+  return (
+    <DatasetStats
+      stats={stats}
+      columns={columns}
+    />
+  );
+}
+```
+
 ## Data Type Color Coding
 
-The DatasetPreview component uses color coding for different data types:
+All dataset components use consistent color coding for different data types:
 
 - **Blue (#3B82F6)**: Numeric types (int, float, number)
 - **Green (#10B981)**: Text types (object, str, string)
