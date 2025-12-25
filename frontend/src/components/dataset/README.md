@@ -173,6 +173,97 @@ function MyPage() {
 }
 ```
 
+### 4. VisualizationGallery
+
+A comprehensive visualization gallery component for displaying EDA charts with filtering and fullscreen viewing.
+
+**Props:**
+- `visualizations: VisualizationData[]` - Array of visualization objects
+- `isLoading?: boolean` - Loading state (default: false)
+- `error?: string | null` - Error message (default: null)
+- `onVisualizationSelect?: (viz: VisualizationData) => void` - Callback when visualization is selected
+- `maxColumns?: number` - Maximum columns in grid (default: 3)
+
+**VisualizationData Interface:**
+```typescript
+{
+  type: 'histogram' | 'scatter' | 'box' | 'correlation' | 'missing';
+  data: any; // Plotly data array
+  title: string;
+  xLabel?: string;
+  yLabel?: string;
+}
+```
+
+**Features:**
+- Responsive grid/list view toggle
+- Search functionality (by title or type)
+- Filter by visualization type (histogram, scatter, box, correlation, missing)
+- Color-coded cards by visualization type
+- Individual card actions:
+  - Fullscreen/expand view with interactive Plotly controls
+  - Download visualization data as JSON
+- Empty states for no data and no search results
+- Loading and error states
+- Plotly.js integration for interactive charts
+
+**Visualization Type Colors:**
+- **Blue (#3B82F6)**: Histogram
+- **Green (#10B981)**: Scatter
+- **Purple (#8B5CF6)**: Box
+- **Orange (#F59E0B)**: Correlation
+- **Red (#EF4444)**: Missing data
+
+**Example:**
+```tsx
+import VisualizationGallery from '../components/dataset/VisualizationGallery';
+
+function MyPage() {
+  const visualizations = [
+    {
+      type: 'histogram',
+      title: 'Age Distribution',
+      data: [{ x: [25, 30, 35, 40, 45], type: 'histogram' }],
+      xLabel: 'Age',
+      yLabel: 'Frequency',
+    },
+    {
+      type: 'scatter',
+      title: 'Income vs Age',
+      data: [{
+        x: [25, 30, 35, 40, 45],
+        y: [50000, 60000, 70000, 80000, 90000],
+        mode: 'markers',
+        type: 'scatter'
+      }],
+      xLabel: 'Age',
+      yLabel: 'Income',
+    },
+    {
+      type: 'correlation',
+      title: 'Feature Correlation Matrix',
+      data: [{
+        z: [[1, 0.8, 0.3], [0.8, 1, 0.5], [0.3, 0.5, 1]],
+        type: 'heatmap',
+        colorscale: 'RdBu',
+      }],
+    },
+  ];
+
+  const handleSelect = (viz) => {
+    console.log('Selected visualization:', viz.title);
+  };
+
+  return (
+    <VisualizationGallery
+      visualizations={visualizations}
+      onVisualizationSelect={handleSelect}
+      maxColumns={3}
+    />
+  );
+}
+```
+
 ## Data Type Color Coding
 
 All dataset components use consistent color coding for different data types:
