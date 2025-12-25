@@ -1,9 +1,73 @@
+# Python
 venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.db
+*.sqlite
+*.sqlite3
 
+# Environment files with secrets
 .env
 .env.local
+*.env.local
 
+# But allow template files
+!.env.example
+!.env.development
+!.env.production
+!.env.test
+!.env.docker
+!.env.docker.production
+
+# Node.js
 node_modules/
-__pycache__/
+npm-debug.log
+yarn-error.log
+.pnpm-debug.log
+
+# IDEs
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Uploads and data
+uploads/
+test_uploads/
+*.csv
+*.xlsx
+*.xls
+!backend/tests/fixtures/*.csv
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Build outputs
+frontend/dist/
+frontend/build/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
