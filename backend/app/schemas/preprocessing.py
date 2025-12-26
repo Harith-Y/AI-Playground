@@ -47,3 +47,22 @@ class PreprocessingApplyResponse(BaseModel):
 	output_dataset_id: Optional[UUID] = None
 	preview: Optional[List[Dict[str, Any]]] = None  # Sample rows
 	statistics: Optional[Dict[str, Any]] = None  # Basic stats
+
+
+# Async preprocessing schemas
+class PreprocessingAsyncResponse(BaseModel):
+	"""Response when starting async preprocessing task"""
+	task_id: str
+	message: str
+	status: str
+
+
+class PreprocessingTaskStatus(BaseModel):
+	"""Status of a preprocessing task"""
+	task_id: str
+	state: str  # PENDING, STARTED, PROGRESS, SUCCESS, FAILURE
+	status: Optional[str] = None  # Human-readable status message
+	progress: Optional[int] = None  # 0-100
+	current_step: Optional[str] = None
+	result: Optional[Dict[str, Any]] = None  # Final result if SUCCESS
+	error: Optional[str] = None  # Error message if FAILURE

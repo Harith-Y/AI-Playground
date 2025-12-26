@@ -9,7 +9,11 @@ celery_app = Celery(
     "aiplayground",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.training_tasks", "app.tasks.tuning_tasks"]
+    include=[
+        "app.tasks.preprocessing_tasks",
+        "app.tasks.training_tasks",
+        "app.tasks.tuning_tasks"
+    ]
 )
 
 # Celery configuration

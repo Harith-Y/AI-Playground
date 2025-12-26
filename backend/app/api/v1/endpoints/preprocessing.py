@@ -24,10 +24,14 @@ from app.schemas.preprocessing import (
     PreprocessingStepRead,
     PreprocessingApplyRequest,
     PreprocessingApplyResponse,
+    PreprocessingAsyncResponse,
+    PreprocessingTaskStatus,
 )
 from app.ml_engine.preprocessing.imputer import MeanImputer, MedianImputer
 from app.ml_engine.preprocessing.scaler import StandardScaler, MinMaxScaler, RobustScaler
 from app.ml_engine.preprocessing.cleaner import IQROutlierDetector, ZScoreOutlierDetector
+from app.tasks.preprocessing_tasks import apply_preprocessing_pipeline as apply_preprocessing_task
+from celery.result import AsyncResult
 
 router = APIRouter()
 
@@ -700,3 +704,220 @@ def _save_transformed_dataset(df: pd.DataFrame, name: str, original_path: str) -
     df.to_csv(output_path, index=False)
 
     return str(output_path)
+
+
+# ============================================================================
+# ASYNC PREPROCESSING ENDPOINTS (Celery-based)
+# ============================================================================
+
+
+@router.post(
+    "/apply/async",
+    response_model=PreprocessingAsyncResponse,
+    summary="Apply preprocessing pipeline asynchronously",
+    description="Start a Celery task to apply preprocessing pipeline in the background",
+    responses={
+        202: {
+            "description": "Preprocessing task started successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "task_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "message": "Preprocessing task started",
+                        "status": "PENDING"
+                    }
+                }
+            }
+        },
+        404: {"description": "Dataset not found"},
+        400: {"description": "No preprocessing steps configured"},
+    }
+)
+async def apply_preprocessing_pipeline_async(
+    request: PreprocessingApplyRequest = Body(...),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Apply preprocessing pipeline asynchronously using Celery.
+
+    This endpoint is recommended for large datasets or complex pipelines
+    that may take longer than 30 seconds to process.
+
+    **Workflow:**
+    1. Submit preprocessing job → Receive task_id
+    2. Poll /preprocessing/task/{task_id} for status
+    3. When status is SUCCESS, retrieve results
+
+    **Advantages over /apply:**
+    - No timeout issues for long-running operations
+    - Progress tracking (0-100%)
+    - Can check status from multiple clients
+    - Task continues even if client disconnects
+
+    **Parameters:**
+    - `dataset_id`: UUID of the dataset to preprocess
+    - `save_output`: Whether to save the transformed dataset (default: True)
+    - `output_name`: Name for the transformed dataset
+    """
+    # Verify dataset exists and belongs to user
+    dataset = db.query(Dataset).filter(
+        and_(Dataset.id == request.dataset_id, Dataset.user_id == user_id)
+    ).first()
+
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset {request.dataset_id} not found or access denied"
+        )
+
+    # Verify preprocessing steps exist
+    steps_count = db.query(PreprocessingStep).filter(
+        PreprocessingStep.dataset_id == request.dataset_id
+    ).count()
+
+    if steps_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No preprocessing steps configured for this dataset"
+        )
+
+    # Start Celery task
+    task = apply_preprocessing_task.delay(
+        dataset_id=str(request.dataset_id),
+        user_id=user_id,
+        save_output=request.save_output,
+        output_name=request.output_name
+    )
+
+    return PreprocessingAsyncResponse(
+        task_id=task.id,
+        message="Preprocessing task started successfully",
+        status="PENDING"
+    )
+
+
+@router.get(
+    "/task/{task_id}",
+    response_model=PreprocessingTaskStatus,
+    summary="Get preprocessing task status",
+    description="Check the status and progress of an async preprocessing task",
+    responses={
+        200: {
+            "description": "Task status retrieved successfully",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "pending": {
+                            "summary": "Task pending",
+                            "value": {
+                                "task_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "state": "PENDING",
+                                "status": "Task is waiting to be processed",
+                                "progress": 0
+                            }
+                        },
+                        "in_progress": {
+                            "summary": "Task in progress",
+                            "value": {
+                                "task_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "state": "PROGRESS",
+                                "status": "Applying step 2/5: scaling",
+                                "progress": 45,
+                                "current_step": "scaling"
+                            }
+                        },
+                        "success": {
+                            "summary": "Task completed",
+                            "value": {
+                                "task_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "state": "SUCCESS",
+                                "status": "Preprocessing completed successfully",
+                                "progress": 100,
+                                "result": {
+                                    "success": True,
+                                    "message": "Successfully applied 5 preprocessing steps",
+                                    "steps_applied": 5,
+                                    "original_shape": [1000, 10],
+                                    "transformed_shape": [950, 12]
+                                }
+                            }
+                        },
+                        "failure": {
+                            "summary": "Task failed",
+                            "value": {
+                                "task_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "state": "FAILURE",
+                                "error": "ValueError: Invalid imputation strategy",
+                                "progress": 0
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        404: {"description": "Task not found"},
+    }
+)
+async def get_preprocessing_task_status(task_id: str):
+    """
+    Get the status of a preprocessing task.
+
+    **Task States:**
+    - `PENDING`: Task is waiting to start
+    - `STARTED`: Task has started but no progress yet
+    - `PROGRESS`: Task is running (check `progress` field for %)
+    - `SUCCESS`: Task completed successfully (check `result` field)
+    - `FAILURE`: Task failed (check `error` field)
+
+    **Progress Tracking:**
+    - 0%: Task queued
+    - 5-10%: Loading dataset
+    - 10-80%: Applying preprocessing steps (incremental)
+    - 85%: Saving transformed dataset
+    - 95%: Generating preview
+    - 100%: Complete
+
+    **Polling Recommendation:**
+    - Poll every 1-2 seconds while state is PENDING/STARTED/PROGRESS
+    - Stop polling when state is SUCCESS or FAILURE
+    """
+    task_result = AsyncResult(task_id)
+
+    if not task_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task {task_id} not found"
+        )
+
+    response = PreprocessingTaskStatus(
+        task_id=task_id,
+        state=task_result.state
+    )
+
+    if task_result.state == 'PENDING':
+        response.status = "Task is waiting to be processed"
+        response.progress = 0
+
+    elif task_result.state == 'STARTED':
+        response.status = "Task has started"
+        response.progress = 5
+
+    elif task_result.state == 'PROGRESS':
+        info = task_result.info or {}
+        response.status = info.get('status', 'Processing...')
+        response.progress = info.get('progress', 0)
+        response.current_step = info.get('current_step')
+
+    elif task_result.state == 'SUCCESS':
+        response.status = "Preprocessing completed successfully"
+        response.progress = 100
+        response.result = task_result.result
+
+    elif task_result.state == 'FAILURE':
+        info = task_result.info or {}
+        response.error = str(info.get('error', task_result.info)) if isinstance(info, dict) else str(task_result.info)
+        response.status = "Task failed"
+        response.progress = 0
+
+    return response
