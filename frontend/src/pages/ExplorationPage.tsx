@@ -1,41 +1,86 @@
-import React from 'react';
-import { Typography, Box, Paper } from '@mui/material';
+import React, { useEffect } from 'react';
+import { Typography, Box, Container, Grid, Card, CardContent } from '@mui/material';
 import { Assessment } from '@mui/icons-material';
+import { useAppDispatch, useAppSelector } from '../hooks/redux';
+import LoadingState from '../components/common/LoadingState';
+import ErrorState from '../components/common/ErrorState';
+import EmptyState from '../components/common/EmptyState';
+import EvaluationMetrics from '../components/evaluation/EvaluationMetrics';
+import ConfusionMatrix from '../components/evaluation/ConfusionMatrix';
 
 const ExplorationPage: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const { metrics, confusionMatrix, isEvaluating, error } = useAppSelector(
+    (state) => state.evaluation
+  );
+  const { currentModel } = useAppSelector((state) => state.modeling);
+
+  const handleRetry = () => {
+    // TODO: Implement retry logic
+  };
+
+  if (isEvaluating) {
+    return <LoadingState message="Evaluating model performance..." />;
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        title="Evaluation Failed"
+        message={error}
+        onRetry={handleRetry}
+      />
+    );
+  }
+
+  if (!currentModel) {
+    return (
+      <EmptyState
+        title="No Model Selected"
+        message="Please train a model first to evaluate its performance"
+      />
+    );
+  }
+
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 'calc(100vh - 64px)',
-        width: '100%',
-        textAlign: 'center',
-      }}
-    >
-      <Assessment sx={{ fontSize: 80, color: 'primary.main', mb: 3 }} />
-      <Typography variant="h3" component="h1" fontWeight={600} gutterBottom>
-        Model Evaluation
-      </Typography>
-      <Paper
-        sx={{
-          p: 6,
-          mt: 4,
-          width: '100%',
-          maxWidth: 600,
-          border: '1px solid #334155',
-        }}
-      >
-        <Typography variant="h5" color="text.primary" gutterBottom>
-          Evaluate model performance
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
-          This page will be implemented in the next steps
-        </Typography>
-      </Paper>
-    </Box>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      {/* Page Header */}
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Assessment sx={{ fontSize: 40, color: 'primary.main' }} />
+          <Box>
+            <Typography variant="h4" component="h1" fontWeight={600}>
+              Model Evaluation
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Analyze and evaluate model performance
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+
+      <Grid container spacing={3}>
+        {/* Evaluation Metrics */}
+        <Grid item xs={12}>
+          <Card sx={{ border: '1px solid #e2e8f0' }}>
+            <CardContent>
+              <EvaluationMetrics metrics={metrics} />
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Confusion Matrix */}
+        {confusionMatrix && (
+          <Grid item xs={12} md={6}>
+            <Card sx={{ border: '1px solid #e2e8f0' }}>
+              <CardContent>
+                <ConfusionMatrix matrix={confusionMatrix} />
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+      </Grid>
+    </Container>
   );
 };
 
