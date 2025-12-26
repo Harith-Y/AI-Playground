@@ -73,3 +73,38 @@ export const generateRealisticCorrelationMatrix = () => {
     matrix,
   };
 };
+
+export const generateSampleMissingValues = (columnCount: number = 10, totalRows: number = 1000) => {
+  const columns = Array.from({ length: columnCount }, (_, i) => {
+    const missingPercentage = Math.random() * 100; // Random percentage 0-100%
+    const missingCount = Math.floor((missingPercentage / 100) * totalRows);
+
+    return {
+      columnName: `Column_${i + 1}`,
+      totalCount: totalRows,
+      missingCount,
+      missingPercentage,
+    };
+  });
+
+  return columns;
+};
+
+export const generateRealisticMissingValues = () => {
+  const totalRows = 5000;
+
+  return [
+    { columnName: 'Customer_ID', totalCount: totalRows, missingCount: 0, missingPercentage: 0 },
+    { columnName: 'Name', totalCount: totalRows, missingCount: 12, missingPercentage: 0.24 },
+    { columnName: 'Email', totalCount: totalRows, missingCount: 145, missingPercentage: 2.9 },
+    { columnName: 'Phone', totalCount: totalRows, missingCount: 523, missingPercentage: 10.46 },
+    { columnName: 'Age', totalCount: totalRows, missingCount: 89, missingPercentage: 1.78 },
+    { columnName: 'Income', totalCount: totalRows, missingCount: 1234, missingPercentage: 24.68 },
+    { columnName: 'Address', totalCount: totalRows, missingCount: 678, missingPercentage: 13.56 },
+    { columnName: 'Purchase_Date', totalCount: totalRows, missingCount: 23, missingPercentage: 0.46 },
+    { columnName: 'Product_Category', totalCount: totalRows, missingCount: 456, missingPercentage: 9.12 },
+    { columnName: 'Payment_Method', totalCount: totalRows, missingCount: 3456, missingPercentage: 69.12 },
+    { columnName: 'Feedback', totalCount: totalRows, missingCount: 2890, missingPercentage: 57.8 },
+    { columnName: 'Rating', totalCount: totalRows, missingCount: 234, missingPercentage: 4.68 },
+  ];
+};

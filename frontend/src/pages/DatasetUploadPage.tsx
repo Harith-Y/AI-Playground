@@ -30,6 +30,7 @@ import {
   Description,
   DataArray,
   Storage,
+  ErrorOutline,
 } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
@@ -39,6 +40,7 @@ import {
   clearDatasetError,
 } from '../store/slices/datasetSlice';
 import { formatFileSize, formatDate } from '../utils/helpers';
+import MissingValuesAnalysis from '../components/dataset/MissingValuesAnalysis';
 
 const DatasetUploadPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -50,6 +52,7 @@ const DatasetUploadPage: React.FC = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(true);
   const [showPreview, setShowPreview] = useState(true);
+  const [showMissingValues, setShowMissingValues] = useState(true);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
@@ -460,6 +463,48 @@ const DatasetUploadPage: React.FC = () => {
                         </CardContent>
                       </Card>
                     </Box>
+                  </Box>
+                </Collapse>
+              </Paper>
+            )}
+
+            {/* Missing Values Analysis */}
+            {columns && columns.length > 0 && stats && (
+              <Paper
+                sx={{
+                  mb: 3,
+                  border: '1px solid #e2e8f0',
+                  background: '#FFFFFF',
+                }}
+              >
+                <Box
+                  sx={{
+                    p: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => setShowMissingValues(!showMissingValues)}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <ErrorOutline color="primary" />
+                    <Typography variant="h6" fontWeight={600}>
+                      Missing Values Analysis
+                    </Typography>
+                  </Box>
+                  <IconButton size="small">
+                    {showMissingValues ? <ExpandLess /> : <ExpandMore />}
+                  </IconButton>
+                </Box>
+                <Collapse in={showMissingValues}>
+                  <Divider />
+                  <Box sx={{ p: 3 }}>
+                    <MissingValuesAnalysis
+                      columns={columns}
+                      totalRows={stats.rowCount}
+                      isLoading={false}
+                    />
                   </Box>
                 </Collapse>
               </Paper>
