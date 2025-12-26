@@ -74,6 +74,30 @@ export const fetchDatasetPreview = createAsyncThunk(
   }
 );
 
+export const fetchDataset = createAsyncThunk(
+  'dataset/fetchDataset',
+  async (datasetId: string, { rejectWithValue }) => {
+    try {
+      const response = await datasetService.getDataset(datasetId);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch dataset');
+    }
+  }
+);
+
+export const deleteDataset = createAsyncThunk(
+  'dataset/deleteDataset',
+  async (datasetId: string, { rejectWithValue }) => {
+    try {
+      await datasetService.deleteDataset(datasetId);
+      return datasetId;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to delete dataset');
+    }
+  }
+);
+
 const datasetSlice = createSlice({
   name: 'dataset',
   initialState,
@@ -144,6 +168,50 @@ const datasetSlice = createSlice({
         state.preview = action.payload;
       })
       .addCase(fetchDatasetPreview.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      // Fetch single dataset
+      .addCase(fetchDataset.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchDataset.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.currentDataset = action.payload;
+
+        // Update in datasets array if it exists
+        const index = state.datasets.findIndex(d => d.id === action.payload.id);
+        if (index !== -1) {
+          state.datasets[index] = action.payload;
+        } else {
+          state.datasets.push(action.payload);
+        }
+      })
+      .addCase(fetchDataset.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      // Delete dataset
+      .addCase(deleteDataset.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(deleteDataset.fulfilled, (state, action) => {
+        state.isLoading = false;
+
+        // Remove from datasets array
+        state.datasets = state.datasets.filter(d => d.id !== action.payload);
+
+        // Clear current dataset if it was deleted
+        if (state.currentDataset?.id === action.payload) {
+          state.currentDataset = null;
+          state.stats = null;
+          state.columns = [];
+          state.preview = [];
+        }
+      })
+      .addCase(deleteDataset.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });
