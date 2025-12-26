@@ -1,18 +1,86 @@
 # AI-Playground 🚀
 
-A full-stack machine learning platform for automated ML workflows, from data ingestion to model deployment and code generation. Built with FastAPI, React, and modern ML libraries.
+A comprehensive full-stack machine learning platform for automated ML workflows - from data ingestion to model deployment and code generation. Build, train, and deploy ML models without writing code, then export production-ready pipelines.
 
 ## 🎯 Overview
 
 AI-Playground is an end-to-end ML platform that enables:
-- **Dataset Management** - Upload, explore, and visualize datasets
-- **Automated Preprocessing** - Smart data cleaning, encoding, and scaling
-- **Feature Engineering** - Feature selection, importance analysis, correlation matrices
-- **Model Training** - Support for regression, classification, and clustering
-- **Hyperparameter Tuning** - Grid search, random search, and Bayesian optimization
-- **Model Evaluation** - Comprehensive metrics and visualizations
-- **Code Generation** - Export production-ready ML pipeline code
-- **Experiment Tracking** - Track and compare model experiments
+- ✅ **Dataset Management** - Upload, explore, and visualize datasets with comprehensive statistics
+- ✅ **Exploratory Data Analysis** - Statistical summaries, correlation analysis, distribution plots, heatmaps
+- ✅ **Automated Preprocessing** - Customizable pipeline with imputation, scaling, encoding, outlier detection
+- ✅ **Feature Engineering** - Feature selection via variance, correlation, and mutual information
+- 🚧 **Model Training** - Support for regression, classification, and clustering (Coming Soon)
+- 🚧 **Hyperparameter Tuning** - Grid search, random search, and Bayesian optimization (Coming Soon)
+- 🚧 **Model Evaluation** - Comprehensive metrics and visualizations (Coming Soon)
+- 🚧 **Code Generation** - Export production-ready ML pipeline code (Coming Soon)
+- 🚧 **Experiment Tracking** - Track and compare model experiments (Coming Soon)
+
+## ✨ Key Features
+
+###  📊 Data Management & EDA (✅ Implemented)
+- ✅ **Multi-format Upload** - Support for CSV, Excel (XLSX, XLS), JSON
+- ✅ **Dataset Preview** - Interactive data table with 10+ rows preview
+- ✅ **Comprehensive Statistics** - Row/column counts, dtypes, missing values, duplicates, memory usage
+- ✅ **Column-level Analysis** - Data types, unique counts, null counts, min/max/mean/median for each column
+- ✅ **EDA Statistics Module** - 10+ analysis methods including distribution, correlation, skewness, kurtosis
+- ✅ **Correlation Analysis** - Pearson, Spearman, Kendall correlation matrices with heatmaps, clustering, multicollinearity detection
+- ✅ **Visualization Gallery** - Interactive Plotly charts (histograms, scatter, box plots, correlation heatmaps)
+- ✅ **Distribution Plots** - Auto-binning algorithms (Sturges', Freedman-Diaconis), grouped histograms, normal curve overlays
+
+### 🔧 Preprocessing Pipeline (✅ Implemented)
+- ✅ **CRUD Operations** - Create, read, update, delete, reorder preprocessing steps
+- ✅ **Modular Steps** - Build custom pipelines by chaining independent steps
+- ✅ **Missing Value Imputation** - Mean, median, mode, constant strategies
+- ✅ **Outlier Detection** - IQR and Z-score methods with configurable thresholds
+- ✅ **Scaling** - Standard, MinMax, Robust scalers
+- ✅ **Encoding** - OneHot, Label, Ordinal encoding for categorical features
+- ✅ **Feature Selection** - Variance threshold, correlation-based, mutual information
+- ✅ **Step Reordering** - Drag-and-drop to change execution order (API ready)
+- ✅ **Configuration Persistence** - All steps stored in PostgreSQL with JSONB parameters
+- ✅ **Authorization** - User ownership verification for all operations
+
+### 🤖 Machine Learning Engine (✅ Core Modules)
+- ✅ **Variance Threshold Selector** - Remove low-variance features with configurable threshold
+- ✅ **Correlation Selector** - Select features based on correlation with target variable
+- ✅ **Mutual Information Selector** - Feature selection using mutual information scores
+- ✅ **Mode Imputer** - Fill missing categorical values with most frequent value
+- ✅ **Mean/Median Imputer** - Fill missing numeric values with mean or median
+- ✅ **IQR Outlier Detector** - Detect and handle outliers using interquartile range
+- ✅ **Z-Score Outlier Detector** - Detect outliers using standard deviation method
+- ✅ **Standard/MinMax/Robust Scalers** - Feature normalization and standardization
+- ✅ **OneHot/Label Encoders** - Categorical variable encoding
+- 🚧 **Model Registry** - Regression, classification, clustering models (Placeholder)
+- 🚧 **Training Pipeline** - Cross-validation, train/test split (Placeholder)
+- 🚧 **Hyperparameter Tuning** - Grid search, random search, Bayesian optimization (Placeholder)
+
+### 🎨 Frontend Features (✅ Implemented)
+- ✅ **Redux State Management** - Complete dataset CRUD with async thunks (6 thunks, 4 sync actions)
+- ✅ **Material-UI Components** - Modern, responsive design with MUI 7.3.6
+- ✅ **Interactive Visualizations** - Plotly.js integration for dynamic charts
+- ✅ **Real-time Progress** - Upload progress tracking and status updates
+- ✅ **Error Handling** - Comprehensive error boundaries and user feedback
+- ✅ **TypeScript** - Full type safety across the application
+- ✅ **Grid/List Views** - Flexible visualization display modes
+- ✅ **Search & Filter** - Find visualizations by name or type
+- ✅ **Fullscreen Mode** - Expand charts for detailed analysis
+- ✅ **Data Download** - Export visualization data as JSON
+- 🚧 **Preprocessing UI** - Step builder with drag-and-drop (Coming Soon)
+- 🚧 **Model Training UI** - Model selection and configuration (Coming Soon)
+
+### 🔌 Backend API (✅ Core Endpoints)
+- ✅ **RESTful API** - Clean, documented endpoints with OpenAPI/Swagger
+- ✅ **Dataset Endpoints** - Upload, preview, stats, delete with full CRUD
+- ✅ **Preprocessing Endpoints** - Step management (create, read, update, delete, reorder) with authorization
+- ✅ **NeonDB Optimized** - Serverless PostgreSQL with connection pooling
+- ✅ **Redis Caching** - Fast data access and session management
+- ✅ **Celery Tasks** - Async processing for long-running operations
+- ✅ **Comprehensive Tests** - 80+ unit tests with pytest
+- ✅ **Input Validation** - Pydantic schemas for all API payloads
+- ✅ **Error Handling** - Structured error responses with detailed messages
+- ✅ **File Storage** - Organized uploads with user/dataset hierarchy
+- 🚧 **Model Training Endpoints** - Train, status, results (Placeholder)
+- 🚧 **Tuning Endpoints** - Optimize, status, results (Placeholder)
+- 🚧 **Code Generation Endpoints** - Python, notebook, FastAPI export (Placeholder)
 
 ## 🏗️ Complete Project Structure
 
