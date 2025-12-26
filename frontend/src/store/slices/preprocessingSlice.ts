@@ -1,18 +1,14 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import type { PreprocessingStep, PreprocessingStepCreate, PreprocessingStepUpdate } from '../../types/preprocessing';
+import axios from 'axios';
 
-interface PreprocessingStep {
-  id: string;
-  type: string;
-  parameters: Record<string, any>;
-  order: number;
-}
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 interface PreprocessingState {
   steps: PreprocessingStep[];
   currentStep: PreprocessingStep | null;
-  history: PreprocessingStep[][];
-  preview: any[];
+  isLoading: boolean;
   isProcessing: boolean;
   error: string | null;
 }
@@ -20,33 +16,79 @@ interface PreprocessingState {
 const initialState: PreprocessingState = {
   steps: [],
   currentStep: null,
-  history: [],
-  preview: [],
+  isLoading: false,
   isProcessing: false,
   error: null,
 };
 
 // Async thunks
-export const applyPreprocessingStep = createAsyncThunk(
-  'preprocessing/applyStep',
-  async (step: PreprocessingStep, { rejectWithValue }) => {
+export const fetchPreprocessingSteps = createAsyncThunk(
+  'preprocessing/fetchSteps',
+  async (datasetId: string, { rejectWithValue }) => {
     try {
-      // TODO: Implement API call
-      return { step, preview: [] };
+      const response = await axios.get<PreprocessingStep[]>(
+        `${API_URL}/api/v1/preprocessing/?dataset_id=${datasetId}`
+      );
+      return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to apply preprocessing step');
+      return rejectWithValue(error.response?.data?.detail || 'Failed to fetch preprocessing steps');
     }
   }
 );
 
-export const executePreprocessingPipeline = createAsyncThunk(
-  'preprocessing/executePipeline',
-  async (_datasetId: string, { /* getState, */ rejectWithValue }) => {
+export const createPreprocessingStep = createAsyncThunk(
+  'preprocessing/createStep',
+  async (step: PreprocessingStepCreate, { rejectWithValue }) => {
     try {
-      // TODO: Implement API call with all steps
-      return { success: true };
+      const response = await axios.post<PreprocessingStep>(
+        `${API_URL}/api/v1/preprocessing/`,
+        step
+      );
+      return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to execute pipeline');
+      return rejectWithValue(error.response?.data?.detail || 'Failed to create preprocessing step');
+    }
+  }
+);
+
+export const updatePreprocessingStep = createAsyncThunk(
+  'preprocessing/updateStep',
+  async ({ id, data }: { id: string; data: PreprocessingStepUpdate }, { rejectWithValue }) => {
+    try {
+      const response = await axios.put<PreprocessingStep>(
+        `${API_URL}/api/v1/preprocessing/${id}`,
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || 'Failed to update preprocessing step');
+    }
+  }
+);
+
+export const deletePreprocessingStep = createAsyncThunk(
+  'preprocessing/deleteStep',
+  async (id: string, { rejectWithValue }) => {
+    try {
+      await axios.delete(`${API_URL}/api/v1/preprocessing/${id}`);
+      return id;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || 'Failed to delete preprocessing step');
+    }
+  }
+);
+
+export const reorderPreprocessingSteps = createAsyncThunk(
+  'preprocessing/reorderSteps',
+  async (stepIds: string[], { rejectWithValue }) => {
+    try {
+      const response = await axios.post<PreprocessingStep[]>(
+        `${API_URL}/api/v1/preprocessing/reorder`,
+        { step_ids: stepIds }
+      );
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || 'Failed to reorder steps');
     }
   }
 );
@@ -55,58 +97,81 @@ const preprocessingSlice = createSlice({
   name: 'preprocessing',
   initialState,
   reducers: {
-    addStep: (state, action: PayloadAction<PreprocessingStep>) => {
-      state.steps.push(action.payload);
-      state.history.push([...state.steps]);
-    },
-    removeStep: (state, action: PayloadAction<string>) => {
-      state.steps = state.steps.filter(step => step.id !== action.payload);
-      state.history.push([...state.steps]);
-    },
-    updateStep: (state, action: PayloadAction<PreprocessingStep>) => {
-      const index = state.steps.findIndex(step => step.id === action.payload.id);
-      if (index !== -1) {
-        state.steps[index] = action.payload;
-        state.history.push([...state.steps]);
-      }
-    },
-    reorderSteps: (state, action: PayloadAction<PreprocessingStep[]>) => {
-      state.steps = action.payload;
-      state.history.push([...state.steps]);
-    },
     setCurrentStep: (state, action: PayloadAction<PreprocessingStep | null>) => {
       state.currentStep = action.payload;
     },
-    undoLastStep: (state) => {
-      if (state.history.length > 1) {
-        state.history.pop();
-        state.steps = [...state.history[state.history.length - 1]];
-      }
+    clearError: (state) => {
+      state.error = null;
     },
     clearPreprocessing: () => initialState,
   },
   extraReducers: (builder) => {
     builder
-      .addCase(applyPreprocessingStep.pending, (state) => {
+      // Fetch preprocessing steps
+      .addCase(fetchPreprocessingSteps.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchPreprocessingSteps.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.steps = action.payload;
+      })
+      .addCase(fetchPreprocessingSteps.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      // Create preprocessing step
+      .addCase(createPreprocessingStep.pending, (state) => {
         state.isProcessing = true;
         state.error = null;
       })
-      .addCase(applyPreprocessingStep.fulfilled, (state, action) => {
+      .addCase(createPreprocessingStep.fulfilled, (state, action) => {
         state.isProcessing = false;
-        state.preview = action.payload.preview;
+        state.steps.push(action.payload);
       })
-      .addCase(applyPreprocessingStep.rejected, (state, action) => {
+      .addCase(createPreprocessingStep.rejected, (state, action) => {
         state.isProcessing = false;
         state.error = action.payload as string;
       })
-      .addCase(executePreprocessingPipeline.pending, (state) => {
+      // Update preprocessing step
+      .addCase(updatePreprocessingStep.pending, (state) => {
         state.isProcessing = true;
         state.error = null;
       })
-      .addCase(executePreprocessingPipeline.fulfilled, (state) => {
+      .addCase(updatePreprocessingStep.fulfilled, (state, action) => {
         state.isProcessing = false;
+        const index = state.steps.findIndex(step => step.id === action.payload.id);
+        if (index !== -1) {
+          state.steps[index] = action.payload;
+        }
       })
-      .addCase(executePreprocessingPipeline.rejected, (state, action) => {
+      .addCase(updatePreprocessingStep.rejected, (state, action) => {
+        state.isProcessing = false;
+        state.error = action.payload as string;
+      })
+      // Delete preprocessing step
+      .addCase(deletePreprocessingStep.pending, (state) => {
+        state.isProcessing = true;
+        state.error = null;
+      })
+      .addCase(deletePreprocessingStep.fulfilled, (state, action) => {
+        state.isProcessing = false;
+        state.steps = state.steps.filter(step => step.id !== action.payload);
+      })
+      .addCase(deletePreprocessingStep.rejected, (state, action) => {
+        state.isProcessing = false;
+        state.error = action.payload as string;
+      })
+      // Reorder preprocessing steps
+      .addCase(reorderPreprocessingSteps.pending, (state) => {
+        state.isProcessing = true;
+        state.error = null;
+      })
+      .addCase(reorderPreprocessingSteps.fulfilled, (state, action) => {
+        state.isProcessing = false;
+        state.steps = action.payload;
+      })
+      .addCase(reorderPreprocessingSteps.rejected, (state, action) => {
         state.isProcessing = false;
         state.error = action.payload as string;
       });
@@ -114,12 +179,8 @@ const preprocessingSlice = createSlice({
 });
 
 export const {
-  addStep,
-  removeStep,
-  updateStep,
-  reorderSteps,
   setCurrentStep,
-  undoLastStep,
+  clearError,
   clearPreprocessing,
 } = preprocessingSlice.actions;
 
