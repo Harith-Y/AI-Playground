@@ -5,7 +5,6 @@ import {
   Box,
   Card,
   CardContent,
-  Grid,
   Button,
 } from '@mui/material';
 import {
@@ -113,9 +112,20 @@ const HomePage: React.FC = () => {
           </Typography>
         </Box>
 
-        <Grid container spacing={3} justifyContent="center">
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: 'repeat(2, 1fr)',
+              md: 'repeat(3, 1fr)',
+            },
+            gap: 3,
+            justifyItems: 'stretch',
+          }}
+        >
           {steps.map((step, index) => (
-            <Grid item xs={12} sm={6} md={4} key={index}>
+            <Box key={index}>
               <Card
                 sx={{
                   height: '100%',
@@ -135,7 +145,7 @@ const HomePage: React.FC = () => {
                       backgroundColor: step.color,
                       color: 'white',
                       transform: 'scale(1.1) rotate(5deg)',
-                    }
+                    },
                   },
                   cursor: 'pointer',
                 }}
@@ -168,9 +178,9 @@ const HomePage: React.FC = () => {
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Box>
 
         <Box sx={{ mt: 6 }}>
           <Button

@@ -41,7 +41,7 @@ export const applyPreprocessingStep = createAsyncThunk(
 
 export const executePreprocessingPipeline = createAsyncThunk(
   'preprocessing/executePipeline',
-  async (datasetId: string, { getState, rejectWithValue }) => {
+  async (_datasetId: string, { /* getState, */ rejectWithValue }) => {
     try {
       // TODO: Implement API call with all steps
       return { success: true };

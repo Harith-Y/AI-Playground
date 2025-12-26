@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Typography, Box, Paper } from '@mui/material';
+import { Typography, Box, Paper } from '@mui/material';
 import { Code } from '@mui/icons-material';
 
 const CodeGenerationPage: React.FC = () => {

@@ -34,7 +34,7 @@ const initialState: ModelingState = {
 export const trainModel = createAsyncThunk(
   'modeling/trainModel',
   async (
-    params: {
+    _params: {
       datasetId: string;
       modelType: string;
       hyperparameters: Hyperparameters;
@@ -64,7 +64,7 @@ export const fetchModels = createAsyncThunk(
 
 export const fetchModelDetails = createAsyncThunk(
   'modeling/fetchModelDetails',
-  async (modelId: string, { rejectWithValue }) => {
+  async (_modelId: string, { rejectWithValue }) => {
     try {
       // TODO: Implement API call
       return {} as Model;
@@ -76,7 +76,7 @@ export const fetchModelDetails = createAsyncThunk(
 
 export const stopTraining = createAsyncThunk(
   'modeling/stopTraining',
-  async (modelId: string, { rejectWithValue }) => {
+  async (_modelId: string, { rejectWithValue }) => {
     try {
       // TODO: Implement API call
       return { success: true };

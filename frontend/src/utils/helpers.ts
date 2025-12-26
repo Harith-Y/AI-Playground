@@ -1,4 +1,4 @@
-import { ApiError } from '../types/api';
+import type { ApiError } from '../types/api';
 
 /**
  * Format file size from bytes to human-readable format
@@ -35,7 +35,7 @@ export const debounce = <T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): ((...args: Parameters<T>) => void) => {
-  let timeout: NodeJS.Timeout | null = null;
+  let timeout: number | null = null;
 
   return (...args: Parameters<T>) => {
     if (timeout) clearTimeout(timeout);

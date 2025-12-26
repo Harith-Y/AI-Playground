@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Typography, Box, Paper } from '@mui/material';
+import { Typography, Box, Paper } from '@mui/material';
 import { ModelTraining } from '@mui/icons-material';
 
 const ModelingPage: React.FC = () => {

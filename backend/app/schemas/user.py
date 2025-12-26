@@ -1,10 +1,10 @@
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: str  # TODO: Change to EmailStr when email-validator is installed
 
 
 class UserCreate(UserBase):

@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, field_validator
@@ -43,3 +43,32 @@ class DatasetRead(DatasetBase):
 
 	class Config:
 		from_attributes = True
+
+
+class ColumnInfo(BaseModel):
+	"""Column metadata for dataset preview"""
+	name: str
+	dataType: str
+	nullCount: int
+	uniqueCount: int
+	sampleValues: List[Any]
+
+
+class DatasetPreviewResponse(BaseModel):
+	"""Dataset preview with column info and sample rows"""
+	preview: List[List[Any]]  # 2D array of values
+	columns: List[ColumnInfo]
+	totalRows: int
+	displayedRows: int
+
+
+class DatasetStatsResponse(BaseModel):
+	"""Dataset statistics summary"""
+	rowCount: int
+	columnCount: int
+	numericColumns: int
+	categoricalColumns: int
+	missingValues: int
+	duplicateRows: int
+	memoryUsage: int  # in bytes
+	columns: List[ColumnInfo]

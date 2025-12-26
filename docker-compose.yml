@@ -1,1 +1,175 @@
-# Docker Compose configuration
+services:
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: aiplayground-redis
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aiplayground-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aiplayground-backend
+    restart: unless-stopped
+    environment:
+      # Database (set Neon connection string via .env or shell before compose)
+      DATABASE_URL: ${DATABASE_URL}
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      
+      # Celery
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      
+      # API Settings
+      API_V1_PREFIX: /api/v1
+      PROJECT_NAME: AI-Playground
+      VERSION: 1.0.0
+      
+      # Security
+      SECRET_KEY: docker-dev-secret-key-change-in-production
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      
+      # File Storage
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE: 104857600
+      
+      # Environment
+      ENVIRONMENT: development
+      DEBUG: "True"
+      
+      # Logging
+      LOG_LEVEL: INFO
+      LOG_DIR: /app/logs
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - aiplayground-network
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        sleep 5 &&
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting FastAPI server...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aiplayground-celery-worker
+    restart: unless-stopped
+    environment:
+      # Database (set Neon connection string via .env or shell before compose)
+      DATABASE_URL: ${DATABASE_URL}
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      
+      # Celery
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      
+      # API Settings
+      API_V1_PREFIX: /api/v1
+      PROJECT_NAME: AI-Playground
+      VERSION: 1.0.0
+      
+      # Security
+      SECRET_KEY: docker-dev-secret-key-change-in-production
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      
+      # File Storage
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE: 104857600
+      
+      # Environment
+      ENVIRONMENT: development
+      DEBUG: "True"
+      
+      # Logging
+      LOG_LEVEL: INFO
+      LOG_DIR: /app/logs
+    volumes:
+      - ./backend:/app
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - aiplayground-network
+    command: celery -A celery_worker.celery_app worker --loglevel=info --concurrency=2
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        - VITE_API_URL=http://localhost:8000
+        - VITE_WS_URL=ws://localhost:8000/ws
+    container_name: aiplayground-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - aiplayground-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Named Volumes
+volumes:
+  redis_data:
+    driver: local
+  backend_uploads:
+    driver: local
+  backend_logs:
+    driver: local
+
+# Networks
+networks:
+  aiplayground-network:
+    driver: bridge

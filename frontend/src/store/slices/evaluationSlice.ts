@@ -44,7 +44,7 @@ const initialState: EvaluationState = {
 // Async thunks
 export const evaluateModel = createAsyncThunk(
   'evaluation/evaluateModel',
-  async (params: { modelId: string; datasetId: string }, { rejectWithValue }) => {
+  async (_params: { modelId: string; datasetId: string }, { rejectWithValue }) => {
     try {
       // TODO: Implement API call
       return {
@@ -60,7 +60,7 @@ export const evaluateModel = createAsyncThunk(
 
 export const fetchPredictions = createAsyncThunk(
   'evaluation/fetchPredictions',
-  async (params: { modelId: string; datasetId: string }, { rejectWithValue }) => {
+  async (_params: { modelId: string; datasetId: string }, { rejectWithValue }) => {
     try {
       // TODO: Implement API call
       return [];
@@ -72,7 +72,7 @@ export const fetchPredictions = createAsyncThunk(
 
 export const generateConfusionMatrix = createAsyncThunk(
   'evaluation/generateConfusionMatrix',
-  async (modelId: string, { rejectWithValue }) => {
+  async (_modelId: string, { rejectWithValue }) => {
     try {
       // TODO: Implement API call
       return { matrix: [], labels: [] };
