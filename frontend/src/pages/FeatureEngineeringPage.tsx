@@ -2,6 +2,11 @@ import React, { useEffect } from 'react';
 import { Typography, Box, Container, Grid, Card, CardContent } from '@mui/material';
 import { TrendingUp } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
+import {
+  fetchCorrelationMatrix,
+  fetchFeatureImportance,
+  clearFeatureError,
+} from '../store/slices/featureSlice';
 import LoadingState from '../components/common/LoadingState';
 import ErrorState from '../components/common/ErrorState';
 import EmptyState from '../components/common/EmptyState';
@@ -15,15 +20,37 @@ const FeatureEngineeringPage: React.FC = () => {
   );
   const { currentDataset } = useAppSelector((state) => state.dataset);
 
+  useEffect(() => {
+    return () => {
+      dispatch(clearFeatureError());
+    };
+  }, [dispatch]);
+
   const handleRetry = () => {
-    // TODO: Implement retry logic
+    dispatch(clearFeatureError());
+    if (currentDataset?.id) {
+      dispatch(fetchCorrelationMatrix(currentDataset.id));
+      dispatch(fetchFeatureImportance(currentDataset.id));
+    }
   };
 
-  if (isLoading) {
+  const handleRefreshCorrelation = () => {
+    if (currentDataset?.id) {
+      dispatch(fetchCorrelationMatrix(currentDataset.id));
+    }
+  };
+
+  const handleRefreshImportance = () => {
+    if (currentDataset?.id) {
+      dispatch(fetchFeatureImportance(currentDataset.id));
+    }
+  };
+
+  if (isLoading && !correlationMatrix && !featureImportance.length) {
     return <LoadingState message="Analyzing features..." />;
   }
 
-  if (error) {
+  if (error && !correlationMatrix && !featureImportance.length) {
     return (
       <ErrorState
         title="Feature Analysis Failed"
@@ -59,12 +86,25 @@ const FeatureEngineeringPage: React.FC = () => {
         </Box>
       </Box>
 
+      {/* Error Alert (non-blocking) */}
+      {error && (correlationMatrix || featureImportance.length > 0) && (
+        <ErrorState
+          message={error}
+          onRetry={handleRetry}
+          variant="alert"
+        />
+      )}
+
       <Grid container spacing={3}>
         {/* Correlation Matrix */}
         <Grid item xs={12} lg={6}>
           <Card sx={{ border: '1px solid #e2e8f0' }}>
             <CardContent>
-              <CorrelationMatrix matrix={correlationMatrix} />
+              <CorrelationMatrix
+                matrix={correlationMatrix}
+                isLoading={isLoading}
+                onRefresh={handleRefreshCorrelation}
+              />
             </CardContent>
           </Card>
         </Grid>
@@ -73,7 +113,10 @@ const FeatureEngineeringPage: React.FC = () => {
         <Grid item xs={12} lg={6}>
           <Card sx={{ border: '1px solid #e2e8f0' }}>
             <CardContent>
-              <FeatureImportance features={featureImportance} />
+              <FeatureImportance
+                features={featureImportance}
+                isLoading={isLoading}
+              />
             </CardContent>
           </Card>
         </Grid>
