@@ -1,9 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { Typography, Box, Container, Grid, Button, Alert, Snackbar } from '@mui/material';
-import { Transform, Add } from '@mui/icons-material';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  Typography,
+  Box,
+  Container,
+  Button,
+  Alert,
+  Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  LinearProgress,
+  Chip,
+  Paper,
+} from '@mui/material';
+import { Transform, Add, CheckCircle } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import LoadingState from '../components/common/LoadingState';
-import ErrorState from '../components/common/ErrorState';
 import EmptyState from '../components/common/EmptyState';
 import StepBuilder from '../components/preprocessing/StepBuilder';
 import StepHistory from '../components/preprocessing/StepHistory';
@@ -13,23 +26,39 @@ import {
   updatePreprocessingStep,
   deletePreprocessingStep,
   reorderPreprocessingSteps,
+  applyPreprocessingPipelineAsync,
+  getPreprocessingTaskStatus,
   clearError,
+  clearPipelineResult,
 } from '../store/slices/preprocessingSlice';
 import { fetchDatasetStats } from '../store/slices/datasetSlice';
 import type { PreprocessingStep, PreprocessingStepCreate } from '../types/preprocessing';
 
 const PreprocessingPage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { steps, isLoading, isProcessing, error } = useAppSelector((state) => state.preprocessing);
+  const {
+    steps,
+    isLoading,
+    isProcessing,
+    isExecuting,
+    error,
+    pipelineResult,
+    currentTaskId,
+    taskStatus,
+  } = useAppSelector((state) => state.preprocessing);
   const { currentDataset, columns } = useAppSelector((state) => state.dataset);
 
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<PreprocessingStep | null>(null);
+  const [showProgressDialog, setShowProgressDialog] = useState(false);
+  const [showResultDialog, setShowResultDialog] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success',
   });
+
+  const pollingIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (currentDataset?.id) {
@@ -97,9 +126,69 @@ const PreprocessingPage: React.FC = () => {
     }
   };
 
-  const handleExecutePipeline = () => {
-    // TODO: Implement pipeline execution
-    showSnackbar('Pipeline execution not yet implemented', 'info' as any);
+  const handleExecutePipeline = async () => {
+    if (!currentDataset?.id || steps.length === 0) {
+      showSnackbar('No steps to execute', 'error');
+      return;
+    }
+
+    try {
+      // Start async preprocessing task
+      await dispatch(applyPreprocessingPipelineAsync({
+        dataset_id: currentDataset.id,
+        save_output: true,
+        output_name: `${currentDataset.name}_preprocessed`,
+      })).unwrap();
+
+      setShowProgressDialog(true);
+    } catch (error: any) {
+      showSnackbar(error || 'Failed to start preprocessing', 'error');
+    }
+  };
+
+  // Poll for task status
+  useEffect(() => {
+    if (currentTaskId && isExecuting) {
+      // Start polling every 2 seconds
+      pollingIntervalRef.current = setInterval(() => {
+        dispatch(getPreprocessingTaskStatus(currentTaskId));
+      }, 2000);
+
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      };
+    }
+  }, [currentTaskId, isExecuting, dispatch]);
+
+  // Handle task completion
+  useEffect(() => {
+    if (taskStatus) {
+      if (taskStatus.state === 'SUCCESS' && pipelineResult) {
+        // Stop polling
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        setShowProgressDialog(false);
+        setShowResultDialog(true);
+      } else if (taskStatus.state === 'FAILURE') {
+        // Stop polling on failure
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        setShowProgressDialog(false);
+        showSnackbar(taskStatus.error || 'Pipeline execution failed', 'error');
+      }
+    }
+  }, [taskStatus, pipelineResult]);
+
+  const handleCloseResultDialog = () => {
+    setShowResultDialog(false);
+    dispatch(clearPipelineResult());
   };
 
   const handleRefreshSteps = () => {
@@ -170,8 +259,8 @@ const PreprocessingPage: React.FC = () => {
       </Box>
 
       {/* Main Content - Step History Sidebar */}
-      <Grid container spacing={3} sx={{ height: 'calc(100% - 120px)' }}>
-        <Grid item xs={12} md={4} sx={{ height: '100%' }}>
+      <Box sx={{ display: 'flex', gap: 3, height: 'calc(100% - 120px)', flexDirection: { xs: 'column', md: 'row' } }}>
+        <Box sx={{ width: { xs: '100%', md: '33.33%' }, height: '100%' }}>
           <StepHistory
             steps={steps}
             onEdit={handleEditStep}
@@ -181,10 +270,10 @@ const PreprocessingPage: React.FC = () => {
             onRefresh={handleRefreshSteps}
             isProcessing={isProcessing}
           />
-        </Grid>
+        </Box>
 
         {/* Main Area - Dataset Preview or Instructions */}
-        <Grid item xs={12} md={8} sx={{ height: '100%' }}>
+        <Box sx={{ width: { xs: '100%', md: '66.67%' }, height: '100%' }}>
           <Box
             sx={{
               height: '100%',
@@ -239,8 +328,8 @@ const PreprocessingPage: React.FC = () => {
               </Box>
             )}
           </Box>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       {/* Step Builder Dialog */}
       <StepBuilder
@@ -264,6 +353,155 @@ const PreprocessingPage: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Progress Dialog */}
+      <Dialog
+        open={showProgressDialog}
+        maxWidth="sm"
+        fullWidth
+        disableEscapeKeyDown
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Transform />
+            <Typography variant="h6">Executing Preprocessing Pipeline</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ py: 2 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              {taskStatus?.status || 'Starting preprocessing...'}
+            </Typography>
+
+            <Box sx={{ mt: 2, mb: 1 }}>
+              <LinearProgress
+                variant="determinate"
+                value={taskStatus?.progress || 0}
+                sx={{ height: 8, borderRadius: 4 }}
+              />
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="caption" color="text.secondary">
+                {taskStatus?.progress || 0}% complete
+              </Typography>
+              {taskStatus?.current_step && (
+                <Chip
+                  label={taskStatus.current_step}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                />
+              )}
+            </Box>
+
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="caption" color="text.secondary">
+                Task ID: {currentTaskId}
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      {/* Result Dialog */}
+      <Dialog
+        open={showResultDialog}
+        onClose={handleCloseResultDialog}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CheckCircle color="success" />
+            <Typography variant="h6">Pipeline Execution Complete</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {pipelineResult && (
+            <Box sx={{ py: 2 }}>
+              <Alert severity="success" sx={{ mb: 3 }}>
+                {pipelineResult.message}
+              </Alert>
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
+                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom>
+                    Steps Applied
+                  </Typography>
+                  <Typography variant="h5" fontWeight={600}>
+                    {pipelineResult.steps_applied}
+                  </Typography>
+                </Paper>
+                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom>
+                    Rows Changed
+                  </Typography>
+                  <Typography variant="h5" fontWeight={600}>
+                    {pipelineResult.original_shape[0]} → {pipelineResult.transformed_shape[0]}
+                  </Typography>
+                </Paper>
+                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom>
+                    Columns Changed
+                  </Typography>
+                  <Typography variant="h5" fontWeight={600}>
+                    {pipelineResult.original_shape[1]} → {pipelineResult.transformed_shape[1]}
+                  </Typography>
+                </Paper>
+                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom>
+                    Output Dataset
+                  </Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {pipelineResult.output_dataset_id ? 'Created' : 'Not Saved'}
+                  </Typography>
+                </Paper>
+              </Box>
+
+              {pipelineResult.statistics && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                    Statistics:
+                  </Typography>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    {Object.entries(pipelineResult.statistics).map(([key, value]) => (
+                      <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          {key.replace(/_/g, ' ')}:
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                          {String(value)}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Paper>
+                </Box>
+              )}
+
+              {pipelineResult.preview && pipelineResult.preview.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                    Preview (first {pipelineResult.preview.length} rows):
+                  </Typography>
+                  <Box sx={{ overflowX: 'auto' }}>
+                    <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                      <pre style={{ fontSize: '12px', margin: 0 }}>
+                        {JSON.stringify(pipelineResult.preview, null, 2)}
+                      </pre>
+                    </Paper>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseResultDialog} variant="contained">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

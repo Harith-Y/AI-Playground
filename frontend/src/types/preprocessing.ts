@@ -279,3 +279,37 @@ export const STEP_TYPE_CONFIGS: Record<StepType, StepTypeConfig> = {
     ],
   },
 };
+
+// API Request/Response types
+export interface PreprocessingApplyRequest {
+  dataset_id: string;
+  save_output?: boolean;
+  output_name?: string;
+}
+
+export interface PreprocessingApplyResponse {
+  success: boolean;
+  message: string;
+  steps_applied: number;
+  original_shape: [number, number];
+  transformed_shape: [number, number];
+  output_dataset_id?: string;
+  preview?: Record<string, any>[];
+  statistics?: Record<string, any>;
+}
+
+export interface PreprocessingAsyncResponse {
+  task_id: string;
+  message: string;
+  status: string;
+}
+
+export interface PreprocessingTaskStatus {
+  task_id: string;
+  state: 'PENDING' | 'STARTED' | 'PROGRESS' | 'SUCCESS' | 'FAILURE';
+  status?: string;
+  progress?: number;
+  current_step?: string;
+  result?: PreprocessingApplyResponse;
+  error?: string;
+}

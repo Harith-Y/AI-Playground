@@ -1,6 +1,14 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import type { PreprocessingStep, PreprocessingStepCreate, PreprocessingStepUpdate } from '../../types/preprocessing';
+import type {
+  PreprocessingStep,
+  PreprocessingStepCreate,
+  PreprocessingStepUpdate,
+  PreprocessingApplyRequest,
+  PreprocessingApplyResponse,
+  PreprocessingAsyncResponse,
+  PreprocessingTaskStatus,
+} from '../../types/preprocessing';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -11,6 +19,11 @@ interface PreprocessingState {
   isLoading: boolean;
   isProcessing: boolean;
   error: string | null;
+  // Pipeline execution state
+  pipelineResult: PreprocessingApplyResponse | null;
+  currentTaskId: string | null;
+  taskStatus: PreprocessingTaskStatus | null;
+  isExecuting: boolean;
 }
 
 const initialState: PreprocessingState = {
@@ -19,6 +32,10 @@ const initialState: PreprocessingState = {
   isLoading: false,
   isProcessing: false,
   error: null,
+  pipelineResult: null,
+  currentTaskId: null,
+  taskStatus: null,
+  isExecuting: false,
 };
 
 // Async thunks
@@ -93,6 +110,53 @@ export const reorderPreprocessingSteps = createAsyncThunk(
   }
 );
 
+// Apply preprocessing pipeline (synchronous)
+export const applyPreprocessingPipeline = createAsyncThunk(
+  'preprocessing/applyPipeline',
+  async (request: PreprocessingApplyRequest, { rejectWithValue }) => {
+    try {
+      const response = await axios.post<PreprocessingApplyResponse>(
+        `${API_URL}/api/v1/preprocessing/apply`,
+        request
+      );
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || 'Failed to apply preprocessing pipeline');
+    }
+  }
+);
+
+// Apply preprocessing pipeline asynchronously
+export const applyPreprocessingPipelineAsync = createAsyncThunk(
+  'preprocessing/applyPipelineAsync',
+  async (request: PreprocessingApplyRequest, { rejectWithValue }) => {
+    try {
+      const response = await axios.post<PreprocessingAsyncResponse>(
+        `${API_URL}/api/v1/preprocessing/apply/async`,
+        request
+      );
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || 'Failed to start async preprocessing');
+    }
+  }
+);
+
+// Get preprocessing task status
+export const getPreprocessingTaskStatus = createAsyncThunk(
+  'preprocessing/getTaskStatus',
+  async (taskId: string, { rejectWithValue }) => {
+    try {
+      const response = await axios.get<PreprocessingTaskStatus>(
+        `${API_URL}/api/v1/preprocessing/task/${taskId}`
+      );
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || 'Failed to get task status');
+    }
+  }
+);
+
 const preprocessingSlice = createSlice({
   name: 'preprocessing',
   initialState,
@@ -104,6 +168,12 @@ const preprocessingSlice = createSlice({
       state.error = null;
     },
     clearPreprocessing: () => initialState,
+    clearPipelineResult: (state) => {
+      state.pipelineResult = null;
+      state.currentTaskId = null;
+      state.taskStatus = null;
+      state.isExecuting = false;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -174,6 +244,59 @@ const preprocessingSlice = createSlice({
       .addCase(reorderPreprocessingSteps.rejected, (state, action) => {
         state.isProcessing = false;
         state.error = action.payload as string;
+      })
+      // Apply preprocessing pipeline (sync)
+      .addCase(applyPreprocessingPipeline.pending, (state) => {
+        state.isExecuting = true;
+        state.error = null;
+        state.pipelineResult = null;
+      })
+      .addCase(applyPreprocessingPipeline.fulfilled, (state, action) => {
+        state.isExecuting = false;
+        state.pipelineResult = action.payload;
+      })
+      .addCase(applyPreprocessingPipeline.rejected, (state, action) => {
+        state.isExecuting = false;
+        state.error = action.payload as string;
+      })
+      // Apply preprocessing pipeline (async)
+      .addCase(applyPreprocessingPipelineAsync.pending, (state) => {
+        state.isExecuting = true;
+        state.error = null;
+        state.pipelineResult = null;
+        state.taskStatus = null;
+      })
+      .addCase(applyPreprocessingPipelineAsync.fulfilled, (state, action) => {
+        state.currentTaskId = action.payload.task_id;
+        state.taskStatus = {
+          task_id: action.payload.task_id,
+          state: 'PENDING',
+          status: action.payload.status,
+          progress: 0,
+        };
+      })
+      .addCase(applyPreprocessingPipelineAsync.rejected, (state, action) => {
+        state.isExecuting = false;
+        state.error = action.payload as string;
+      })
+      // Get task status
+      .addCase(getPreprocessingTaskStatus.fulfilled, (state, action) => {
+        state.taskStatus = action.payload;
+
+        // If task completed successfully
+        if (action.payload.state === 'SUCCESS' && action.payload.result) {
+          state.isExecuting = false;
+          state.pipelineResult = action.payload.result;
+        }
+
+        // If task failed
+        if (action.payload.state === 'FAILURE') {
+          state.isExecuting = false;
+          state.error = action.payload.error || 'Preprocessing task failed';
+        }
+      })
+      .addCase(getPreprocessingTaskStatus.rejected, (state, action) => {
+        state.error = action.payload as string;
       });
   },
 });
@@ -182,6 +305,7 @@ export const {
   setCurrentStep,
   clearError,
   clearPreprocessing,
+  clearPipelineResult,
 } = preprocessingSlice.actions;
 
 export default preprocessingSlice.reducer;
