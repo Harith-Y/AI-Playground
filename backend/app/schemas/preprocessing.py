@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from uuid import UUID
 from pydantic import BaseModel
 
@@ -27,3 +27,23 @@ class PreprocessingStepRead(PreprocessingStepBase):
 
 	class Config:
 		from_attributes = True
+
+
+# Apply preprocessing pipeline schemas
+class PreprocessingApplyRequest(BaseModel):
+	"""Request to apply preprocessing pipeline to a dataset"""
+	dataset_id: UUID
+	save_output: Optional[bool] = True
+	output_name: Optional[str] = None
+
+
+class PreprocessingApplyResponse(BaseModel):
+	"""Response from applying preprocessing pipeline"""
+	success: bool
+	message: str
+	steps_applied: int
+	original_shape: List[int]  # [rows, cols]
+	transformed_shape: List[int]  # [rows, cols]
+	output_dataset_id: Optional[UUID] = None
+	preview: Optional[List[Dict[str, Any]]] = None  # Sample rows
+	statistics: Optional[Dict[str, Any]] = None  # Basic stats
