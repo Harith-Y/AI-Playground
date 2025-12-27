@@ -1,0 +1,162 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  pr-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: amannn/action-semantic-pull-request@v5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        types: |
+          feat
+          fix
+          docs
+          style
+          refactor
+          perf
+          test
+          chore
+          ci
+          build
+        requireScope: false
+
+  pr-size:
+    name: Check PR Size
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check PR size
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          });
+
+          const additions = pr.data.additions;
+          const deletions = pr.data.deletions;
+          const totalChanges = additions + deletions;
+
+          if (totalChanges > 1000) {
+            core.setFailed(`PR is too large (${totalChanges} lines changed). Consider splitting into smaller PRs.`);
+          } else if (totalChanges > 500) {
+            core.warning(`PR is quite large (${totalChanges} lines changed). Consider splitting if possible.`);
+          }
+
+  pr-labels:
+    name: Auto-label PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+    - uses: actions/labeler@v5
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        configuration-path: .github/labeler.yml
+
+  pr-checklist:
+    name: PR Checklist Verification
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for PR description
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          });
+
+          const body = pr.data.body || '';
+
+          if (body.length < 50) {
+            core.setFailed('PR description is too short. Please provide more details.');
+          }
+
+          // Check for required sections
+          const requiredSections = ['## Description', '## Testing', '## Checklist'];
+          const missingSections = requiredSections.filter(section => !body.includes(section));
+
+          if (missingSections.length > 0) {
+            core.warning(`Missing recommended sections: ${missingSections.join(', ')}`);
+          }
+
+  conflict-check:
+    name: Check for Merge Conflicts
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for conflicts
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          });
+
+          if (pr.data.mergeable === false) {
+            core.setFailed('PR has merge conflicts. Please resolve them.');
+          }
+
+  todo-check:
+    name: Check for TODO/FIXME Comments
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check for TODO/FIXME in changed files
+      run: |
+        git diff origin/${{ github.base_ref }}...HEAD | grep -E '^\+.*TODO|^\+.*FIXME' && echo "Found TODO/FIXME in PR" || echo "No TODO/FIXME found"
+
+  breaking-changes:
+    name: Detect Breaking Changes
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for breaking changes
+      run: |
+        # Check if API endpoints were modified
+        git diff origin/${{ github.base_ref }}...HEAD -- 'backend/app/api/**/*.py' > api_changes.txt
+
+        if [ -s api_changes.txt ]; then
+          echo "API changes detected. Please ensure backward compatibility."
+          cat api_changes.txt
+        fi
+
+    - name: Comment on PR if breaking changes detected
+      uses: actions/github-script@v7
+      if: false  # Enable to auto-comment
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '⚠️ **Potential breaking changes detected!** Please review the API changes carefully and update documentation.'
+          });

@@ -1,0 +1,36 @@
+# CODEOWNERS file
+#
+# This file defines code ownership for the repository.
+# Users or teams mentioned here will be automatically requested for review
+# when someone opens a pull request that modifies files they own.
+
+# Default owners for everything in the repo
+* @Harith-Y @DAbhiraj
+
+# Backend owners
+/backend/ @backend-team @Harith-Y @DAbhiraj
+/backend/app/api/ @api-team @backend-team
+/backend/app/ml_engine/ @ml-team @backend-team
+/backend/tests/ @backend-team @qa-team
+
+# Frontend owners
+/frontend/ @frontend-team @Harith-Y @DAbhiraj
+/frontend/src/components/ @frontend-team @ui-team
+
+# Docker and infrastructure
+/docker/ @devops-team @Harith-Y @DAbhiraj
+docker-compose*.yml @devops-team
+Dockerfile @devops-team
+
+# CI/CD
+/.github/ @devops-team @Harith-Y @DAbhiraj
+/.github/workflows/ @devops-team
+
+# Documentation
+*.md @documentation-team @Harith-Y @DAbhiraj
+/docs/ @documentation-team
+
+# Configuration files
+*.yml @devops-team
+*.yaml @devops-team
+*.json @Harith-Y @DAbhiraj

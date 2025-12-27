@@ -1,0 +1,131 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly on Sundays at 00:00 UTC
+    - cron: '0 0 * * 0'
+
+jobs:
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python', 'javascript' ]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-and-quality
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{ matrix.language }}"
+
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      if: true  # Enable when SonarCloud is configured
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      with:
+        args: >
+          -Dsonar.projectKey=ai-playground
+          -Dsonar.organization=your-org
+          -Dsonar.sources=backend/app,frontend/src
+          -Dsonar.tests=backend/tests,frontend/src/__tests__
+          -Dsonar.python.coverage.reportPaths=backend/coverage.xml
+          -Dsonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v4
+      with:
+        fail-on-severity: moderate
+        deny-licenses: GPL-3.0, AGPL-3.0
+
+  dependency-update:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for Python dependency updates
+      working-directory: ./backend
+      run: |
+        pip install pip-audit
+        pip-audit --desc || true
+
+    - name: Check for npm dependency updates
+      working-directory: ./frontend
+      run: |
+        npm outdated || true
+
+    - name: Create issue for outdated dependencies
+      uses: peter-evans/create-issue-from-file@v5
+      if: false  # Enable to auto-create issues
+      with:
+        title: Weekly Dependency Update Check
+        content-filepath: ./dependency-report.md
+        labels: dependencies, automated
+
+  license-check:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check Python licenses
+      working-directory: ./backend
+      run: |
+        pip install pip-licenses
+        pip-licenses --format=markdown --output-file=python-licenses.md || true
+
+    - name: Check npm licenses
+      working-directory: ./frontend
+      run: |
+        npx license-checker --summary || true
+
+    - name: Upload license reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: license-reports
+        path: |
+          backend/python-licenses.md

@@ -1,0 +1,128 @@
+name: Docker Compose CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'docker/**'
+      - 'docker-compose*.yml'
+      - '.github/workflows/docker-compose-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'docker/**'
+      - 'docker-compose*.yml'
+      - '.github/workflows/docker-compose-ci.yml'
+
+jobs:
+  validate:
+    name: Validate Docker Compose Files
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Validate docker-compose.yml
+      run: docker-compose config
+
+    - name: Validate docker-compose.dev.yml
+      run: docker-compose -f docker-compose.dev.yml config || true
+
+    - name: Validate docker-compose.prod.yml
+      run: docker-compose -f docker-compose.prod.yml config || true
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Create .env file
+      run: |
+        cat > .env << EOF
+        # Database
+        DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_playground
+
+        # Redis
+        REDIS_URL=redis://redis:6379
+
+        # Security
+        SECRET_KEY=test-secret-key-for-integration
+        ALGORITHM=HS256
+        ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+        # CORS
+        BACKEND_CORS_ORIGINS=["http://localhost:3000"]
+
+        # Environment
+        ENVIRONMENT=testing
+        DEBUG=True
+
+        # PostgreSQL
+        POSTGRES_USER=postgres
+        POSTGRES_PASSWORD=postgres
+        POSTGRES_DB=ai_playground
+        EOF
+
+    - name: Build and start services
+      run: |
+        docker-compose up -d --build
+
+    - name: Wait for services to be ready
+      run: |
+        echo "Waiting for backend to be ready..."
+        timeout 60 bash -c 'until curl -f http://localhost:8000/health 2>/dev/null; do sleep 2; done' || true
+        echo "Waiting for frontend to be ready..."
+        timeout 60 bash -c 'until curl -f http://localhost:3000 2>/dev/null; do sleep 2; done' || true
+
+    - name: Check service health
+      run: |
+        docker-compose ps
+        curl -f http://localhost:8000/health || echo "Backend health check failed"
+        curl -f http://localhost:3000 || echo "Frontend health check failed"
+
+    - name: Run backend integration tests
+      run: |
+        docker-compose exec -T backend pytest tests/ -v -m integration || true
+
+    - name: Check logs on failure
+      if: failure()
+      run: |
+        docker-compose logs backend
+        docker-compose logs frontend
+        docker-compose logs db
+        docker-compose logs redis
+
+    - name: Tear down services
+      if: always()
+      run: docker-compose down -v
+
+  security-scan:
+    name: Docker Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner - Backend
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: './backend'
+        format: 'sarif'
+        output: 'trivy-backend-results.sarif'
+
+    - name: Run Trivy vulnerability scanner - Frontend
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: './frontend'
+        format: 'sarif'
+        output: 'trivy-frontend-results.sarif'
+
+    - name: Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: '.'

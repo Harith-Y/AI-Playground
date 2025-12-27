@@ -1,0 +1,42 @@
+# Auto-labeling configuration for PRs
+
+backend:
+  - backend/**/*
+  - backend/**/*.py
+
+frontend:
+  - frontend/**/*
+  - frontend/**/*.{js,jsx,ts,tsx}
+
+docker:
+  - docker/**/*
+  - Dockerfile
+  - docker-compose*.yml
+  - .dockerignore
+
+documentation:
+  - '**/*.md'
+  - docs/**/*
+
+tests:
+  - backend/tests/**/*
+  - frontend/**/*.test.{js,jsx,ts,tsx}
+  - frontend/**/*.spec.{js,jsx,ts,tsx}
+
+ci/cd:
+  - .github/**/*
+
+ml-engine:
+  - backend/app/ml_engine/**/*
+
+api:
+  - backend/app/api/**/*
+
+database:
+  - backend/app/models/**/*
+  - backend/alembic/**/*
+
+dependencies:
+  - backend/requirements.txt
+  - frontend/package.json
+  - frontend/package-lock.json

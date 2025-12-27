@@ -1,5 +1,11 @@
 # AI-Playground 🚀
 
+[![Backend CI](https://github.com/Harith-Y/AI-Playground/workflows/Backend%20CI/badge.svg)](https://github.com/Harith-Y/AI-Playground/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/Harith-Y/AI-Playground/workflows/Frontend%20CI/badge.svg)](https://github.com/Harith-Y/AI-Playground/actions/workflows/frontend-ci.yml)
+[![Docker Compose CI](https://github.com/Harith-Y/AI-Playground/workflows/Docker%20Compose%20CI/badge.svg)](https://github.com/Harith-Y/AI-Playground/actions/workflows/docker-compose-ci.yml)
+[![Code Quality](https://github.com/Harith-Y/AI-Playground/workflows/Code%20Quality/badge.svg)](https://github.com/Harith-Y/AI-Playground/actions/workflows/code-quality.yml)
+[![codecov](https://codecov.io/gh/Harith-Y/AI-Playground/branch/main/graph/badge.svg)](https://codecov.io/gh/Harith-Y/AI-Playground)
+
 A comprehensive full-stack machine learning platform for automated ML workflows - from data ingestion to model deployment and code generation. Build, train, and deploy ML models without writing code, then export production-ready pipelines.
 
 ## 🎯 Overview
