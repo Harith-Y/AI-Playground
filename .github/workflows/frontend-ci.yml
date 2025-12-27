@@ -73,13 +73,10 @@ jobs:
         npm test -- --coverage --watchAll=false || true
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       if: matrix.node-version == '20'
       with:
-        file: ./frontend/coverage/coverage-final.json
-        flags: frontend
-        name: frontend-coverage
-        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   build:
     name: Build Frontend
