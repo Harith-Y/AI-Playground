@@ -13,9 +13,11 @@ Provides methods to select the most relevant features for model training:
 from .variance_threshold import VarianceThreshold
 from .correlation_selector import CorrelationSelector
 from .mutual_information_selector import MutualInformationSelector
+from .univariate_selector import UnivariateSelector
 
 __all__ = [
     "VarianceThreshold",
     "CorrelationSelector",
     "MutualInformationSelector",
+    "UnivariateSelector",
 ]
