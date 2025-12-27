@@ -160,30 +160,95 @@ X_final, y_final = smote.fit_resample(X_under, y_under)
 
 ---
 
+### Model Training & Selection
+
+```python
+from app.ml_engine.models import create_model, ModelFactory
+
+# Regression example
+model = create_model('random_forest_regressor', n_estimators=100, max_depth=10, random_state=42)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+r2_score = model.score(X_test, y_test)
+
+# Classification example
+model = create_model('gradient_boosting_classifier', n_estimators=200, learning_rate=0.1, random_state=42)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+accuracy = model.score(X_test, y_test)
+
+# Clustering example
+model = create_model('kmeans', n_clusters=5, random_state=42)
+model.fit(X)
+labels = model.predict(X)
+inertia = model.get_inertia()
+
+# List all available models
+available_models = ModelFactory.get_available_models()
+print(list(available_models.keys()))
+
+# Save and load models
+model.save('models/my_model.joblib')
+loaded_model = type(model).load('models/my_model.joblib')
+```
+
+**Key concept:** Unified wrapper interface for 25+ ML algorithms with consistent API for training, prediction, and evaluation.
+
+---
+
 ## Learning Path
 
 ### For Beginners
-1. Start with the **Column Type Detection** theory
+
+**Recommended order:**
+
+1. **Column Type Detection Theory**
    - Easier concept to grasp
    - Directly useful for data exploration
    - Foundation for preprocessing
 
-2. Then read **Undersampling Methods**
-   - Focuses on specific ML problem (imbalance)
-   - Multiple algorithms to compare
+2. **Regression Models Theory** OR **Classification Models Theory** (choose based on your task)
+   - Learn about supervised learning
+   - Understand model selection
+   - Study hyperparameters
+
+3. **Undersampling/Oversampling Methods Theory**
+   - Address imbalanced datasets
+   - Learn resampling techniques
    - Practical decision-making guidance
 
-3. Finally read **Oversampling Methods**
-   - More advanced: synthetic sample generation
-   - Complements undersampling
-   - Learn when to use which approach
+4. **Clustering Models Theory**
+   - Explore unsupervised learning
+   - Learn pattern discovery
+   - Understand evaluation without labels
+
+### For Intermediate Users
+
+**Focus areas:**
+
+1. **Preprocessing pipeline:**
+   - Column Type Detection → Undersampling/Oversampling → Model Training
+
+2. **Model selection:**
+   - Study "Model Selection Guide" sections in Regression, Classification, and Clustering theory docs
+   - Compare performance tiers
+   - Learn when to use each algorithm
+
+3. **Hyperparameter tuning:**
+   - Review "Key Hyperparameters" for each model
+   - Understand defaults and when to change them
 
 ### For Advanced Users
-- Read all three documents for comprehensive understanding
+
+**Deep dive topics:**
+
+- Read all six documents for comprehensive understanding
 - Focus on "Algorithm Flow" and "Mathematical Foundations" sections
 - Study "Best Practices" for production deployment
-- Review "Limitations" to understand when NOT to use these methods
-- Compare oversampling vs undersampling trade-offs
+- Review "Limitations" and "Common Pitfalls" sections
+- Compare trade-offs between algorithms
+- Experiment with combining techniques (e.g., SMOTE + Random Forest with class_weight)
+- Understand when NOT to use certain methods
 
 ---
 
@@ -198,6 +263,11 @@ X_final, y_final = smote.fit_resample(X_under, y_under)
 - `backend/app/ml_engine/utils/README.md` - Column type detector API reference
 - `backend/app/ml_engine/preprocessing/undersampling.py` - Undersampling inline docstrings
 - `backend/app/ml_engine/preprocessing/oversampling.py` - Oversampling inline docstrings
+- `backend/app/ml_engine/models/base.py` - Model wrapper base classes
+- `backend/app/ml_engine/models/registry.py` - Model factory and registry
+- `backend/app/ml_engine/models/regression.py` - Regression model wrappers
+- `backend/app/ml_engine/models/classification.py` - Classification model wrappers
+- `backend/app/ml_engine/models/clustering.py` - Clustering model wrappers
 
 ### Tests
 - `backend/tests/ml_engine/utils/test_column_type_detector.py` - Type detection tests
@@ -230,6 +300,67 @@ When adding new ML components, please:
 
 ---
 
+### 4. [Regression Models Theory](models/REGRESSION_THEORY.md)
+**Location:** `app/ml_engine/models/REGRESSION_THEORY.md`
+
+**Topics covered:**
+- 11 regression algorithms (Linear, Ridge, Lasso, Elastic Net, Decision Tree, Random Forest, Extra Trees, Gradient Boosting, AdaBoost, SVR, KNN)
+- What each model does and how it works
+- When to use each algorithm
+- Strengths, weaknesses, and key hyperparameters
+- Model selection decision trees
+- Performance tiers and common pitfalls
+
+**Read this if you want to understand:**
+- How to choose the right regression algorithm
+- Regularization techniques (L1, L2, Elastic Net)
+- Ensemble methods vs single models
+- When to use tree-based vs linear models
+- Hyperparameter tuning strategies
+
+---
+
+### 5. [Classification Models Theory](models/CLASSIFICATION_THEORY.md)
+**Location:** `app/ml_engine/models/CLASSIFICATION_THEORY.md`
+
+**Topics covered:**
+- 9 classification algorithms (Logistic Regression, Decision Tree, Random Forest, Extra Trees, Gradient Boosting, AdaBoost, SVM, KNN, Gaussian Naive Bayes)
+- Algorithm explanations and use cases
+- Strengths, weaknesses, and hyperparameters
+- Model selection guide
+- Handling class imbalance
+- Evaluation metrics (accuracy, precision, recall, F1, ROC-AUC)
+
+**Read this if you want to understand:**
+- Choosing classification algorithms for your problem
+- Handling imbalanced datasets
+- Linear vs non-linear decision boundaries
+- Ensemble methods for classification
+- Evaluation metrics selection
+
+---
+
+### 6. [Clustering Models Theory](models/CLUSTERING_THEORY.md)
+**Location:** `app/ml_engine/models/CLUSTERING_THEORY.md`
+
+**Topics covered:**
+- 4 clustering algorithms (K-Means, DBSCAN, Agglomerative Clustering, Gaussian Mixture Model)
+- How each clustering method works
+- When to use each algorithm
+- Strengths, weaknesses, and hyperparameters
+- Determining optimal number of clusters
+- Internal and external evaluation metrics
+- Practical tips and comparison table
+
+**Read this if you want to understand:**
+- Unsupervised learning approaches
+- Choosing clustering algorithms
+- Elbow method, silhouette score, AIC/BIC
+- Density-based vs centroid-based clustering
+- Soft vs hard clustering assignments
+
+---
+
 ## Future Theory Documents
 
 Planned theory documentation for upcoming features:
@@ -247,11 +378,17 @@ Planned theory documentation for upcoming features:
   - Configuration management
   - Serialization/deserialization
 
-- **Model Training & Evaluation** - ML-31 to ML-61
-  - Model registry concepts
-  - Training workflows
-  - Hyperparameter tuning strategies
-  - Evaluation metrics for different tasks
+- **Model Evaluation & Metrics** - ML-51 to ML-61
+  - Cross-validation strategies
+  - Metrics for regression, classification, clustering
+  - Model comparison techniques
+  - Statistical significance testing
+
+- **Hyperparameter Tuning** - ML-71 to ML-80
+  - Grid search vs random search
+  - Bayesian optimization
+  - Automated tuning strategies
+  - Early stopping techniques
 
 ---
 
