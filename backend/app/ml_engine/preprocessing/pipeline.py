@@ -214,6 +214,135 @@ class Pipeline:
         """
         return self.fit(X, y).transform(X)
 
+    def inverse_transform(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        skip_non_invertible: bool = True
+    ) -> Union[pd.DataFrame, np.ndarray]:
+        """
+        Reverse transformations to get back to original data representation.
+
+        Applies inverse transformations in reverse order (last to first).
+        Only works for invertible transformations like scalers and some encoders.
+
+        Args:
+            X: Transformed data to reverse
+            skip_non_invertible: If True, skip steps that don't support inverse transform.
+                               If False, raise error on non-invertible steps.
+
+        Returns:
+            Data in original (or partially original) representation
+
+        Raises:
+            RuntimeError: If pipeline has not been fitted
+            NotImplementedError: If skip_non_invertible=False and a step doesn't support inverse
+            RuntimeError: If any step fails during inverse transformation
+
+        Example:
+            >>> pipeline = Pipeline(steps=[
+            ...     MeanImputer(columns=['age']),
+            ...     StandardScaler(columns=['age', 'salary'])
+            ... ])
+            >>> pipeline.fit(X_train)
+            >>> X_scaled = pipeline.transform(X_train)
+            >>> X_original = pipeline.inverse_transform(X_scaled)
+            >>> # Note: imputation cannot be reversed, so missing values won't be restored
+        """
+        if not self.fitted:
+            raise RuntimeError(
+                f"Pipeline '{self.name}' must be fitted before inverse_transform. "
+                "Call fit() or fit_transform() first."
+            )
+
+        if not self.steps:
+            logger.warning("Pipeline has no steps, returning input unchanged")
+            return X
+
+        logger.debug(
+            f"Inverse transforming data through {len(self.steps)} steps (in reverse order)"
+        )
+
+        X_current = X
+
+        # Apply inverse transforms in reverse order
+        for idx in range(len(self.steps) - 1, -1, -1):
+            step = self.steps[idx]
+
+            try:
+                # Check if step supports inverse transform
+                if not step.supports_inverse_transform():
+                    if skip_non_invertible:
+                        logger.warning(
+                            f"Step {idx + 1} ({step.name}) does not support inverse_transform, skipping"
+                        )
+                        continue
+                    else:
+                        raise NotImplementedError(
+                            f"Step {idx + 1} ({step.name}) does not support inverse_transform"
+                        )
+
+                logger.debug(
+                    f"Applying inverse transform for step {idx + 1}/{len(self.steps)}: {step.name}"
+                )
+                X_current = step.inverse_transform(X_current)
+
+            except NotImplementedError as e:
+                if skip_non_invertible:
+                    logger.warning(f"Skipping non-invertible step {idx + 1} ({step.name})")
+                    continue
+                else:
+                    raise
+
+            except Exception as e:
+                logger.error(
+                    f"Error in inverse transform for step {idx + 1} ({step.name}): {str(e)}"
+                )
+                raise RuntimeError(
+                    f"Pipeline inverse transformation failed at step {idx + 1} ({step.name}): {str(e)}"
+                ) from e
+
+        logger.debug("Pipeline inverse transformation complete")
+
+        return X_current
+
+    def supports_full_inverse_transform(self) -> bool:
+        """
+        Check if all steps in the pipeline support inverse transformation.
+
+        Returns:
+            True if all steps support inverse_transform, False otherwise
+        """
+        if not self.steps:
+            return True
+
+        return all(step.supports_inverse_transform() for step in self.steps)
+
+    def get_invertible_steps(self) -> List[int]:
+        """
+        Get indices of steps that support inverse transformation.
+
+        Returns:
+            List of step indices that support inverse_transform
+        """
+        return [
+            idx
+            for idx, step in enumerate(self.steps)
+            if step.supports_inverse_transform()
+        ]
+
+    def get_non_invertible_steps(self) -> List[int]:
+        """
+        Get indices of steps that do NOT support inverse transformation.
+
+        Returns:
+            List of step indices that don't support inverse_transform
+        """
+        return [
+            idx
+            for idx, step in enumerate(self.steps)
+            if not step.supports_inverse_transform()
+        ]
+
     # Step Management Methods
 
     def add_step(

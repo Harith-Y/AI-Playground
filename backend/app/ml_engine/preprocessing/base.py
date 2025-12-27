@@ -72,16 +72,47 @@ class PreprocessingStep(ABC):
     def fit_transform(self, X: Union[pd.DataFrame, np.ndarray], y: Optional[Union[pd.Series, np.ndarray]] = None) -> Union[pd.DataFrame, np.ndarray]:
         """
         Fit on data and then transform it (convenience method).
-        
+
         Args:
             X: Training features
             y: Optional training labels
-            
+
         Returns:
             Transformed data
         """
         return self.fit(X, y).transform(X)
-    
+
+    def inverse_transform(self, X: Union[pd.DataFrame, np.ndarray]) -> Union[pd.DataFrame, np.ndarray]:
+        """
+        Reverse the transformation (optional, not all steps support this).
+
+        Args:
+            X: Transformed data to reverse
+
+        Returns:
+            Data in original representation
+
+        Raises:
+            NotImplementedError: If this step doesn't support inverse transform
+            RuntimeError: If step has not been fitted
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support inverse_transform. "
+            "Only invertible transformations (e.g., scalers, some encoders) can be reversed."
+        )
+
+    def supports_inverse_transform(self) -> bool:
+        """
+        Check if this step supports inverse transformation.
+
+        Returns:
+            True if inverse_transform is implemented, False otherwise
+        """
+        # Check if inverse_transform is overridden in subclass
+        return (
+            self.__class__.inverse_transform is not PreprocessingStep.inverse_transform
+        )
+
     def _check_fitted(self) -> None:
         """
         Check if step has been fitted.
