@@ -19,7 +19,6 @@ ENV/
 
 # Uploads
 uploads/
-models/
 generated/
 
 # IDE
