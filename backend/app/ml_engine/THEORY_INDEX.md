@@ -45,6 +45,31 @@ This directory contains theoretical documentation for various ML engine componen
 
 ---
 
+### 3. [Oversampling Methods Theory](preprocessing/OVERSAMPLING_THEORY.md)
+**Location:** `app/ml_engine/preprocessing/OVERSAMPLING_THEORY.md`
+
+**Topics covered:**
+- SMOTE (Synthetic Minority Over-sampling TEchnique)
+- Borderline-SMOTE (boundary-focused variant)
+- ADASYN (Adaptive Synthetic Sampling)
+- How synthetic sample generation works
+- Interpolation vs duplication
+- Mathematical foundations and algorithms
+- Comparison of all three methods
+- Oversampling vs undersampling decision guide
+- Combined hybrid approaches
+- Best practices and common pitfalls
+
+**Read this if you want to understand:**
+- How SMOTE creates synthetic samples
+- Why interpolation prevents overfitting
+- When to use each oversampling variant
+- How to combine over- and undersampling
+- Cross-validation with oversampling
+- Feature scaling requirements
+
+---
+
 ## Quick Reference
 
 ### Column Type Detection
@@ -98,6 +123,43 @@ X_final, y_final = rus.fit_resample(X_clean, y_clean)
 
 ---
 
+### Oversampling Methods
+
+```python
+from app.ml_engine.preprocessing.oversampling import (
+    SMOTE,
+    BorderlineSMOTE,
+    ADASYN
+)
+
+# SMOTE (general-purpose)
+smote = SMOTE(sampling_strategy='auto', k_neighbors=5, random_state=42)
+X_res, y_res = smote.fit_resample(X, y)
+
+# Borderline-SMOTE (boundary-focused)
+bsmote = BorderlineSMOTE(kind='borderline-1', k_neighbors=5, m_neighbors=10, random_state=42)
+X_res, y_res = bsmote.fit_resample(X, y)
+
+# ADASYN (adaptive density-based)
+adasyn = ADASYN(k_neighbors=5, random_state=42)
+X_res, y_res = adasyn.fit_resample(X, y)
+
+# Combined (undersample + oversample)
+from app.ml_engine.preprocessing.undersampling import RandomUnderSampler
+
+# Step 1: Undersample majority
+rus = RandomUnderSampler(sampling_strategy={0: 50, 1: 500}, random_state=42)
+X_under, y_under = rus.fit_resample(X, y)
+
+# Step 2: Oversample minority
+smote = SMOTE(random_state=42)
+X_final, y_final = smote.fit_resample(X_under, y_under)
+```
+
+**Key concept:** Generate synthetic minority samples via interpolation to balance classes without losing data.
+
+---
+
 ## Learning Path
 
 ### For Beginners
@@ -111,11 +173,17 @@ X_final, y_final = rus.fit_resample(X_clean, y_clean)
    - Multiple algorithms to compare
    - Practical decision-making guidance
 
+3. Finally read **Oversampling Methods**
+   - More advanced: synthetic sample generation
+   - Complements undersampling
+   - Learn when to use which approach
+
 ### For Advanced Users
-- Read both documents for comprehensive understanding
+- Read all three documents for comprehensive understanding
 - Focus on "Algorithm Flow" and "Mathematical Foundations" sections
 - Study "Best Practices" for production deployment
 - Review "Limitations" to understand when NOT to use these methods
+- Compare oversampling vs undersampling trade-offs
 
 ---
 
@@ -124,14 +192,17 @@ X_final, y_final = rus.fit_resample(X_clean, y_clean)
 ### Code Examples
 - `backend/examples/column_type_detection_example.py` - Practical usage of type detection
 - `backend/examples/undersampling_example.py` - Comparing all undersampling methods
+- `backend/examples/oversampling_example.py` - Comparing SMOTE, Borderline-SMOTE, and ADASYN
 
 ### API Documentation
 - `backend/app/ml_engine/utils/README.md` - Column type detector API reference
-- `backend/app/ml_engine/preprocessing/undersampling.py` - Inline docstrings
+- `backend/app/ml_engine/preprocessing/undersampling.py` - Undersampling inline docstrings
+- `backend/app/ml_engine/preprocessing/oversampling.py` - Oversampling inline docstrings
 
 ### Tests
 - `backend/tests/ml_engine/utils/test_column_type_detector.py` - Type detection tests
 - `backend/tests/ml_engine/preprocessing/test_undersampling.py` - Undersampling tests
+- `backend/tests/ml_engine/preprocessing/test_oversampling.py` - Oversampling tests
 
 ---
 
@@ -162,11 +233,6 @@ When adding new ML components, please:
 ## Future Theory Documents
 
 Planned theory documentation for upcoming features:
-
-- **SMOTE (Oversampling)** - ML-25
-  - Synthetic minority oversampling technique
-  - When to oversample vs undersample
-  - Variants (Borderline-SMOTE, ADASYN)
 
 - **Feature Selection Methods** - ML-15, ML-16
   - Variance threshold
