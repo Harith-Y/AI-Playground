@@ -12,6 +12,7 @@ import json
 import yaml
 from copy import deepcopy
 from datetime import datetime
+import pandas as pd
 
 from app.ml_engine.preprocessing.pipeline import Pipeline
 from app.utils.logger import get_logger
@@ -120,17 +121,26 @@ class ConfigManager:
         >>> loaded = manager.load_config("configs/my_pipeline.json")
     """
 
-    def __init__(self, config_dir: Optional[Path] = None):
+    def __init__(self, config_dir: Optional[Path] = None, enable_validation: bool = True):
         """
         Initialize configuration manager.
 
         Args:
             config_dir: Optional directory for storing configurations
+            enable_validation: Whether to enable automatic validation (default True)
         """
         self.config_dir = Path(config_dir) if config_dir else Path("configs/preprocessing")
         self.config_dir.mkdir(parents=True, exist_ok=True)
+        self.enable_validation = enable_validation
 
         self.presets = self._load_presets()
+
+        # Import validator here to avoid circular imports
+        if self.enable_validation:
+            from app.ml_engine.preprocessing.config_validator import ConfigValidator
+            self.validator = ConfigValidator()
+        else:
+            self.validator = None
 
         logger.info(f"Initialized ConfigManager with config_dir: {self.config_dir}")
 
@@ -301,17 +311,103 @@ class ConfigManager:
 
         return sorted(all_files)
 
-    def validate_config(self, config: Dict[str, Any]) -> tuple[bool, List[str]]:
+    def validate_config(
+        self,
+        config: Dict[str, Any],
+        df: Optional[pd.DataFrame] = None,
+        strict: bool = False
+    ) -> tuple[bool, List[str]]:
         """
         Validate a configuration.
 
         Args:
             config: Configuration to validate
+            df: Optional DataFrame for semantic validation
+            strict: If True, treat warnings as errors
 
         Returns:
             Tuple of (is_valid, error_messages)
         """
-        return ConfigurationSchema.validate(config)
+        # First do basic schema validation
+        is_valid, errors = ConfigurationSchema.validate(config)
+
+        # If enabled, do comprehensive validation
+        if self.enable_validation and self.validator is not None:
+            result = self.validator.validate(config, df=df, strict=strict)
+
+            # Add error messages from detailed validation
+            for issue in result.get_errors():
+                errors.append(f"{issue.code}: {issue.message}")
+
+            # Add warnings if in strict mode
+            if strict:
+                for issue in result.get_warnings():
+                    errors.append(f"{issue.code}: {issue.message}")
+
+            is_valid = is_valid and result.valid
+
+        return is_valid, errors
+
+    def validate_config_detailed(
+        self,
+        config: Dict[str, Any],
+        df: Optional[pd.DataFrame] = None,
+        strict: bool = False
+    ):
+        """
+        Perform detailed validation and return ValidationResult.
+
+        Args:
+            config: Configuration to validate
+            df: Optional DataFrame for semantic validation
+            strict: If True, treat warnings as errors
+
+        Returns:
+            ValidationResult object with all issues
+
+        Raises:
+            RuntimeError: If validation is not enabled
+        """
+        if not self.enable_validation or self.validator is None:
+            raise RuntimeError("Validation is not enabled for this ConfigManager")
+
+        return self.validator.validate(config, df=df, strict=strict)
+
+    def validate_and_raise(
+        self,
+        config: Dict[str, Any],
+        df: Optional[pd.DataFrame] = None
+    ) -> None:
+        """
+        Validate configuration and raise exception if errors found.
+
+        Args:
+            config: Configuration to validate
+            df: Optional DataFrame for semantic validation
+
+        Raises:
+            ValueError: If validation fails
+        """
+        if self.enable_validation and self.validator is not None:
+            self.validator.validate_and_raise(config, df)
+        else:
+            # Fall back to basic validation
+            is_valid, errors = ConfigurationSchema.validate(config)
+            if not is_valid:
+                raise ValueError(f"Configuration validation failed: {', '.join(errors)}")
+
+    def auto_fix_config(self, config: Dict[str, Any]) -> tuple[Dict[str, Any], List[str]]:
+        """
+        Attempt to automatically fix common configuration issues.
+
+        Args:
+            config: Configuration to fix
+
+        Returns:
+            Tuple of (fixed_config, list_of_fixes_applied)
+        """
+        from app.ml_engine.preprocessing.config_validator import auto_fix_config
+        return auto_fix_config(config)
 
     def merge_configs(
         self,
@@ -387,7 +483,9 @@ class ConfigManager:
     def build_pipeline_from_config(
         self,
         config: Dict[str, Any],
-        name: Optional[str] = None
+        name: Optional[str] = None,
+        validate: bool = True,
+        df: Optional[pd.DataFrame] = None
     ) -> Pipeline:
         """
         Build a Pipeline instance from configuration.
@@ -395,10 +493,34 @@ class ConfigManager:
         Args:
             config: Configuration dictionary
             name: Optional pipeline name (defaults to config name)
+            validate: Whether to validate config before building (default True)
+            df: Optional DataFrame for semantic validation
 
         Returns:
             Pipeline instance
+
+        Raises:
+            ValueError: If validation is enabled and config is invalid
         """
+        # Validate if requested
+        if validate:
+            if self.enable_validation and self.validator is not None:
+                # Use detailed validation
+                result = self.validator.validate(config, df=df, strict=False)
+                if result.has_errors():
+                    error_msg = "\n".join([str(issue) for issue in result.get_errors()])
+                    raise ValueError(f"Configuration validation failed:\n{error_msg}")
+
+                # Log warnings
+                if result.has_warnings():
+                    for warning in result.get_warnings():
+                        logger.warning(f"{warning.code}: {warning.message}")
+            else:
+                # Fall back to basic validation
+                is_valid, errors = ConfigurationSchema.validate(config)
+                if not is_valid:
+                    raise ValueError(f"Configuration validation failed: {', '.join(errors)}")
+
         pipeline_name = name or config.get("name", "ConfiguredPipeline")
 
         pipeline_dict = {
