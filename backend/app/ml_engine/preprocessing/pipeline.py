@@ -431,23 +431,32 @@ class Pipeline:
 
     # Serialization Methods
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, include_version: bool = True) -> Dict[str, Any]:
         """
         Serialize pipeline configuration to dictionary.
 
         Note: This saves configuration only, not fitted parameters.
         Use save() to persist fitted pipeline with pickle.
 
+        Args:
+            include_version: Whether to include version information
+
         Returns:
             Dictionary containing pipeline configuration
         """
-        return {
+        config = {
             "name": self.name,
             "fitted": self.fitted,
             "steps": [step.to_dict() for step in self.steps],
             "metadata": self.metadata,
             "statistics": self.step_statistics
         }
+
+        if include_version:
+            config["_version"] = "1.0.0"  # Pipeline serialization format version
+            config["_schema_version"] = 1  # For future compatibility
+
+        return config
 
     @classmethod
     def from_dict(
@@ -687,3 +696,219 @@ def load_pipeline(path: Union[str, Path]) -> Pipeline:
         >>> pipeline = load_pipeline('models/preprocessing_pipeline.pkl')
     """
     return Pipeline.load(path)
+
+
+def export_pipeline_to_sklearn_code(
+    pipeline: Pipeline,
+    include_imports: bool = True,
+    include_comments: bool = True
+) -> str:
+    """
+    Export pipeline as executable scikit-learn Python code.
+
+    Args:
+        pipeline: Pipeline to export
+        include_imports: Whether to include import statements
+        include_comments: Whether to include explanatory comments
+
+    Returns:
+        Python code as string
+
+    Example:
+        >>> code = export_pipeline_to_sklearn_code(pipeline)
+        >>> print(code)
+    """
+    lines = []
+
+    # Add header comment
+    if include_comments:
+        lines.append("# Generated preprocessing pipeline")
+        lines.append(f"# Pipeline: {pipeline.name}")
+        lines.append(f"# Steps: {len(pipeline.steps)}")
+        lines.append("")
+
+    # Add imports
+    if include_imports:
+        lines.append("import pandas as pd")
+        lines.append("import numpy as np")
+        lines.append("from sklearn.pipeline import Pipeline")
+
+        # Collect unique step classes for imports
+        step_imports = set()
+        for step in pipeline.steps:
+            class_name = step.__class__.__name__
+            module_name = step.__class__.__module__
+
+            # Map custom classes to sklearn equivalents where possible
+            sklearn_mappings = {
+                "StandardScaler": "from sklearn.preprocessing import StandardScaler",
+                "MinMaxScaler": "from sklearn.preprocessing import MinMaxScaler",
+                "RobustScaler": "from sklearn.preprocessing import RobustScaler",
+                "OneHotEncoder": "from sklearn.preprocessing import OneHotEncoder",
+                "LabelEncoder": "from sklearn.preprocessing import LabelEncoder",
+                "OrdinalEncoder": "from sklearn.preprocessing import OrdinalEncoder",
+                "MeanImputer": "from sklearn.impute import SimpleImputer",
+                "MedianImputer": "from sklearn.impute import SimpleImputer",
+                "ModeImputer": "from sklearn.impute import SimpleImputer",
+            }
+
+            if class_name in sklearn_mappings:
+                step_imports.add(sklearn_mappings[class_name])
+            else:
+                # Use custom import
+                step_imports.add(f"from {module_name} import {class_name}")
+
+        for import_stmt in sorted(step_imports):
+            lines.append(import_stmt)
+
+        lines.append("")
+
+    # Create pipeline steps
+    if include_comments:
+        lines.append("# Define preprocessing steps")
+
+    lines.append("pipeline = Pipeline([")
+
+    for idx, step in enumerate(pipeline.steps):
+        class_name = step.__class__.__name__
+        step_name = step.name or f"step_{idx}"
+        params = step.get_params()
+
+        # Format parameters
+        param_strs = []
+        for key, value in params.items():
+            if isinstance(value, str):
+                param_strs.append(f"{key}='{value}'")
+            elif isinstance(value, list):
+                if all(isinstance(v, str) for v in value):
+                    formatted_list = "[" + ", ".join(f"'{v}'" for v in value) + "]"
+                else:
+                    formatted_list = str(value)
+                param_strs.append(f"{key}={formatted_list}")
+            elif value is None:
+                param_strs.append(f"{key}=None")
+            else:
+                param_strs.append(f"{key}={value}")
+
+        param_str = ", ".join(param_strs)
+
+        # Map to sklearn class if needed
+        sklearn_class_mappings = {
+            "MeanImputer": "SimpleImputer(strategy='mean')",
+            "MedianImputer": "SimpleImputer(strategy='median')",
+            "ModeImputer": "SimpleImputer(strategy='most_frequent')",
+        }
+
+        if class_name in sklearn_class_mappings:
+            instance_str = sklearn_class_mappings[class_name]
+        else:
+            instance_str = f"{class_name}({param_str})" if param_str else f"{class_name}()"
+
+        comma = "," if idx < len(pipeline.steps) - 1 else ""
+
+        if include_comments:
+            lines.append(f"    ('{step_name}', {instance_str}){comma}  # Step {idx + 1}")
+        else:
+            lines.append(f"    ('{step_name}', {instance_str}){comma}")
+
+    lines.append("])")
+    lines.append("")
+
+    # Add usage example
+    if include_comments:
+        lines.append("# Usage:")
+        lines.append("# X_train_transformed = pipeline.fit_transform(X_train, y_train)")
+        lines.append("# X_test_transformed = pipeline.transform(X_test)")
+
+    return "\n".join(lines)
+
+
+def export_pipeline_to_standalone_code(
+    pipeline: Pipeline,
+    include_imports: bool = True,
+    include_comments: bool = True
+) -> str:
+    """
+    Export pipeline as standalone Python code using custom preprocessing steps.
+
+    Args:
+        pipeline: Pipeline to export
+        include_imports: Whether to include import statements
+        include_comments: Whether to include explanatory comments
+
+    Returns:
+        Python code as string
+    """
+    lines = []
+
+    # Add header comment
+    if include_comments:
+        lines.append("# Generated preprocessing pipeline (standalone)")
+        lines.append(f"# Pipeline: {pipeline.name}")
+        lines.append(f"# Steps: {len(pipeline.steps)}")
+        lines.append("")
+
+    # Add imports
+    if include_imports:
+        lines.append("import pandas as pd")
+        lines.append("import numpy as np")
+        lines.append("from app.ml_engine.preprocessing.pipeline import Pipeline")
+
+        # Collect imports
+        step_imports = set()
+        for step in pipeline.steps:
+            class_name = step.__class__.__name__
+            module_name = step.__class__.__module__
+            step_imports.add(f"from {module_name} import {class_name}")
+
+        for import_stmt in sorted(step_imports):
+            lines.append(import_stmt)
+
+        lines.append("")
+
+    # Create steps
+    if include_comments:
+        lines.append("# Initialize preprocessing steps")
+
+    for idx, step in enumerate(pipeline.steps):
+        class_name = step.__class__.__name__
+        step_var = f"step_{idx}"
+        params = step.get_params()
+
+        # Format parameters
+        param_strs = []
+        for key, value in params.items():
+            if isinstance(value, str):
+                param_strs.append(f"{key}='{value}'")
+            elif isinstance(value, list):
+                if all(isinstance(v, str) for v in value):
+                    formatted_list = "[" + ", ".join(f"'{v}'" for v in value) + "]"
+                else:
+                    formatted_list = str(value)
+                param_strs.append(f"{key}={formatted_list}")
+            elif value is None:
+                param_strs.append(f"{key}=None")
+            else:
+                param_strs.append(f"{key}={value}")
+
+        param_str = ", ".join(param_strs)
+        lines.append(f"{step_var} = {class_name}({param_str})")
+
+    lines.append("")
+
+    # Create pipeline
+    if include_comments:
+        lines.append("# Create pipeline")
+
+    step_vars = [f"step_{idx}" for idx in range(len(pipeline.steps))]
+    lines.append(f"pipeline = Pipeline(steps=[{', '.join(step_vars)}], name='{pipeline.name}')")
+    lines.append("")
+
+    # Add usage example
+    if include_comments:
+        lines.append("# Usage:")
+        lines.append("# pipeline.fit(X_train, y_train)")
+        lines.append("# X_train_transformed = pipeline.transform(X_train)")
+        lines.append("# X_test_transformed = pipeline.transform(X_test)")
+
+    return "\n".join(lines)

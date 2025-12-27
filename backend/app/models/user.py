@@ -20,6 +20,7 @@ class User(Base):
     # Relationships
     datasets = relationship("Dataset", back_populates="user", cascade="all, delete-orphan")
     experiments = relationship("Experiment", back_populates="user", cascade="all, delete-orphan")
+    preprocessing_pipelines = relationship("PreprocessingPipeline", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email})>"
