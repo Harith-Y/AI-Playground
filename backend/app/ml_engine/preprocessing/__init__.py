@@ -5,6 +5,12 @@ from .scaler import StandardScaler, MinMaxScaler
 from .cleaner import IQROutlierDetector, ZScoreOutlierDetector
 from .undersampling import RandomUnderSampler, NearMissUnderSampler, TomekLinksRemover
 from .oversampling import SMOTE, BorderlineSMOTE, ADASYN
+from .serializer import (
+    PipelineSerializer,
+    PipelineRegistry,
+    save_pipeline,
+    load_pipeline,
+)
 
 __all__ = [
     "PreprocessingStep",
@@ -23,4 +29,8 @@ __all__ = [
     "SMOTE",
     "BorderlineSMOTE",
     "ADASYN",
+    "PipelineSerializer",
+    "PipelineRegistry",
+    "save_pipeline",
+    "load_pipeline",
 ]

@@ -570,3 +570,273 @@ def export_pipeline_code(
 
 # Additional endpoints (clone, import, step management, etc.) can be added here
 # Implementations omitted for brevity but follow similar patterns
+
+
+# Serialization Endpoints
+
+@router.post("/{pipeline_id}/export", response_model=dict)
+def export_pipeline_file(
+    pipeline_id: UUID,
+    format: str = "pickle",
+    compression: str = "none",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Export pipeline to a serialized file.
+
+    Supports multiple formats:
+    - pickle: Binary format with full state (fitted parameters)
+    - json: Configuration only (can be reconstructed)
+    - joblib: Optimized binary format
+    - yaml: Human-readable configuration
+
+    Compression options: none, gzip, bz2, lzma
+    """
+    from app.ml_engine.preprocessing.serializer import PipelineSerializer
+
+    db_pipeline = db.query(PreprocessingPipeline).filter(
+        PreprocessingPipeline.id == pipeline_id,
+        PreprocessingPipeline.user_id == current_user.id,
+    ).first()
+
+    if not db_pipeline:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pipeline {pipeline_id} not found",
+        )
+
+    try:
+        pipeline = _pipeline_from_db(db_pipeline, db)
+
+        # Determine export path
+        export_dir = Path("data/exports/pipelines")
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        # Build filename with appropriate extensions
+        ext_map = {
+            "pickle": "pkl",
+            "json": "json",
+            "joblib": "joblib",
+            "yaml": "yml"
+        }
+        compress_ext_map = {
+            "gzip": ".gz",
+            "bz2": ".bz2",
+            "lzma": ".xz",
+            "none": ""
+        }
+
+        filename = f"{db_pipeline.name.replace(' ', '_')}_{pipeline_id}.{ext_map[format]}{compress_ext_map[compression]}"
+        export_path = export_dir / filename
+
+        # Serialize
+        serializer = PipelineSerializer(default_format=format, compression=compression)
+        file_info = serializer.save(
+            pipeline,
+            export_path,
+            metadata={
+                "pipeline_id": str(pipeline_id),
+                "dataset_id": str(db_pipeline.dataset_id) if db_pipeline.dataset_id else None,
+                "user_id": str(current_user.id),
+                "description": db_pipeline.description,
+            }
+        )
+
+        logger.info(f"Exported pipeline {pipeline_id} to {export_path}")
+
+        return {
+            "success": True,
+            "message": f"Pipeline exported successfully",
+            "file_info": file_info,
+            "download_path": f"/api/v1/pipelines/{pipeline_id}/download/{filename}"
+        }
+
+    except Exception as e:
+        logger.error(f"Error exporting pipeline file: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export pipeline: {str(e)}",
+        )
+
+
+@router.post("/import", response_model=PipelineRead)
+def import_pipeline_file(
+    file_path: str,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    format: Optional[str] = None,
+    compression: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Import a pipeline from a serialized file.
+
+    Automatically detects format and compression from file extension.
+    Creates a new pipeline entry in the database.
+    """
+    from app.ml_engine.preprocessing.serializer import PipelineSerializer
+
+    import_path = Path(file_path)
+
+    if not import_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"File not found: {file_path}",
+        )
+
+    try:
+        # Load pipeline
+        serializer = PipelineSerializer()
+        loaded_data = serializer.load(import_path, format=format, compression=compression)
+
+        # Extract pipeline (might be wrapped in metadata)
+        if isinstance(loaded_data, dict) and "pipeline" in loaded_data:
+            pipeline = loaded_data["pipeline"]
+            metadata = loaded_data.get("metadata", {})
+        else:
+            pipeline = loaded_data
+            metadata = {}
+
+        # If it's a config dict (from JSON/YAML), reconstruct pipeline
+        if isinstance(pipeline, dict):
+            pipeline = Pipeline.from_dict(pipeline)
+
+        # Create database entry
+        pipeline_name = name or metadata.get("name") or pipeline.name or import_path.stem
+        db_pipeline = PreprocessingPipeline(
+            user_id=current_user.id,
+            name=pipeline_name,
+            description=description or metadata.get("description") or f"Imported from {import_path.name}",
+            config=pipeline.to_dict(),
+            fitted=pipeline.fitted if hasattr(pipeline, "fitted") else False,
+            num_steps=len(pipeline.steps) if hasattr(pipeline, "steps") else 0,
+        )
+
+        # Save fitted pipeline if applicable
+        if db_pipeline.fitted:
+            pickle_dir = Path("data/pipelines")
+            pickle_dir.mkdir(parents=True, exist_ok=True)
+            pickle_path = pickle_dir / f"{db_pipeline.id}.pkl"
+            pipeline.save(pickle_path)
+            db_pipeline.pickle_path = str(pickle_path)
+
+        db.add(db_pipeline)
+        db.commit()
+        db.refresh(db_pipeline)
+
+        logger.info(f"Imported pipeline from {import_path} as {db_pipeline.id}")
+
+        return PipelineRead.from_orm(db_pipeline)
+
+    except Exception as e:
+        logger.error(f"Error importing pipeline: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to import pipeline: {str(e)}",
+        )
+
+
+@router.get("/{pipeline_id}/export-config", response_model=dict)
+def export_pipeline_config(
+    pipeline_id: UUID,
+    format: str = "json",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Export pipeline configuration (without fitted parameters).
+
+    Returns the configuration as JSON or YAML that can be used
+    to reconstruct the pipeline structure.
+    """
+    db_pipeline = db.query(PreprocessingPipeline).filter(
+        PreprocessingPipeline.id == pipeline_id,
+        PreprocessingPipeline.user_id == current_user.id,
+    ).first()
+
+    if not db_pipeline:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pipeline {pipeline_id} not found",
+        )
+
+    try:
+        config = db_pipeline.config
+
+        if format.lower() == "yaml":
+            try:
+                import yaml
+                config_str = yaml.dump(config, default_flow_style=False, sort_keys=False)
+            except ImportError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="YAML export requires pyyaml package"
+                )
+        else:  # JSON
+            import json
+            config_str = json.dumps(config, indent=2)
+
+        return {
+            "success": True,
+            "pipeline_id": str(pipeline_id),
+            "pipeline_name": db_pipeline.name,
+            "format": format,
+            "config": config,
+            "config_string": config_str
+        }
+
+    except Exception as e:
+        logger.error(f"Error exporting config: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export config: {str(e)}",
+        )
+
+
+@router.post("/import-config", response_model=PipelineRead)
+def import_pipeline_config(
+    config: dict,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Import a pipeline from a configuration dictionary.
+
+    Accepts a configuration dict (from to_dict() format) and
+    creates a new unfitted pipeline.
+    """
+    try:
+        # Reconstruct pipeline from config
+        pipeline = Pipeline.from_dict(config)
+
+        # Create database entry
+        pipeline_name = name or config.get("name") or "Imported Pipeline"
+        db_pipeline = PreprocessingPipeline(
+            user_id=current_user.id,
+            name=pipeline_name,
+            description=description or "Imported from configuration",
+            config=config,
+            fitted=False,  # Config import creates unfitted pipeline
+            num_steps=len(config.get("steps", [])),
+        )
+
+        db.add(db_pipeline)
+        db.commit()
+        db.refresh(db_pipeline)
+
+        logger.info(f"Imported pipeline config as {db_pipeline.id}")
+
+        return PipelineRead.from_orm(db_pipeline)
+
+    except Exception as e:
+        logger.error(f"Error importing config: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to import config: {str(e)}",
+        )
