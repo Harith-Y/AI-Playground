@@ -56,6 +56,7 @@ export interface ModelRun {
   completedAt?: string;
   hyperparameters: Record<string, any>;
   metrics?: ModelMetrics;
+  insights?: ModelInsightsData;
 }
 
 /**
@@ -130,7 +131,45 @@ export type ModelMetrics =
 export interface FeatureImportance {
   feature: string;
   importance: number;
-  rank: number;
+  rank?: number;
+  stdDev?: number;
+}
+
+/**
+ * Permutation importance entry
+ */
+export interface PermutationImportance {
+  feature: string;
+  importance: number;
+  importances?: number[];
+  mean?: number;
+  std?: number;
+  rank?: number;
+}
+
+/**
+ * Feature ranking with multiple metrics
+ */
+export interface FeatureRanking {
+  feature: string;
+  importance: number;
+  permutationImportance?: number;
+  rank?: number;
+  permutationRank?: number;
+  correlation?: number;
+  type?: string;
+  stdDev?: number;
+}
+
+/**
+ * Model insights data
+ */
+export interface ModelInsightsData {
+  featureImportance?: FeatureImportance[];
+  permutationImportance?: PermutationImportance[];
+  featureRankings?: FeatureRanking[];
+  importanceType?: 'gain' | 'split' | 'weight' | 'cover';
+  metric?: string;
 }
 
 /**
