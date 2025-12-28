@@ -14,6 +14,12 @@ import { getErrorMessage } from '../../utils/preprocessingValidation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+interface HistoryEntry {
+  steps: PreprocessingStep[];
+  timestamp: number;
+  action: string;
+}
+
 interface PreprocessingState {
   steps: PreprocessingStep[];
   currentStep: PreprocessingStep | null;
@@ -25,6 +31,10 @@ interface PreprocessingState {
   currentTaskId: string | null;
   taskStatus: PreprocessingTaskStatus | null;
   isExecuting: boolean;
+  // Undo/Redo state
+  history: HistoryEntry[];
+  historyIndex: number;
+  maxHistorySize: number;
 }
 
 const initialState: PreprocessingState = {
@@ -37,6 +47,9 @@ const initialState: PreprocessingState = {
   currentTaskId: null,
   taskStatus: null,
   isExecuting: false,
+  history: [],
+  historyIndex: -1,
+  maxHistorySize: 50,
 };
 
 // Async thunks
@@ -158,6 +171,28 @@ export const getPreprocessingTaskStatus = createAsyncThunk(
   }
 );
 
+// Helper function to add to history
+const addToHistory = (state: PreprocessingState, action: string) => {
+  const newEntry: HistoryEntry = {
+    steps: JSON.parse(JSON.stringify(state.steps)),
+    timestamp: Date.now(),
+    action,
+  };
+
+  // Remove any entries after current index (when undoing and then making a new action)
+  state.history = state.history.slice(0, state.historyIndex + 1);
+
+  // Add new entry
+  state.history.push(newEntry);
+
+  // Limit history size
+  if (state.history.length > state.maxHistorySize) {
+    state.history.shift();
+  } else {
+    state.historyIndex++;
+  }
+};
+
 const preprocessingSlice = createSlice({
   name: 'preprocessing',
   initialState,
@@ -175,6 +210,58 @@ const preprocessingSlice = createSlice({
       state.taskStatus = null;
       state.isExecuting = false;
     },
+    // Undo/Redo actions
+    undo: (state) => {
+      if (state.historyIndex > 0) {
+        state.historyIndex--;
+        state.steps = JSON.parse(JSON.stringify(state.history[state.historyIndex].steps));
+      }
+    },
+    redo: (state) => {
+      if (state.historyIndex < state.history.length - 1) {
+        state.historyIndex++;
+        state.steps = JSON.parse(JSON.stringify(state.history[state.historyIndex].steps));
+      }
+    },
+    // Local step operations (without API calls)
+    moveStepUp: (state, action: PayloadAction<number>) => {
+      const index = action.payload;
+      if (index > 0 && index < state.steps.length) {
+        addToHistory(state, `Move step ${state.steps[index].step_type} up`);
+        const temp = state.steps[index];
+        state.steps[index] = state.steps[index - 1];
+        state.steps[index - 1] = temp;
+        // Update order property
+        state.steps.forEach((step, idx) => {
+          step.order = idx;
+        });
+      }
+    },
+    moveStepDown: (state, action: PayloadAction<number>) => {
+      const index = action.payload;
+      if (index >= 0 && index < state.steps.length - 1) {
+        addToHistory(state, `Move step ${state.steps[index].step_type} down`);
+        const temp = state.steps[index];
+        state.steps[index] = state.steps[index + 1];
+        state.steps[index + 1] = temp;
+        // Update order property
+        state.steps.forEach((step, idx) => {
+          step.order = idx;
+        });
+      }
+    },
+    removeStepLocal: (state, action: PayloadAction<string>) => {
+      const stepId = action.payload;
+      const step = state.steps.find(s => s.id === stepId);
+      if (step) {
+        addToHistory(state, `Remove step ${step.step_type}`);
+        state.steps = state.steps.filter(s => s.id !== stepId);
+        // Update order property
+        state.steps.forEach((step, idx) => {
+          step.order = idx;
+        });
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -186,6 +273,15 @@ const preprocessingSlice = createSlice({
       .addCase(fetchPreprocessingSteps.fulfilled, (state, action) => {
         state.isLoading = false;
         state.steps = action.payload;
+        // Initialize history with fetched steps
+        if (action.payload.length > 0) {
+          state.history = [{
+            steps: JSON.parse(JSON.stringify(action.payload)),
+            timestamp: Date.now(),
+            action: 'Fetch steps',
+          }];
+          state.historyIndex = 0;
+        }
       })
       .addCase(fetchPreprocessingSteps.rejected, (state, action) => {
         state.isLoading = false;
@@ -198,6 +294,7 @@ const preprocessingSlice = createSlice({
       })
       .addCase(createPreprocessingStep.fulfilled, (state, action) => {
         state.isProcessing = false;
+        addToHistory(state, `Add step: ${action.payload.step_type}`);
         state.steps.push(action.payload);
       })
       .addCase(createPreprocessingStep.rejected, (state, action) => {
@@ -211,6 +308,7 @@ const preprocessingSlice = createSlice({
       })
       .addCase(updatePreprocessingStep.fulfilled, (state, action) => {
         state.isProcessing = false;
+        addToHistory(state, `Update step: ${action.payload.step_type}`);
         const index = state.steps.findIndex(step => step.id === action.payload.id);
         if (index !== -1) {
           state.steps[index] = action.payload;
@@ -227,6 +325,10 @@ const preprocessingSlice = createSlice({
       })
       .addCase(deletePreprocessingStep.fulfilled, (state, action) => {
         state.isProcessing = false;
+        const step = state.steps.find(s => s.id === action.payload);
+        if (step) {
+          addToHistory(state, `Delete step: ${step.step_type}`);
+        }
         state.steps = state.steps.filter(step => step.id !== action.payload);
       })
       .addCase(deletePreprocessingStep.rejected, (state, action) => {
@@ -240,6 +342,7 @@ const preprocessingSlice = createSlice({
       })
       .addCase(reorderPreprocessingSteps.fulfilled, (state, action) => {
         state.isProcessing = false;
+        addToHistory(state, 'Reorder steps');
         state.steps = action.payload;
       })
       .addCase(reorderPreprocessingSteps.rejected, (state, action) => {
@@ -307,6 +410,11 @@ export const {
   clearError,
   clearPreprocessing,
   clearPipelineResult,
+  undo,
+  redo,
+  moveStepUp,
+  moveStepDown,
+  removeStepLocal,
 } = preprocessingSlice.actions;
 
 export default preprocessingSlice.reducer;

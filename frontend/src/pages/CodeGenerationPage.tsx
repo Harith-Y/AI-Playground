@@ -68,7 +68,6 @@ const CodeGenerationPage: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Pipeline Summary */}
-        <Grid item xs={12} md={4}>
           <Card sx={{ border: '1px solid #e2e8f0' }}>
             <CardContent>
               <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -93,10 +92,10 @@ const CodeGenerationPage: React.FC = () => {
               </Button>
             </CardContent>
           </Card>
-        </Grid>
+       
 
         {/* Code Preview */}
-        <Grid item xs={12} md={8}>
+       
           <Card sx={{ border: '1px solid #e2e8f0' }}>
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -119,7 +118,6 @@ const CodeGenerationPage: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-      </Grid>
     </Container>
   );
 };

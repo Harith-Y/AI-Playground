@@ -13,8 +13,11 @@ import {
   LinearProgress,
   Chip,
   Paper,
+  IconButton,
+  Tooltip,
+  Divider,
 } from '@mui/material';
-import { Transform, Add, CheckCircle } from '@mui/icons-material';
+import { Transform, Add, CheckCircle, Undo, Redo, History } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import LoadingState from '../components/common/LoadingState';
 import EmptyState from '../components/common/EmptyState';
@@ -30,6 +33,11 @@ import {
   getPreprocessingTaskStatus,
   clearError,
   clearPipelineResult,
+  undo,
+  redo,
+  moveStepUp,
+  moveStepDown,
+  removeStepLocal,
 } from '../store/slices/preprocessingSlice';
 import { fetchDatasetStats } from '../store/slices/datasetSlice';
 import type { PreprocessingStep, PreprocessingStepCreate } from '../types/preprocessing';
@@ -47,6 +55,8 @@ const PreprocessingPage: React.FC = () => {
     pipelineResult,
     currentTaskId,
     taskStatus,
+    history,
+    historyIndex,
   } = useAppSelector((state) => state.preprocessing);
   const { currentDataset, columns } = useAppSelector((state) => state.dataset);
 
@@ -73,6 +83,34 @@ const PreprocessingPage: React.FC = () => {
       }
     }
   }, [currentDataset?.id, dispatch, columns.length]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Z or Cmd+Z for Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) {
+          dispatch(undo());
+          showSnackbar('Undo successful', 'success');
+        }
+      }
+      // Ctrl+Shift+Z or Cmd+Shift+Z or Ctrl+Y for Redo
+      if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') || (e.ctrlKey && e.key === 'y')) {
+        e.preventDefault();
+        if (canRedo) {
+          dispatch(redo());
+          showSnackbar('Redo successful', 'success');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dispatch, historyIndex, history.length]);
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
 
   const handleAddStep = () => {
     setEditingStep(null);
@@ -224,6 +262,33 @@ const PreprocessingPage: React.FC = () => {
     }
   };
 
+  const handleUndo = () => {
+    if (canUndo) {
+      dispatch(undo());
+      showSnackbar('Undo successful', 'success');
+    }
+  };
+
+  const handleRedo = () => {
+    if (canRedo) {
+      dispatch(redo());
+      showSnackbar('Redo successful', 'success');
+    }
+  };
+
+  const handleMoveUp = (index: number) => {
+    dispatch(moveStepUp(index));
+  };
+
+  const handleMoveDown = (index: number) => {
+    dispatch(moveStepDown(index));
+  };
+
+  const handleRemoveStep = (stepId: string) => {
+    dispatch(removeStepLocal(stepId));
+    showSnackbar('Step removed', 'success');
+  };
+
   const showSnackbar = (message: string, severity: 'success' | 'error') => {
     setSnackbar({ open: true, message, severity });
   };
@@ -262,14 +327,59 @@ const PreprocessingPage: React.FC = () => {
               </Typography>
             </Box>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={handleAddStep}
-            disabled={isProcessing || columns.length === 0}
-          >
-            Add Step
-          </Button>
+
+          {/* Action Buttons */}
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            {/* Undo/Redo Controls */}
+            <Box sx={{ display: 'flex', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Tooltip title={`Undo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Z)`}>
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={handleUndo}
+                    disabled={!canUndo || isProcessing}
+                    sx={{ borderRadius: 0 }}
+                  >
+                    <Undo fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Divider orientation="vertical" flexItem />
+              <Tooltip title={`Redo (${navigator.platform.includes('Mac') ? 'Cmd+Shift+Z' : 'Ctrl+Y'})`}>
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={handleRedo}
+                    disabled={!canRedo || isProcessing}
+                    sx={{ borderRadius: 0 }}
+                  >
+                    <Redo fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Box>
+
+            {/* History Info */}
+            {history.length > 0 && (
+              <Tooltip title={`${history.length} actions in history`}>
+                <Chip
+                  icon={<History />}
+                  label={`${historyIndex + 1}/${history.length}`}
+                  size="small"
+                  variant="outlined"
+                />
+              </Tooltip>
+            )}
+
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={handleAddStep}
+              disabled={isProcessing || columns.length === 0}
+            >
+              Add Step
+            </Button>
+          </Box>
         </Box>
 
         {error && (
@@ -293,6 +403,9 @@ const PreprocessingPage: React.FC = () => {
             onEdit={handleEditStep}
             onDelete={handleDeleteStep}
             onReorder={handleReorderSteps}
+            onMoveUp={handleMoveUp}
+            onMoveDown={handleMoveDown}
+            onRemove={handleRemoveStep}
             onExecute={handleExecutePipeline}
             onRefresh={handleRefreshSteps}
             isProcessing={isProcessing}

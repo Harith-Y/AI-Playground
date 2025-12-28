@@ -19,6 +19,9 @@ import {
   DragIndicator,
   PlayArrow,
   Refresh,
+  KeyboardArrowUp,
+  KeyboardArrowDown,
+  DeleteOutline,
 } from '@mui/icons-material';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import type { PreprocessingStep } from '../../types/preprocessing';
@@ -29,6 +32,9 @@ interface StepHistoryProps {
   onEdit: (step: PreprocessingStep) => void;
   onDelete: (stepId: string) => void;
   onReorder: (steps: PreprocessingStep[]) => void;
+  onMoveUp?: (index: number) => void;
+  onMoveDown?: (index: number) => void;
+  onRemove?: (stepId: string) => void;
   onExecute?: () => void;
   onRefresh?: () => void;
   isProcessing?: boolean;
@@ -39,6 +45,9 @@ const StepHistory: React.FC<StepHistoryProps> = ({
   onEdit,
   onDelete,
   onReorder,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
   onExecute,
   onRefresh,
   isProcessing = false,
@@ -245,27 +254,76 @@ const StepHistory: React.FC<StepHistoryProps> = ({
 
                           {/* Actions */}
                           <ListItemSecondaryAction>
-                            <Tooltip title="Edit step">
-                              <IconButton
-                                edge="end"
-                                size="small"
-                                onClick={() => onEdit(step)}
-                                disabled={isProcessing}
-                              >
-                                <Edit fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete step">
-                              <IconButton
-                                edge="end"
-                                size="small"
-                                onClick={() => onDelete(step.id)}
-                                disabled={isProcessing}
-                                sx={{ ml: 0.5 }}
-                              >
-                                <Delete fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                              {/* Move Up */}
+                              {onMoveUp && (
+                                <Tooltip title="Move up">
+                                  <span>
+                                    <IconButton
+                                      edge="end"
+                                      size="small"
+                                      onClick={() => onMoveUp(index)}
+                                      disabled={isProcessing || index === 0}
+                                    >
+                                      <KeyboardArrowUp fontSize="small" />
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
+                              )}
+
+                              {/* Move Down */}
+                              {onMoveDown && (
+                                <Tooltip title="Move down">
+                                  <span>
+                                    <IconButton
+                                      edge="end"
+                                      size="small"
+                                      onClick={() => onMoveDown(index)}
+                                      disabled={isProcessing || index === steps.length - 1}
+                                    >
+                                      <KeyboardArrowDown fontSize="small" />
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
+                              )}
+
+                              {/* Edit */}
+                              <Tooltip title="Edit step">
+                                <IconButton
+                                  edge="end"
+                                  size="small"
+                                  onClick={() => onEdit(step)}
+                                  disabled={isProcessing}
+                                >
+                                  <Edit fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+
+                              {/* Remove (Local) or Delete (with API) */}
+                              {onRemove ? (
+                                <Tooltip title="Remove step">
+                                  <IconButton
+                                    edge="end"
+                                    size="small"
+                                    onClick={() => onRemove(step.id)}
+                                    disabled={isProcessing}
+                                  >
+                                    <DeleteOutline fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              ) : (
+                                <Tooltip title="Delete step">
+                                  <IconButton
+                                    edge="end"
+                                    size="small"
+                                    onClick={() => onDelete(step.id)}
+                                    disabled={isProcessing}
+                                  >
+                                    <Delete fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </Box>
                           </ListItemSecondaryAction>
                         </ListItem>
                       )}
