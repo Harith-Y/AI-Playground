@@ -1,1 +1,467 @@
-# Training async tasks
+"""
+Celery tasks for model training operations
+
+This module contains asynchronous tasks for training machine learning models.
+Long-running training operations are handled here to prevent API timeouts.
+"""
+
+import uuid
+import time
+import traceback
+from pathlib import Path
+from typing import Dict, Any, Optional
+import pandas as pd
+import numpy as np
+from celery import Task
+from sqlalchemy.orm import Session
+from sklearn.model_selection import train_test_split
+
+from app.celery_app import celery_app
+from app.db.session import SessionLocal
+from app.models.model_run import ModelRun
+from app.models.experiment import Experiment
+from app.models.dataset import Dataset
+from app.models.preprocessing_step import PreprocessingStep
+from app.ml_engine.model_registry import ModelRegistry
+from app.ml_engine.preprocessing.serialization import deserialize_transformer
+from app.ml_engine.evaluation.metrics import (
+    calculate_classification_metrics,
+    calculate_regression_metrics,
+    calculate_clustering_metrics
+)
+from app.core.config import settings
+from app.core.logging_config import get_logger
+
+
+class TrainingTask(Task):
+    """Base task for model training operations with progress tracking and logging"""
+
+    def on_success(self, retval, task_id, args, kwargs):
+        """Called when task completes successfully"""
+        logger = get_logger(task_id=task_id)
+        logger.info(
+            f"Training task completed successfully",
+            extra={
+                'event': 'task_success',
+                'duration_seconds': retval.get('training_time', 0),
+                'model_type': retval.get('model_type', 'unknown'),
+                'task_type': retval.get('task_type', 'unknown'),
+            }
+        )
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        """Called when task fails"""
+        logger = get_logger(task_id=task_id)
+        logger.error(
+            f"Training task failed: {exc}",
+            extra={
+                'event': 'task_failure',
+                'error_type': type(exc).__name__,
+                'error_message': str(exc),
+                'traceback': str(einfo)
+            },
+            exc_info=True
+        )
+
+
+@celery_app.task(
+    base=TrainingTask,
+    bind=True,
+    name="app.tasks.training_tasks.train_model"
+)
+def train_model(
+    self,
+    model_run_id: str,
+    experiment_id: str,
+    dataset_id: str,
+    model_type: str,
+    hyperparameters: Optional[Dict[str, Any]] = None,
+    target_column: Optional[str] = None,
+    feature_columns: Optional[list] = None,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    user_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Train a machine learning model asynchronously.
+
+    Args:
+        self: Task instance (bound)
+        model_run_id: UUID of the model run record
+        experiment_id: UUID of the experiment
+        dataset_id: UUID of the dataset to train on
+        model_type: Type of model to train (e.g., 'random_forest_classifier')
+        hyperparameters: Model hyperparameters (optional)
+        target_column: Name of target column (required for supervised learning)
+        feature_columns: List of feature column names (optional, uses all if None)
+        test_size: Proportion of data for testing (default: 0.2)
+        random_state: Random seed for reproducibility (default: 42)
+        user_id: UUID of the user (for logging)
+
+    Returns:
+        Dictionary with training results and metrics
+    """
+    # Setup logging with context
+    logger = get_logger(
+        task_id=self.request.id,
+        user_id=user_id,
+        dataset_id=dataset_id
+    )
+
+    logger.info(
+        f"Starting model training",
+        extra={
+            'event': 'training_start',
+            'model_type': model_type,
+            'experiment_id': experiment_id,
+            'test_size': test_size,
+        }
+    )
+
+    task_start_time = time.time()
+    db: Session = SessionLocal()
+
+    try:
+        # Update progress: Initializing
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'current': 0,
+                'total': 100,
+                'status': 'Initializing training...'
+            }
+        )
+
+        # 1. Fetch model run and validate
+        model_run = db.query(ModelRun).filter(ModelRun.id == uuid.UUID(model_run_id)).first()
+        if not model_run:
+            raise ValueError(f"ModelRun with id {model_run_id} not found")
+
+        experiment = db.query(Experiment).filter(Experiment.id == uuid.UUID(experiment_id)).first()
+        if not experiment:
+            raise ValueError(f"Experiment with id {experiment_id} not found")
+
+        dataset = db.query(Dataset).filter(Dataset.id == uuid.UUID(dataset_id)).first()
+        if not dataset:
+            raise ValueError(f"Dataset with id {dataset_id} not found")
+
+        # Update progress: Loading data
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'current': 10,
+                'total': 100,
+                'status': 'Loading dataset...'
+            }
+        )
+
+        # 2. Load dataset
+        logger.info(f"Loading dataset from {dataset.file_path}")
+        df = pd.read_csv(dataset.file_path)
+
+        initial_shape = df.shape
+        logger.info(f"Dataset loaded: {initial_shape[0]} rows, {initial_shape[1]} columns")
+
+        # Update progress: Applying preprocessing
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'current': 20,
+                'total': 100,
+                'status': 'Applying preprocessing steps...'
+            }
+        )
+
+        # 3. Apply preprocessing steps if any exist
+        preprocessing_steps = db.query(PreprocessingStep).filter(
+            PreprocessingStep.dataset_id == uuid.UUID(dataset_id),
+            PreprocessingStep.is_active == True
+        ).order_by(PreprocessingStep.order).all()
+
+        if preprocessing_steps:
+            logger.info(f"Applying {len(preprocessing_steps)} preprocessing steps")
+            for idx, step in enumerate(preprocessing_steps):
+                try:
+                    if step.fitted_transformer:
+                        transformer = deserialize_transformer(step.fitted_transformer)
+                        df = pd.DataFrame(
+                            transformer.transform(df),
+                            columns=df.columns
+                        )
+                        logger.info(f"Applied step {idx + 1}/{len(preprocessing_steps)}: {step.step_type}")
+                except Exception as e:
+                    logger.warning(f"Failed to apply preprocessing step {step.step_type}: {e}")
+                    # Continue with training even if some preprocessing fails
+
+        # Update progress: Preparing features
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'current': 35,
+                'total': 100,
+                'status': 'Preparing features and target...'
+            }
+        )
+
+        # 4. Get model info from registry
+        registry = ModelRegistry()
+        model_info = registry.get_model(model_type)
+        if not model_info:
+            raise ValueError(f"Model type '{model_type}' not found in registry")
+
+        task_type = model_info.task_type
+        logger.info(f"Training {task_type.value} model: {model_info.name}")
+
+        # 5. Prepare features and target
+        if task_type.value in ['classification', 'regression']:
+            # Supervised learning
+            if not target_column:
+                raise ValueError("target_column is required for supervised learning")
+
+            if target_column not in df.columns:
+                raise ValueError(f"Target column '{target_column}' not found in dataset")
+
+            # Separate features and target
+            if feature_columns:
+                # Use specified feature columns
+                missing_cols = set(feature_columns) - set(df.columns)
+                if missing_cols:
+                    raise ValueError(f"Feature columns not found: {missing_cols}")
+                X = df[feature_columns]
+            else:
+                # Use all columns except target
+                X = df.drop(columns=[target_column])
+
+            y = df[target_column]
+
+            # Split into train and test sets
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y,
+                test_size=test_size,
+                random_state=random_state,
+                stratify=y if task_type.value == 'classification' and len(y.unique()) < 50 else None
+            )
+
+            logger.info(f"Train set: {X_train.shape}, Test set: {X_test.shape}")
+
+        else:
+            # Unsupervised learning (clustering)
+            if feature_columns:
+                X = df[feature_columns]
+            else:
+                X = df
+
+            X_train = X
+            X_test = None
+            y_train = None
+            y_test = None
+
+        # Update progress: Training model
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'current': 50,
+                'total': 100,
+                'status': f'Training {model_info.name}...'
+            }
+        )
+
+        # 6. Create and configure model
+        from app.ml_engine.models.classification import ClassificationModel
+        from app.ml_engine.models.regression import RegressionModel
+        from app.ml_engine.models.clustering import ClusteringModel
+
+        # Create model instance based on task type
+        if task_type.value == 'classification':
+            model = ClassificationModel(
+                model_type=model_type,
+                config=hyperparameters or {}
+            )
+        elif task_type.value == 'regression':
+            model = RegressionModel(
+                model_type=model_type,
+                config=hyperparameters or {}
+            )
+        else:  # clustering
+            model = ClusteringModel(
+                model_type=model_type,
+                config=hyperparameters or {}
+            )
+
+        # 7. Train the model
+        training_start = time.time()
+
+        if task_type.value in ['classification', 'regression']:
+            model.fit(X_train, y_train)
+        else:
+            model.fit(X_train)
+
+        training_duration = time.time() - training_start
+        logger.info(f"Model training completed in {training_duration:.2f} seconds")
+
+        # Update progress: Evaluating model
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'current': 75,
+                'total': 100,
+                'status': 'Evaluating model performance...'
+            }
+        )
+
+        # 8. Evaluate model and calculate metrics
+        metrics = {}
+
+        if task_type.value == 'classification':
+            y_pred = model.predict(X_test)
+            y_pred_proba = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
+
+            metrics = calculate_classification_metrics(
+                y_true=y_test,
+                y_pred=y_pred,
+                y_pred_proba=y_pred_proba,
+                labels=sorted(y_test.unique())
+            )
+
+        elif task_type.value == 'regression':
+            y_pred = model.predict(X_test)
+
+            metrics = calculate_regression_metrics(
+                y_true=y_test,
+                y_pred=y_pred
+            )
+
+        else:  # clustering
+            labels = model.get_labels()
+
+            metrics = calculate_clustering_metrics(
+                X=X_train,
+                labels=labels,
+                n_clusters=len(np.unique(labels))
+            )
+
+        # 9. Get feature importance if available
+        feature_importance = None
+        try:
+            feature_importance = model.get_feature_importance()
+            if feature_importance is not None:
+                logger.info(f"Feature importance calculated: {len(feature_importance)} features")
+        except Exception as e:
+            logger.warning(f"Could not calculate feature importance: {e}")
+
+        # Update progress: Saving model
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'current': 90,
+                'total': 100,
+                'status': 'Saving model artifact...'
+            }
+        )
+
+        # 10. Save model artifact
+        model_dir = Path(settings.UPLOAD_DIR) / "models" / str(experiment_id)
+        model_dir.mkdir(parents=True, exist_ok=True)
+
+        model_path = model_dir / f"{model_run_id}.joblib"
+        model.save(str(model_path))
+        logger.info(f"Model saved to {model_path}")
+
+        # 11. Update ModelRun with results
+        model_run.metrics = metrics
+        model_run.training_time = training_duration
+        model_run.model_artifact_path = str(model_path)
+        model_run.status = "completed"
+
+        # Store feature importance if available
+        if feature_importance is not None:
+            if not model_run.metadata:
+                model_run.metadata = {}
+            model_run.metadata['feature_importance'] = feature_importance
+
+        db.commit()
+        db.refresh(model_run)
+
+        logger.info(f"ModelRun updated with results")
+
+        # 12. Update experiment status if needed
+        if experiment.status == "running":
+            # Check if all model runs in this experiment are completed
+            all_runs = db.query(ModelRun).filter(ModelRun.experiment_id == uuid.UUID(experiment_id)).all()
+            if all(run.status == "completed" for run in all_runs):
+                experiment.status = "completed"
+                db.commit()
+
+        # Calculate total execution time
+        total_execution_time = time.time() - task_start_time
+
+        # Update progress: Complete
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'current': 100,
+                'total': 100,
+                'status': 'Training completed successfully!'
+            }
+        )
+
+        result = {
+            'model_run_id': model_run_id,
+            'model_type': model_type,
+            'task_type': task_type.value,
+            'training_time': training_duration,
+            'total_execution_time': total_execution_time,
+            'metrics': metrics,
+            'train_samples': len(X_train),
+            'test_samples': len(X_test) if X_test is not None else 0,
+            'n_features': X_train.shape[1],
+            'feature_importance': feature_importance,
+            'model_path': str(model_path),
+            'status': 'completed'
+        }
+
+        logger.info(
+            f"Training completed successfully",
+            extra={
+                'event': 'training_complete',
+                'metrics': metrics,
+                'duration': total_execution_time
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        # Log the error
+        logger.error(
+            f"Training failed: {e}",
+            extra={
+                'event': 'training_error',
+                'error_type': type(e).__name__,
+                'error_message': str(e),
+                'traceback': traceback.format_exc()
+            },
+            exc_info=True
+        )
+
+        # Update model run status to failed
+        try:
+            model_run = db.query(ModelRun).filter(ModelRun.id == uuid.UUID(model_run_id)).first()
+            if model_run:
+                model_run.status = "failed"
+                if not model_run.metadata:
+                    model_run.metadata = {}
+                model_run.metadata['error'] = {
+                    'type': type(e).__name__,
+                    'message': str(e),
+                    'traceback': traceback.format_exc()
+                }
+                db.commit()
+        except Exception as update_error:
+            logger.error(f"Failed to update model run status: {update_error}")
+
+        # Re-raise the exception for Celery to handle
+        raise
+
+    finally:
+        db.close()
