@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -19,11 +19,13 @@ import {
   Tooltip,
   IconButton,
   Alert,
+  AlertTitle,
 } from '@mui/material';
-import { Info, Close } from '@mui/icons-material';
+import { Info, Close, Warning, Error as ErrorIcon } from '@mui/icons-material';
 import { useAppSelector } from '../../hooks/redux';
 import type { PreprocessingStepCreate, StepType, ParameterField } from '../../types/preprocessing';
 import { STEP_TYPE_CONFIGS } from '../../types/preprocessing';
+import { validatePreprocessingStep, validateColumnForStep } from '../../utils/preprocessingValidation';
 
 interface StepBuilderProps {
   open: boolean;
@@ -39,8 +41,23 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
   const [selectedColumn, setSelectedColumn] = useState<string>(editStep?.column_name || '');
   const [parameters, setParameters] = useState<Record<string, any>>(editStep?.parameters || {});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [columnWarning, setColumnWarning] = useState<string | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
   const selectedConfig = stepType ? STEP_TYPE_CONFIGS[stepType] : null;
+
+  // Validate column compatibility when column or step type changes
+  useEffect(() => {
+    if (stepType && selectedColumn && selectedConfig?.requiresColumn) {
+      const column = columns.find(col => col.name === selectedColumn);
+      if (column) {
+        const validation = validateColumnForStep(selectedColumn, column.dtype, stepType);
+        setColumnWarning(validation.warning || null);
+      }
+    } else {
+      setColumnWarning(null);
+    }
+  }, [stepType, selectedColumn, columns, selectedConfig]);
 
   const handleStepTypeChange = (type: StepType) => {
     setStepType(type);
@@ -66,39 +83,37 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
   };
 
   const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!stepType) {
-      newErrors.stepType = 'Please select a step type';
+    if (!currentDataset || !stepType) {
+      setGeneralError('Invalid configuration. Please select a step type.');
+      return false;
     }
 
-    if (selectedConfig?.requiresColumn && !selectedColumn) {
-      newErrors.column = 'Please select a column';
+    // Check if dataset is empty
+    if (columns.length === 0) {
+      setGeneralError('Cannot create preprocessing step. Dataset has no columns.');
+      return false;
     }
 
-    // Validate required parameters
-    selectedConfig?.parameterSchema.forEach((field: ParameterField) => {
-      if (field.required && !parameters[field.name]) {
-        newErrors[field.name] = `${field.label} is required`;
-      }
+    // Use validation utility
+    const validationResult = validatePreprocessingStep(
+      {
+        dataset_id: currentDataset.id,
+        step_type: stepType,
+        parameters,
+        column_name: selectedColumn,
+      },
+      columns
+    );
 
-      // Type-specific validation
-      if (parameters[field.name] !== undefined && parameters[field.name] !== '') {
-        if (field.type === 'number') {
-          const value = Number(parameters[field.name]);
-          if (isNaN(value)) {
-            newErrors[field.name] = 'Must be a valid number';
-          } else if (field.min !== undefined && value < field.min) {
-            newErrors[field.name] = `Must be at least ${field.min}`;
-          } else if (field.max !== undefined && value > field.max) {
-            newErrors[field.name] = `Must be at most ${field.max}`;
-          }
-        }
-      }
-    });
+    setErrors(validationResult.errors);
+    setGeneralError(null);
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // Show general error if column warning exists and it's invalid
+    if (columnWarning && !columnWarning.toLowerCase().includes('may')) {
+      setGeneralError(columnWarning);
+    }
+
+    return validationResult.isValid && !columnWarning?.toLowerCase().includes('requires');
   };
 
   const handleSave = () => {
@@ -120,6 +135,8 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
     setSelectedColumn('');
     setParameters({});
     setErrors({});
+    setColumnWarning(null);
+    setGeneralError(null);
     onClose();
   };
 
@@ -223,6 +240,26 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
 
       <DialogContent dividers>
         <Grid container spacing={3}>
+          {/* General Error Alert */}
+          {generalError && (
+            <Grid item xs={12}>
+              <Alert severity="error" icon={<ErrorIcon />}>
+                <AlertTitle>Configuration Error</AlertTitle>
+                {generalError}
+              </Alert>
+            </Grid>
+          )}
+
+          {/* Empty Dataset Warning */}
+          {columns.length === 0 && (
+            <Grid item xs={12}>
+              <Alert severity="warning" icon={<Warning />}>
+                <AlertTitle>No Columns Available</AlertTitle>
+                The selected dataset has no columns. Please upload a valid dataset before creating preprocessing steps.
+              </Alert>
+            </Grid>
+          )}
+
           {/* Step Type Selection */}
           <Grid item xs={12}>
             <Typography variant="subtitle2" gutterBottom fontWeight={600}>
@@ -278,6 +315,7 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
                   value={selectedColumn}
                   label="Target Column *"
                   onChange={(e) => setSelectedColumn(e.target.value)}
+                  disabled={columns.length === 0}
                 >
                   {columns.map((col) => (
                     <MenuItem key={col.name} value={col.name}>
@@ -294,6 +332,17 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
                   </Typography>
                 )}
               </FormControl>
+
+              {/* Column Type Warning */}
+              {columnWarning && (
+                <Alert
+                  severity={columnWarning.toLowerCase().includes('requires') ? 'error' : 'warning'}
+                  sx={{ mt: 2 }}
+                  icon={<Warning />}
+                >
+                  {columnWarning}
+                </Alert>
+              )}
             </Grid>
           )}
 

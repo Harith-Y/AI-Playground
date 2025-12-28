@@ -10,6 +10,7 @@ import type {
   PreprocessingTaskStatus,
 } from '../../types/preprocessing';
 import axios from 'axios';
+import { getErrorMessage } from '../../utils/preprocessingValidation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -48,7 +49,7 @@ export const fetchPreprocessingSteps = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to fetch preprocessing steps');
+      return rejectWithValue(getErrorMessage(error));
     }
   }
 );
@@ -63,7 +64,7 @@ export const createPreprocessingStep = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to create preprocessing step');
+      return rejectWithValue(getErrorMessage(error));
     }
   }
 );
@@ -78,7 +79,7 @@ export const updatePreprocessingStep = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to update preprocessing step');
+      return rejectWithValue(getErrorMessage(error));
     }
   }
 );
@@ -90,7 +91,7 @@ export const deletePreprocessingStep = createAsyncThunk(
       await axios.delete(`${API_URL}/api/v1/preprocessing/${id}`);
       return id;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to delete preprocessing step');
+      return rejectWithValue(getErrorMessage(error));
     }
   }
 );
@@ -105,7 +106,7 @@ export const reorderPreprocessingSteps = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to reorder steps');
+      return rejectWithValue(getErrorMessage(error));
     }
   }
 );
@@ -121,7 +122,7 @@ export const applyPreprocessingPipeline = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to apply preprocessing pipeline');
+      return rejectWithValue(getErrorMessage(error));
     }
   }
 );
@@ -137,7 +138,7 @@ export const applyPreprocessingPipelineAsync = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to start async preprocessing');
+      return rejectWithValue(getErrorMessage(error));
     }
   }
 );
@@ -152,7 +153,7 @@ export const getPreprocessingTaskStatus = createAsyncThunk(
       );
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to get task status');
+      return rejectWithValue(getErrorMessage(error));
     }
   }
 );

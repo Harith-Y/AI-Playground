@@ -32,6 +32,8 @@ import {
   TrendingUp,
   TrendingDown,
   RemoveCircle,
+  Error as ErrorIcon,
+  WarningAmber,
 } from '@mui/icons-material';
 import {
   BarChart,
@@ -71,11 +73,12 @@ interface PreviewData {
 interface PreviewPanelProps {
   previewData: PreviewData | null;
   isLoading?: boolean;
+  error?: string | null;
 }
 
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
 
-const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = false }) => {
+const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = false, error = null }) => {
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
   const [selectedColumn, setSelectedColumn] = useState<string>('');
 
@@ -161,6 +164,67 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
     return histogram;
   };
 
+  // Error state
+  if (error) {
+    return (
+      <Paper sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box sx={{ textAlign: 'center', maxWidth: 500 }}>
+          <ErrorIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
+          <Typography variant="h6" color="error" gutterBottom>
+            Preview Error
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {error}
+          </Typography>
+          <Alert severity="error" sx={{ mt: 2, textAlign: 'left' }}>
+            Common causes:
+            <ul style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20 }}>
+              <li>Invalid preprocessing configuration</li>
+              <li>Empty or corrupted dataset</li>
+              <li>Incompatible column types for selected operations</li>
+              <li>Backend service error</li>
+            </ul>
+          </Alert>
+        </Box>
+      </Paper>
+    );
+  }
+
+  // Empty data state (no rows)
+  if (previewData && previewData.before.shape[0] === 0) {
+    return (
+      <Paper sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <WarningAmber sx={{ fontSize: 64, color: 'warning.main', mb: 2 }} />
+          <Typography variant="h6" color="warning.main" gutterBottom>
+            Empty Dataset
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            The dataset has no rows to preview. Please upload a dataset with data.
+          </Typography>
+        </Box>
+      </Paper>
+    );
+  }
+
+  // Empty columns state
+  if (previewData && previewData.before.shape[1] === 0) {
+    return (
+      <Paper sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <WarningAmber sx={{ fontSize: 64, color: 'warning.main', mb: 2 }} />
+          <Typography variant="h6" color="warning.main" gutterBottom>
+            No Columns
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            The dataset has no columns. Please upload a valid dataset.
+          </Typography>
+        </Box>
+      </Paper>
+    );
+  }
+
+  // No preview data yet
   if (!previewData) {
     return (
       <Paper sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

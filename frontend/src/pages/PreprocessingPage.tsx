@@ -33,6 +33,8 @@ import {
 } from '../store/slices/preprocessingSlice';
 import { fetchDatasetStats } from '../store/slices/datasetSlice';
 import type { PreprocessingStep, PreprocessingStepCreate } from '../types/preprocessing';
+import { validateDatasetForPreprocessing, getErrorMessage } from '../utils/preprocessingValidation';
+import PreviewPanel from '../components/preprocessing/PreviewPanel';
 
 const PreprocessingPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -100,8 +102,11 @@ const PreprocessingPage: React.FC = () => {
         await dispatch(createPreprocessingStep(stepData)).unwrap();
         showSnackbar('Step added successfully', 'success');
       }
+      setIsBuilderOpen(false);
+      setEditingStep(null);
     } catch (error: any) {
-      showSnackbar(error || 'Failed to save step', 'error');
+      const errorMessage = getErrorMessage(error);
+      showSnackbar(errorMessage, 'error');
     }
   };
 
@@ -111,7 +116,8 @@ const PreprocessingPage: React.FC = () => {
         await dispatch(deletePreprocessingStep(stepId)).unwrap();
         showSnackbar('Step deleted successfully', 'success');
       } catch (error: any) {
-        showSnackbar(error || 'Failed to delete step', 'error');
+        const errorMessage = getErrorMessage(error);
+        showSnackbar(errorMessage, 'error');
       }
     }
   };
@@ -122,27 +128,47 @@ const PreprocessingPage: React.FC = () => {
       await dispatch(reorderPreprocessingSteps(stepIds)).unwrap();
       showSnackbar('Steps reordered successfully', 'success');
     } catch (error: any) {
-      showSnackbar(error || 'Failed to reorder steps', 'error');
+      const errorMessage = getErrorMessage(error);
+      showSnackbar(errorMessage, 'error');
     }
   };
 
   const handleExecutePipeline = async () => {
-    if (!currentDataset?.id || steps.length === 0) {
-      showSnackbar('No steps to execute', 'error');
+    // Validate dataset and steps before execution
+    const validation = validateDatasetForPreprocessing(currentDataset, steps);
+
+    if (!validation.isValid) {
+      const errorMessages = validation.errorList.map(e => e.message).join('; ');
+      showSnackbar(errorMessages, 'error');
       return;
+    }
+
+    // Additional validation: check if dataset has data
+    if (currentDataset?.shape) {
+      const [rows, cols] = currentDataset.shape;
+      if (rows === 0) {
+        showSnackbar('Cannot execute pipeline: Dataset has no rows', 'error');
+        return;
+      }
+      if (cols === 0) {
+        showSnackbar('Cannot execute pipeline: Dataset has no columns', 'error');
+        return;
+      }
     }
 
     try {
       // Start async preprocessing task
       await dispatch(applyPreprocessingPipelineAsync({
-        dataset_id: currentDataset.id,
+        dataset_id: currentDataset!.id,
         save_output: true,
-        output_name: `${currentDataset.name}_preprocessed`,
+        output_name: `${currentDataset!.name}_preprocessed`,
       })).unwrap();
 
       setShowProgressDialog(true);
+      showSnackbar('Preprocessing pipeline started', 'success');
     } catch (error: any) {
-      showSnackbar(error || 'Failed to start preprocessing', 'error');
+      const errorMessage = getErrorMessage(error);
+      showSnackbar(errorMessage, 'error');
     }
   };
 
@@ -181,7 +207,8 @@ const PreprocessingPage: React.FC = () => {
           pollingIntervalRef.current = null;
         }
         setShowProgressDialog(false);
-        showSnackbar(taskStatus.error || 'Pipeline execution failed', 'error');
+        const errorMessage = getErrorMessage(taskStatus.error || 'Pipeline execution failed');
+        showSnackbar(errorMessage, 'error');
       }
     }
   }, [taskStatus, pipelineResult]);
@@ -272,62 +299,70 @@ const PreprocessingPage: React.FC = () => {
           />
         </Box>
 
-        {/* Main Area - Dataset Preview or Instructions */}
+        {/* Main Area - Preview Panel or Instructions */}
         <Box sx={{ width: { xs: '100%', md: '66.67%' }, height: '100%' }}>
-          <Box
-            sx={{
-              height: '100%',
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 2,
-              p: 4,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'background.paper',
-            }}
-          >
-            {steps.length === 0 ? (
-              <EmptyState
-                title="Build Your Preprocessing Pipeline"
-                message="Click 'Add Step' to start building your data preprocessing pipeline. You can add multiple steps and drag to reorder them."
-              />
-            ) : (
-              <Box sx={{ textAlign: 'center', maxWidth: 600 }}>
-                <Typography variant="h6" gutterBottom fontWeight={600}>
-                  Pipeline Preview
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Your preprocessing pipeline has <strong>{steps.length}</strong> step{steps.length !== 1 ? 's' : ''}.
-                  Steps will be executed in the order shown in the sidebar.
-                </Typography>
-                <Box sx={{ mt: 4, textAlign: 'left' }}>
-                  <Typography variant="subtitle2" gutterBottom fontWeight={600}>
-                    Pipeline Steps:
+          {pipelineResult ? (
+            <PreviewPanel
+              previewData={pipelineResult.preview as any}
+              isLoading={isExecuting}
+              error={error}
+            />
+          ) : (
+            <Box
+              sx={{
+                height: '100%',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2,
+                p: 4,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'background.paper',
+              }}
+            >
+              {steps.length === 0 ? (
+                <EmptyState
+                  title="Build Your Preprocessing Pipeline"
+                  message="Click 'Add Step' to start building your data preprocessing pipeline. You can add multiple steps and drag to reorder them."
+                />
+              ) : (
+                <Box sx={{ textAlign: 'center', maxWidth: 600 }}>
+                  <Typography variant="h6" gutterBottom fontWeight={600}>
+                    Pipeline Preview
                   </Typography>
-                  {steps.map((step, index) => (
-                    <Box
-                      key={step.id}
-                      sx={{
-                        p: 2,
-                        mb: 1,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                        bgcolor: 'grey.50',
-                      }}
-                    >
-                      <Typography variant="body2">
-                        <strong>{index + 1}.</strong> {step.step_type}
-                        {step.column_name && ` on column "${step.column_name}"`}
-                      </Typography>
-                    </Box>
-                  ))}
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    Your preprocessing pipeline has <strong>{steps.length}</strong> step{steps.length !== 1 ? 's' : ''}.
+                    Steps will be executed in the order shown in the sidebar.
+                  </Typography>
+                  <Box sx={{ mt: 4, textAlign: 'left' }}>
+                    <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                      Pipeline Steps:
+                    </Typography>
+                    {steps.map((step, index) => (
+                      <Box
+                        key={step.id}
+                        sx={{
+                          p: 2,
+                          mb: 1,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          bgcolor: 'grey.50',
+                        }}
+                      >
+                        <Typography variant="body2">
+                          <strong>{index + 1}.</strong> {step.step_type}
+                          {step.column_name && ` on column "${step.column_name}"`}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
                 </Box>
-              </Box>
-            )}
-          </Box>
+              )}
+            </Box>
+          )}
         </Box>
       </Box>
 
