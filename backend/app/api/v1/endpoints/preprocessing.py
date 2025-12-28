@@ -26,6 +26,8 @@ from app.schemas.preprocessing import (
     PreprocessingApplyResponse,
     PreprocessingAsyncResponse,
     PreprocessingTaskStatus,
+    PreprocessingPreviewResponse,
+    DataPreview,
 )
 from app.ml_engine.preprocessing.imputer import MeanImputer, MedianImputer
 from app.ml_engine.preprocessing.scaler import StandardScaler, MinMaxScaler, RobustScaler
@@ -921,3 +923,197 @@ async def get_preprocessing_task_status(task_id: str):
         response.progress = 0
 
     return response
+
+
+# ============================================================================
+# PREVIEW ENDPOINT - Before/After Comparison
+# ============================================================================
+
+
+def _create_data_preview(df: pd.DataFrame, sample_size: int = 10) -> DataPreview:
+    """
+    Create a DataPreview object from a pandas DataFrame.
+
+    Args:
+        df: The dataframe to preview
+        sample_size: Number of rows to include in the preview (default: 10)
+
+    Returns:
+        DataPreview object with shape, columns, dtypes, data, and statistics
+    """
+    # Limit sample size to dataframe length
+    sample_size = min(sample_size, len(df))
+
+    # Get sample data
+    sample_df = df.head(sample_size)
+
+    # Create preview
+    return DataPreview(
+        shape=[df.shape[0], df.shape[1]],
+        columns=df.columns.tolist(),
+        dtypes={col: str(df[col].dtype) for col in df.columns},
+        data=sample_df.to_dict('records'),
+        missing_counts={col: int(df[col].isna().sum()) for col in df.columns},
+        null_counts={col: int(df[col].isna().sum()) for col in df.columns},
+        statistics={
+            col: {
+                'mean': float(df[col].mean()) if pd.api.types.is_numeric_dtype(df[col]) else None,
+                'std': float(df[col].std()) if pd.api.types.is_numeric_dtype(df[col]) else None,
+                'min': float(df[col].min()) if pd.api.types.is_numeric_dtype(df[col]) else None,
+                'max': float(df[col].max()) if pd.api.types.is_numeric_dtype(df[col]) else None,
+                'unique': int(df[col].nunique()),
+            }
+            for col in df.columns
+        }
+    )
+
+
+@router.post(
+    "/preview",
+    response_model=PreprocessingPreviewResponse,
+    summary="Preview preprocessing transformations",
+    description="Get a before/after comparison of preprocessing pipeline without saving",
+    responses={
+        200: {
+            "description": "Preview generated successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "Preview generated with 3 steps",
+                        "before": {
+                            "shape": [1000, 10],
+                            "columns": ["age", "income", "education"],
+                            "dtypes": {"age": "int64", "income": "float64"},
+                            "data": [{"age": 25, "income": 50000.0}],
+                            "missing_counts": {"age": 10, "income": 5},
+                            "null_counts": {"age": 10, "income": 5}
+                        },
+                        "after": {
+                            "shape": [950, 12],
+                            "columns": ["age", "income", "education_high", "education_low"],
+                            "dtypes": {"age": "float64", "income": "float64"},
+                            "data": [{"age": 0.5, "income": 0.75}],
+                            "missing_counts": {"age": 0, "income": 0},
+                            "null_counts": {"age": 0, "income": 0}
+                        },
+                        "steps_applied": 3
+                    }
+                }
+            }
+        },
+        404: {"description": "Dataset not found"},
+        400: {"description": "No preprocessing steps configured"},
+    }
+)
+async def preview_preprocessing_transformations(
+    request: PreprocessingApplyRequest = Body(...),
+    sample_size: int = Query(10, ge=1, le=100, description="Number of rows to preview"),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Preview preprocessing transformations with before/after comparison.
+
+    This endpoint applies the preprocessing pipeline to the dataset and returns
+    a preview of the data before and after transformations, WITHOUT saving the result.
+
+    **Use Cases:**
+    - Validate preprocessing configuration before applying
+    - Debug transformation issues
+    - Visualize data changes in the frontend
+    - Compare column types and statistics
+
+    **Features:**
+    - Shows shape changes (rows/columns added or removed)
+    - Displays sample data (customizable sample size)
+    - Includes missing value counts
+    - Provides basic statistics (mean, std, min, max)
+    - Lists transformation details
+
+    **Parameters:**
+    - `dataset_id`: UUID of the dataset to preview
+    - `sample_size`: Number of rows to include in preview (1-100, default: 10)
+    - `save_output`: Ignored for preview (always False)
+    - `output_name`: Ignored for preview
+
+    **Note:** This endpoint does NOT save the transformed dataset.
+    Use `/preprocessing/apply` or `/preprocessing/apply/async` to save results.
+    """
+    # Verify dataset exists and belongs to user
+    dataset = db.query(Dataset).filter(
+        and_(Dataset.id == request.dataset_id, Dataset.user_id == user_id)
+    ).first()
+
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset {request.dataset_id} not found or access denied"
+        )
+
+    # Get all preprocessing steps for the dataset
+    steps = db.query(PreprocessingStep).filter(
+        PreprocessingStep.dataset_id == request.dataset_id
+    ).order_by(PreprocessingStep.order).all()
+
+    if not steps:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No preprocessing steps configured for this dataset"
+        )
+
+    try:
+        # Load the dataset
+        df_before = pd.read_csv(dataset.file_path)
+        df_after = df_before.copy()
+
+        # Track transformations
+        transformations = []
+
+        # Apply each preprocessing step in order
+        for idx, step in enumerate(steps):
+            before_shape = df_after.shape
+            before_columns = set(df_after.columns)
+            before_missing = df_after.isna().sum().sum()
+
+            df_after, step_stats = _apply_single_step(df_after, step)
+
+            after_shape = df_after.shape
+            after_columns = set(df_after.columns)
+            after_missing = df_after.isna().sum().sum()
+
+            # Record transformation details
+            transformation = {
+                "step_number": idx + 1,
+                "step_type": step.step_type,
+                "column_name": step.column_name,
+                "parameters": step.parameters,
+                "shape_before": list(before_shape),
+                "shape_after": list(after_shape),
+                "rows_removed": before_shape[0] - after_shape[0],
+                "columns_added": after_shape[1] - before_shape[1],
+                "missing_values_before": int(before_missing),
+                "missing_values_after": int(after_missing),
+                "new_columns": list(after_columns - before_columns),
+                "removed_columns": list(before_columns - after_columns),
+            }
+            transformations.append(transformation)
+
+        # Generate before/after previews
+        preview_before = _create_data_preview(df_before, sample_size)
+        preview_after = _create_data_preview(df_after, sample_size)
+
+        return PreprocessingPreviewResponse(
+            success=True,
+            message=f"Preview generated with {len(steps)} preprocessing step{'s' if len(steps) != 1 else ''}",
+            before=preview_before,
+            after=preview_after,
+            steps_applied=len(steps),
+            transformations=transformations
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating preview: {str(e)}"
+        )

@@ -66,3 +66,25 @@ class PreprocessingTaskStatus(BaseModel):
 	current_step: Optional[str] = None
 	result: Optional[Dict[str, Any]] = None  # Final result if SUCCESS
 	error: Optional[str] = None  # Error message if FAILURE
+
+
+# Preview schemas for before/after comparison
+class DataPreview(BaseModel):
+	"""Data preview for a single dataset state"""
+	shape: List[int]  # [rows, cols]
+	columns: List[str]
+	dtypes: Dict[str, str]
+	data: List[Dict[str, Any]]  # Sample rows (default 10 rows)
+	missing_counts: Dict[str, int]
+	null_counts: Dict[str, int]
+	statistics: Optional[Dict[str, Any]] = None
+
+
+class PreprocessingPreviewResponse(BaseModel):
+	"""Before/After preview comparison for preprocessing pipeline"""
+	success: bool
+	message: str
+	before: DataPreview
+	after: DataPreview
+	steps_applied: int
+	transformations: Optional[List[Dict[str, Any]]] = None  # Details of what changed
