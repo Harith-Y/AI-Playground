@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any, List
 from uuid import UUID
+from datetime import datetime
 from pydantic import BaseModel
 
 
@@ -88,3 +89,43 @@ class PreprocessingPreviewResponse(BaseModel):
 	after: DataPreview
 	steps_applied: int
 	transformations: Optional[List[Dict[str, Any]]] = None  # Details of what changed
+
+
+# Preprocessing history schemas
+class PreprocessingHistoryBase(BaseModel):
+	"""Base schema for preprocessing history"""
+	dataset_id: UUID
+	operation_type: str  # 'apply', 'preview', 'execute'
+	steps_applied: List[Dict[str, Any]]  # Array of step details
+	original_shape: List[int]  # [rows, cols]
+	transformed_shape: List[int]  # [rows, cols]
+	execution_time: Optional[float] = None
+	status: str = 'success'  # 'success', 'failure'
+	error_message: Optional[str] = None
+	output_dataset_id: Optional[UUID] = None
+	statistics: Optional[Dict[str, Any]] = None
+
+
+class PreprocessingHistoryCreate(PreprocessingHistoryBase):
+	"""Schema for creating preprocessing history"""
+	user_id: UUID
+
+
+class PreprocessingHistoryRead(PreprocessingHistoryBase):
+	"""Schema for reading preprocessing history"""
+	id: UUID
+	user_id: UUID
+	created_at: datetime
+
+	class Config:
+		from_attributes = True
+
+
+class PreprocessingHistoryList(BaseModel):
+	"""Schema for listing preprocessing history"""
+	total: int
+	items: List[PreprocessingHistoryRead]
+	page: int
+	page_size: int
+	has_next: bool
+	has_prev: bool

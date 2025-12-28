@@ -7,6 +7,7 @@ Users can create, read, update, delete, and reorder preprocessing steps for thei
 
 import uuid
 import os
+import time
 from typing import List, Optional
 from pathlib import Path
 import pandas as pd
@@ -18,6 +19,7 @@ from sqlalchemy import and_
 from app.db.session import get_db
 from app.models.preprocessing_step import PreprocessingStep
 from app.models.dataset import Dataset
+from app.models.preprocessing_history import PreprocessingHistory
 from app.schemas.preprocessing import (
     PreprocessingStepCreate,
     PreprocessingStepUpdate,
@@ -28,6 +30,8 @@ from app.schemas.preprocessing import (
     PreprocessingTaskStatus,
     PreprocessingPreviewResponse,
     DataPreview,
+    PreprocessingHistoryRead,
+    PreprocessingHistoryList,
 )
 from app.ml_engine.preprocessing.imputer import MeanImputer, MedianImputer
 from app.ml_engine.preprocessing.scaler import StandardScaler, MinMaxScaler, RobustScaler
@@ -485,6 +489,9 @@ async def apply_preprocessing_pipeline(
             detail="No preprocessing steps configured for this dataset"
         )
 
+    # Start timing
+    start_time = time.time()
+
     try:
         # Load the dataset
         df = pd.read_csv(dataset.file_path)
@@ -535,6 +542,34 @@ async def apply_preprocessing_pipeline(
             db.refresh(new_dataset)
             output_dataset_id = new_dataset.id
 
+        # Calculate execution time
+        execution_time = time.time() - start_time
+
+        # Record history
+        history_record = PreprocessingHistory(
+            id=uuid.uuid4(),
+            dataset_id=request.dataset_id,
+            user_id=user_id,
+            operation_type='apply',
+            steps_applied=[
+                {
+                    "step_type": step.step_type,
+                    "column_name": step.column_name,
+                    "parameters": step.parameters,
+                    "order": step.order
+                }
+                for step in steps
+            ],
+            original_shape=original_shape,
+            transformed_shape=transformed_shape,
+            execution_time=execution_time,
+            status='success',
+            output_dataset_id=output_dataset_id,
+            statistics=stats
+        )
+        db.add(history_record)
+        db.commit()
+
         # Generate preview (first 5 rows)
         preview = df.head(5).to_dict('records')
 
@@ -550,6 +585,33 @@ async def apply_preprocessing_pipeline(
         )
 
     except Exception as e:
+        # Calculate execution time even on failure
+        execution_time = time.time() - start_time
+
+        # Record failed operation in history
+        history_record = PreprocessingHistory(
+            id=uuid.uuid4(),
+            dataset_id=request.dataset_id,
+            user_id=user_id,
+            operation_type='apply',
+            steps_applied=[
+                {
+                    "step_type": step.step_type,
+                    "column_name": step.column_name,
+                    "parameters": step.parameters,
+                    "order": step.order
+                }
+                for step in steps
+            ],
+            original_shape=[0, 0],  # Unknown on failure
+            transformed_shape=[0, 0],  # Unknown on failure
+            execution_time=execution_time,
+            status='failure',
+            error_message=str(e)
+        )
+        db.add(history_record)
+        db.commit()
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error applying preprocessing pipeline: {str(e)}"
@@ -1117,3 +1179,136 @@ async def preview_preprocessing_transformations(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating preview: {str(e)}"
         )
+
+
+@router.get(
+    "/history/{dataset_id}",
+    response_model=PreprocessingHistoryList,
+    summary="Get preprocessing history for a dataset",
+    description="Retrieve all preprocessing operations performed on a specific dataset",
+)
+async def get_preprocessing_history(
+    dataset_id: uuid.UUID,
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    operation_type: Optional[str] = Query(None, description="Filter by operation type"),
+    status_filter: Optional[str] = Query(None, description="Filter by status (success/failure)"),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get preprocessing history for a dataset with pagination and filtering.
+
+    Features:
+    - Pagination support
+    - Filter by operation type (apply, preview, execute)
+    - Filter by status (success, failure)
+    - Sorted by most recent first
+    """
+    # Verify dataset exists and user has access
+    dataset = db.query(Dataset).filter(
+        and_(Dataset.id == dataset_id, Dataset.user_id == user_id)
+    ).first()
+
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset {dataset_id} not found or access denied"
+        )
+
+    # Build query with filters
+    query = db.query(PreprocessingHistory).filter(
+        PreprocessingHistory.dataset_id == dataset_id
+    )
+
+    if operation_type:
+        query = query.filter(PreprocessingHistory.operation_type == operation_type)
+
+    if status_filter:
+        query = query.filter(PreprocessingHistory.status == status_filter)
+
+    # Get total count
+    total = query.count()
+
+    # Apply pagination and ordering
+    offset = (page - 1) * page_size
+    items = query.order_by(PreprocessingHistory.created_at.desc()).offset(offset).limit(page_size).all()
+
+    # Calculate pagination metadata
+    has_next = (offset + page_size) < total
+    has_prev = page > 1
+
+    return PreprocessingHistoryList(
+        total=total,
+        items=items,
+        page=page,
+        page_size=page_size,
+        has_next=has_next,
+        has_prev=has_prev
+    )
+
+
+@router.get(
+    "/history/record/{history_id}",
+    response_model=PreprocessingHistoryRead,
+    summary="Get a specific preprocessing history record",
+    description="Retrieve detailed information about a specific preprocessing operation",
+)
+async def get_preprocessing_history_record(
+    history_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get a specific preprocessing history record.
+
+    Returns detailed information about a single preprocessing operation including:
+    - All steps applied
+    - Original and transformed data shapes
+    - Execution time
+    - Status and any error messages
+    - Output dataset ID if saved
+    """
+    history = db.query(PreprocessingHistory).filter(
+        and_(PreprocessingHistory.id == history_id, PreprocessingHistory.user_id == user_id)
+    ).first()
+
+    if not history:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"History record {history_id} not found or access denied"
+        )
+
+    return history
+
+
+@router.delete(
+    "/history/{history_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a preprocessing history record",
+    description="Delete a specific preprocessing history record",
+)
+async def delete_preprocessing_history(
+    history_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Delete a preprocessing history record.
+
+    Only the user who created the record can delete it.
+    """
+    history = db.query(PreprocessingHistory).filter(
+        and_(PreprocessingHistory.id == history_id, PreprocessingHistory.user_id == user_id)
+    ).first()
+
+    if not history:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"History record {history_id} not found or access denied"
+        )
+
+    db.delete(history)
+    db.commit()
+
+    return None
