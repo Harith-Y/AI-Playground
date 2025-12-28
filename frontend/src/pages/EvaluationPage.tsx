@@ -33,6 +33,8 @@ import type {
   EvaluationPageProps,
 } from '../types/evaluation';
 import { EvaluationTab as EvaluationTabEnum, TaskType as TaskTypeEnum } from '../types/evaluation';
+import { MetricsDisplay } from '../components/evaluation/metrics';
+import { ClassificationCharts } from '../components/evaluation/charts';
 
 // Tab panel component
 interface TabPanelProps {
@@ -263,21 +265,24 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                 </Alert>
               ) : (
                 <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Classification Evaluation
-                  </Typography>
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    <Typography variant="body2">
-                      <strong>Available metrics:</strong> Accuracy, Precision, Recall, F1-Score, AUC-ROC
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      <strong>Visualizations:</strong> Confusion Matrix, ROC Curve, Precision-Recall Curve
-                    </Typography>
-                  </Alert>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    Found {classificationRuns.length} classification run(s). Detailed metrics and
-                    visualizations will be displayed here.
-                  </Typography>
+                  {/* Metrics Display */}
+                  <MetricsDisplay
+                    taskType={TaskTypeEnum.CLASSIFICATION}
+                    metrics={classificationRuns[0]?.metrics || null}
+                    isLoading={isLoading}
+                    showDescription={true}
+                    compact={false}
+                  />
+
+                  {/* Classification Charts */}
+                  {classificationRuns[0]?.metrics && (
+                    <Box mt={4}>
+                      <ClassificationCharts
+                        metrics={classificationRuns[0].metrics as any}
+                        isLoading={isLoading}
+                      />
+                    </Box>
+                  )}
                 </Box>
               )}
             </TabPanel>
@@ -421,6 +426,22 @@ const getMockRuns = (): ModelRun[] => {
         recall: 0.96,
         f1Score: 0.95,
         auc: 0.98,
+        confusionMatrix: [
+          [45, 3, 2],
+          [1, 48, 1],
+          [2, 1, 47],
+        ],
+        classNames: ['Setosa', 'Versicolor', 'Virginica'],
+        rocCurve: {
+          fpr: Array.from({ length: 50 }, (_, i) => i / 49),
+          tpr: Array.from({ length: 50 }, (_, i) => Math.min(1, (i / 49) * 1.1 + Math.random() * 0.05)),
+          thresholds: Array.from({ length: 50 }, (_, i) => 1 - i / 49),
+        },
+        prCurve: {
+          precision: Array.from({ length: 50 }, (_, i) => Math.max(0.8, 1 - (i / 49) * 0.2 + Math.random() * 0.05)),
+          recall: Array.from({ length: 50 }, (_, i) => 1 - i / 49),
+          thresholds: Array.from({ length: 50 }, (_, i) => 1 - i / 49),
+        },
       },
     },
     {
