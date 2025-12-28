@@ -7,6 +7,7 @@ import PreprocessingPage from './pages/PreprocessingPage'
 import FeatureEngineeringPage from './pages/FeatureEngineeringPage'
 import ModelingPage from './pages/ModelingPage'
 import ExplorationPage from './pages/ExplorationPage'
+import EvaluationPage from './pages/EvaluationPage'
 import TuningPage from './pages/TuningPage'
 import CodeGenerationPage from './pages/CodeGenerationPage'
 import './App.css'
@@ -22,7 +23,7 @@ function App() {
           <Route path="/preprocessing" element={<PreprocessingPage />} />
           <Route path="/features" element={<FeatureEngineeringPage />} />
           <Route path="/modeling" element={<ModelingPage />} />
-          <Route path="/evaluation" element={<ExplorationPage />} />
+          <Route path="/evaluation" element={<EvaluationPage />} />
           <Route path="/tuning" element={<TuningPage />} />
           <Route path="/code-generation" element={<CodeGenerationPage />} />
         </Routes>
