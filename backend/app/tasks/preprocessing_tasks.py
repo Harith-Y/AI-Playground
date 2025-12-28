@@ -6,6 +6,7 @@ Long-running preprocessing operations are handled here to prevent API timeouts.
 """
 
 import uuid
+import time
 from pathlib import Path
 from typing import Dict, Any, List
 import pandas as pd
@@ -20,18 +21,38 @@ from app.models.dataset import Dataset
 from app.ml_engine.preprocessing.imputer import MeanImputer, MedianImputer
 from app.ml_engine.preprocessing.scaler import StandardScaler, MinMaxScaler, RobustScaler
 from app.ml_engine.preprocessing.cleaner import IQROutlierDetector, ZScoreOutlierDetector
+from app.core.logging_config import get_preprocessing_logger, log_preprocessing_metrics
 
 
 class PreprocessingTask(Task):
-    """Base task for preprocessing operations with progress tracking"""
+    """Base task for preprocessing operations with progress tracking and logging"""
 
     def on_success(self, retval, task_id, args, kwargs):
         """Called when task completes successfully"""
-        print(f"Preprocessing task {task_id} completed successfully")
+        logger = get_preprocessing_logger(task_id=task_id)
+        logger.info(
+            f"Preprocessing task completed successfully",
+            extra={
+                'event': 'task_success',
+                'duration_seconds': retval.get('total_execution_time', 0),
+                'steps_applied': retval.get('steps_applied', 0),
+                'rows_processed': retval.get('transformed_shape', [0])[0]
+            }
+        )
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """Called when task fails"""
-        print(f"Preprocessing task {task_id} failed: {exc}")
+        logger = get_preprocessing_logger(task_id=task_id)
+        logger.error(
+            f"Preprocessing task failed: {exc}",
+            extra={
+                'event': 'task_failure',
+                'error_type': type(exc).__name__,
+                'error_message': str(exc),
+                'traceback': str(einfo)
+            },
+            exc_info=True
+        )
 
 
 @celery_app.task(
@@ -59,6 +80,23 @@ def apply_preprocessing_pipeline(
     Returns:
         Dictionary with processing results
     """
+    # Setup logging with context
+    logger = get_preprocessing_logger(
+        dataset_id=dataset_id,
+        task_id=self.request.id,
+        user_id=user_id
+    )
+
+    logger.info(
+        f"Starting preprocessing pipeline",
+        extra={
+            'event': 'pipeline_start',
+            'save_output': save_output,
+            'output_name': output_name
+        }
+    )
+
+    task_start_time = time.time()
     db: Session = SessionLocal()
 
     try:
@@ -68,6 +106,8 @@ def apply_preprocessing_pipeline(
             meta={'status': 'Loading dataset...', 'progress': 0}
         )
 
+        logger.debug("Task state updated to STARTED")
+
         # Verify dataset exists and belongs to user
         dataset = db.query(Dataset).filter(
             Dataset.id == dataset_id,
@@ -75,7 +115,20 @@ def apply_preprocessing_pipeline(
         ).first()
 
         if not dataset:
+            logger.error(
+                f"Dataset not found or access denied",
+                extra={'event': 'dataset_not_found'}
+            )
             raise ValueError(f"Dataset {dataset_id} not found or access denied")
+
+        logger.info(
+            f"Dataset found: {dataset.name}",
+            extra={
+                'event': 'dataset_loaded',
+                'dataset_name': dataset.name,
+                'file_path': dataset.file_path
+            }
+        )
 
         # Get all preprocessing steps
         steps = db.query(PreprocessingStep).filter(
@@ -83,9 +136,21 @@ def apply_preprocessing_pipeline(
         ).order_by(PreprocessingStep.order).all()
 
         if not steps:
+            logger.error(
+                "No preprocessing steps configured",
+                extra={'event': 'no_steps_configured'}
+            )
             raise ValueError("No preprocessing steps configured for this dataset")
 
         total_steps = len(steps)
+        logger.info(
+            f"Found {total_steps} preprocessing steps to apply",
+            extra={
+                'event': 'steps_loaded',
+                'total_steps': total_steps,
+                'step_types': [s.step_type for s in steps]
+            }
+        )
 
         # Load dataset
         self.update_state(
@@ -93,8 +158,24 @@ def apply_preprocessing_pipeline(
             meta={'status': f'Loading dataset: {dataset.name}', 'progress': 5}
         )
 
+        logger.debug(f"Loading data from {dataset.file_path}")
+        load_start = time.time()
         df = pd.read_csv(dataset.file_path)
+        load_time = time.time() - load_start
+
         original_shape = list(df.shape)
+
+        logger.info(
+            f"Dataset loaded successfully",
+            extra={
+                'event': 'data_loaded',
+                'shape': original_shape,
+                'rows': df.shape[0],
+                'columns': df.shape[1],
+                'load_time_seconds': round(load_time, 3),
+                'memory_mb': round(df.memory_usage(deep=True).sum() / 1024 / 1024, 2)
+            }
+        )
 
         # Initialize statistics
         stats = {
@@ -111,6 +192,18 @@ def apply_preprocessing_pipeline(
         for idx, step in enumerate(steps, 1):
             progress = 10 + int((idx / total_steps) * 70)  # 10-80%
 
+            logger.info(
+                f"Starting step {idx}/{total_steps}: {step.step_type}",
+                extra={
+                    'event': 'step_start',
+                    'step_number': idx,
+                    'step_type': step.step_type,
+                    'step_parameters': step.parameters,
+                    'column_name': step.column_name,
+                    'progress': progress
+                }
+            )
+
             self.update_state(
                 state='PROGRESS',
                 meta={
@@ -120,7 +213,41 @@ def apply_preprocessing_pipeline(
                 }
             )
 
-            df, step_stats = _apply_single_step(df, step)
+            step_start_time = time.time()
+            rows_before = df.shape[0]
+            cols_before = df.shape[1]
+
+            df, step_stats = _apply_single_step(df, step, logger)
+
+            step_execution_time = time.time() - step_start_time
+            rows_after = df.shape[0]
+            cols_after = df.shape[1]
+
+            # Log step metrics
+            log_preprocessing_metrics(
+                logger=logger.logger,  # Get underlying logger from adapter
+                dataset_id=dataset_id,
+                task_id=self.request.id,
+                step_type=step.step_type,
+                execution_time=step_execution_time,
+                rows_before=rows_before,
+                rows_after=rows_after,
+                cols_before=cols_before,
+                cols_after=cols_after,
+                **step_stats
+            )
+
+            logger.info(
+                f"Step {idx}/{total_steps} completed: {step.step_type}",
+                extra={
+                    'event': 'step_complete',
+                    'step_number': idx,
+                    'step_type': step.step_type,
+                    'execution_time_seconds': round(step_execution_time, 3),
+                    'shape_before': [rows_before, cols_before],
+                    'shape_after': [rows_after, cols_after]
+                }
+            )
 
             # Update statistics
             for key, value in step_stats.items():
@@ -131,6 +258,17 @@ def apply_preprocessing_pipeline(
         stats["rows_after"] = df.shape[0]
         stats["columns_after"] = df.shape[1]
 
+        logger.info(
+            f"All steps applied successfully",
+            extra={
+                'event': 'all_steps_complete',
+                'total_steps': total_steps,
+                'shape_before': original_shape,
+                'shape_after': transformed_shape,
+                'statistics': stats
+            }
+        )
+
         # Save transformed dataset
         self.update_state(
             state='PROGRESS',
@@ -139,8 +277,13 @@ def apply_preprocessing_pipeline(
 
         output_dataset_id = None
         if save_output:
+            logger.debug(f"Saving transformed dataset")
+            save_start = time.time()
+
             output_name = output_name or f"{dataset.name}_preprocessed"
-            output_path = _save_transformed_dataset(df, output_name, dataset.file_path)
+            output_path = _save_transformed_dataset(df, output_name, dataset.file_path, logger)
+
+            save_time = time.time() - save_start
 
             # Create new dataset record
             new_dataset = Dataset(
@@ -158,6 +301,18 @@ def apply_preprocessing_pipeline(
             db.refresh(new_dataset)
             output_dataset_id = str(new_dataset.id)
 
+            logger.info(
+                f"Transformed dataset saved",
+                extra={
+                    'event': 'dataset_saved',
+                    'output_name': output_name,
+                    'output_path': output_path,
+                    'output_dataset_id': output_dataset_id,
+                    'save_time_seconds': round(save_time, 3),
+                    'file_size_mb': round(Path(output_path).stat().st_size / 1024 / 1024, 2)
+                }
+            )
+
         # Generate preview
         self.update_state(
             state='PROGRESS',
@@ -165,6 +320,8 @@ def apply_preprocessing_pipeline(
         )
 
         preview = df.head(5).to_dict('records')
+
+        total_execution_time = time.time() - task_start_time
 
         # Task complete
         result = {
@@ -176,13 +333,35 @@ def apply_preprocessing_pipeline(
             'output_dataset_id': output_dataset_id,
             'preview': preview,
             'statistics': stats,
-            'progress': 100
+            'progress': 100,
+            'total_execution_time': round(total_execution_time, 3)
         }
+
+        logger.info(
+            f"Preprocessing pipeline completed successfully",
+            extra={
+                'event': 'pipeline_complete',
+                'total_execution_time_seconds': round(total_execution_time, 3),
+                'total_steps': total_steps,
+                'output_dataset_id': output_dataset_id,
+                **stats
+            }
+        )
 
         return result
 
     except Exception as e:
         # Task failed
+        logger.error(
+            f"Preprocessing pipeline failed: {e}",
+            extra={
+                'event': 'pipeline_failure',
+                'error_type': type(e).__name__,
+                'error_message': str(e)
+            },
+            exc_info=True
+        )
+
         self.update_state(
             state='FAILURE',
             meta={'error': str(e), 'progress': 0}
@@ -191,11 +370,17 @@ def apply_preprocessing_pipeline(
 
     finally:
         db.close()
+        logger.debug("Database session closed")
 
 
-def _apply_single_step(df: pd.DataFrame, step: PreprocessingStep) -> tuple:
+def _apply_single_step(df: pd.DataFrame, step: PreprocessingStep, logger) -> tuple:
     """
     Apply a single preprocessing step to the dataframe.
+
+    Args:
+        df: Input dataframe
+        step: Preprocessing step configuration
+        logger: Logger instance for step execution logging
 
     Returns:
         Tuple of (transformed_df, statistics_dict)
@@ -204,6 +389,15 @@ def _apply_single_step(df: pd.DataFrame, step: PreprocessingStep) -> tuple:
     params = step.parameters or {}
     column_name = step.column_name
     stats = {}
+
+    logger.debug(
+        f"Applying {step_type}",
+        extra={
+            'step_type': step_type,
+            'parameters': params,
+            'column': column_name
+        }
+    )
 
     if step_type == "missing_value_imputation":
         strategy = params.get("strategy", "mean")
@@ -321,9 +515,15 @@ def _apply_single_step(df: pd.DataFrame, step: PreprocessingStep) -> tuple:
     return df, stats
 
 
-def _save_transformed_dataset(df: pd.DataFrame, name: str, original_path: str) -> str:
+def _save_transformed_dataset(df: pd.DataFrame, name: str, original_path: str, logger) -> str:
     """
     Save the transformed dataset to disk.
+
+    Args:
+        df: Transformed dataframe
+        name: Name for the output file
+        original_path: Path to the original dataset
+        logger: Logger instance
 
     Returns:
         Path to the saved file
@@ -332,6 +532,9 @@ def _save_transformed_dataset(df: pd.DataFrame, name: str, original_path: str) -
     output_dir.mkdir(exist_ok=True)
 
     output_path = output_dir / f"{name}.csv"
+
+    logger.debug(f"Saving to {output_path}")
     df.to_csv(output_path, index=False)
+    logger.debug(f"File saved successfully: {output_path}")
 
     return str(output_path)

@@ -8,11 +8,12 @@ Users can create, read, update, delete, and reorder preprocessing steps for thei
 import uuid
 import os
 import time
+import logging
 from typing import List, Optional
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
@@ -38,8 +39,10 @@ from app.ml_engine.preprocessing.scaler import StandardScaler, MinMaxScaler, Rob
 from app.ml_engine.preprocessing.cleaner import IQROutlierDetector, ZScoreOutlierDetector
 from app.tasks.preprocessing_tasks import apply_preprocessing_pipeline as apply_preprocessing_task
 from celery.result import AsyncResult
+from app.core.logging_config import get_preprocessing_logger
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # Mock authentication - replace with actual auth later
@@ -824,12 +827,31 @@ async def apply_preprocessing_pipeline_async(
     - `save_output`: Whether to save the transformed dataset (default: True)
     - `output_name`: Name for the transformed dataset
     """
+    logger.info(
+        f"Async preprocessing request received",
+        extra={
+            'event': 'api_async_request',
+            'dataset_id': str(request.dataset_id),
+            'user_id': user_id,
+            'save_output': request.save_output,
+            'output_name': request.output_name
+        }
+    )
+
     # Verify dataset exists and belongs to user
     dataset = db.query(Dataset).filter(
         and_(Dataset.id == request.dataset_id, Dataset.user_id == user_id)
     ).first()
 
     if not dataset:
+        logger.warning(
+            f"Dataset not found or access denied",
+            extra={
+                'event': 'dataset_not_found',
+                'dataset_id': str(request.dataset_id),
+                'user_id': user_id
+            }
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset {request.dataset_id} not found or access denied"
@@ -841,17 +863,43 @@ async def apply_preprocessing_pipeline_async(
     ).count()
 
     if steps_count == 0:
+        logger.warning(
+            f"No preprocessing steps configured",
+            extra={
+                'event': 'no_steps_configured',
+                'dataset_id': str(request.dataset_id)
+            }
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No preprocessing steps configured for this dataset"
         )
 
     # Start Celery task
+    logger.info(
+        f"Starting Celery task for dataset {dataset.name}",
+        extra={
+            'event': 'celery_task_start',
+            'dataset_id': str(request.dataset_id),
+            'dataset_name': dataset.name,
+            'steps_count': steps_count
+        }
+    )
+
     task = apply_preprocessing_task.delay(
         dataset_id=str(request.dataset_id),
         user_id=user_id,
         save_output=request.save_output,
         output_name=request.output_name
+    )
+
+    logger.info(
+        f"Celery task created successfully",
+        extra={
+            'event': 'celery_task_created',
+            'task_id': task.id,
+            'dataset_id': str(request.dataset_id)
+        }
     )
 
     return PreprocessingAsyncResponse(
