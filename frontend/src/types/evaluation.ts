@@ -90,6 +90,8 @@ export interface RegressionMetrics {
   rmse: number;
   r2: number;
   mape?: number;
+  predicted?: number[];
+  actual?: number[];
   residuals?: {
     predicted: number[];
     actual: number[];

@@ -34,7 +34,7 @@ import type {
 } from '../types/evaluation';
 import { EvaluationTab as EvaluationTabEnum, TaskType as TaskTypeEnum } from '../types/evaluation';
 import { MetricsDisplay } from '../components/evaluation/metrics';
-import { ClassificationCharts } from '../components/evaluation/charts';
+import { ClassificationCharts, RegressionCharts } from '../components/evaluation/charts';
 
 // Tab panel component
 interface TabPanelProps {
@@ -298,22 +298,24 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                 </Alert>
               ) : (
                 <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Regression Evaluation
-                  </Typography>
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    <Typography variant="body2">
-                      <strong>Available metrics:</strong> MAE, MSE, RMSE, R², MAPE
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      <strong>Visualizations:</strong> Actual vs Predicted, Residual Plot, Error
-                      Distribution
-                    </Typography>
-                  </Alert>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    Found {regressionRuns.length} regression run(s). Detailed metrics and visualizations
-                    will be displayed here.
-                  </Typography>
+                  {/* Metrics Display */}
+                  <MetricsDisplay
+                    taskType={TaskTypeEnum.REGRESSION}
+                    metrics={regressionRuns[0]?.metrics || null}
+                    isLoading={isLoading}
+                    showDescription={true}
+                    compact={false}
+                  />
+
+                  {/* Regression Charts */}
+                  {regressionRuns[0]?.metrics && (
+                    <Box mt={4}>
+                      <RegressionCharts
+                        metrics={regressionRuns[0].metrics as any}
+                        isLoading={isLoading}
+                      />
+                    </Box>
+                  )}
                 </Box>
               )}
             </TabPanel>
@@ -465,6 +467,18 @@ const getMockRuns = (): ModelRun[] => {
         rmse: 3959.5,
         r2: 0.82,
         mape: 12.3,
+        // Generate realistic predicted and actual values for housing prices
+        predicted: Array.from({ length: 100 }, (_, i) => {
+          const base = 200000 + i * 5000;
+          const noise = (Math.random() - 0.5) * 10000;
+          return base + noise;
+        }),
+        actual: Array.from({ length: 100 }, (_, i) => {
+          const base = 200000 + i * 5000;
+          const noise = (Math.random() - 0.5) * 8000;
+          const trend = i * 100; // Slight upward trend
+          return base + noise + trend;
+        }),
       },
     },
     {
