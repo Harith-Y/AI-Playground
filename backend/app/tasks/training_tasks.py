@@ -375,9 +375,9 @@ def train_model(
 
         # Store feature importance if available
         if feature_importance is not None:
-            if not model_run.metadata:
-                model_run.metadata = {}
-            model_run.metadata['feature_importance'] = feature_importance
+            if not model_run.run_metadata:
+                model_run.run_metadata = {}
+            model_run.run_metadata['feature_importance'] = feature_importance
 
         db.commit()
         db.refresh(model_run)
@@ -449,9 +449,9 @@ def train_model(
             model_run = db.query(ModelRun).filter(ModelRun.id == uuid.UUID(model_run_id)).first()
             if model_run:
                 model_run.status = "failed"
-                if not model_run.metadata:
-                    model_run.metadata = {}
-                model_run.metadata['error'] = {
+                if not model_run.run_metadata:
+                    model_run.run_metadata = {}
+                model_run.run_metadata['error'] = {
                     'type': type(e).__name__,
                     'message': str(e),
                     'traceback': traceback.format_exc()

@@ -384,10 +384,10 @@ async def train_model_endpoint(
         user_id=user_id
     )
 
-    # 8. Store task_id in model_run metadata
-    if not model_run.metadata:
-        model_run.metadata = {}
-    model_run.metadata['task_id'] = task.id
+    # 8. Store task_id in model_run run_metadata
+    if not model_run.run_metadata:
+        model_run.run_metadata = {}
+    model_run.run_metadata['task_id'] = task.id
     db.commit()
 
     return ModelTrainingResponse(
@@ -442,8 +442,8 @@ async def get_training_status(
             detail="You don't have permission to access this model run"
         )
 
-    # 3. Get task_id from metadata
-    task_id = model_run.metadata.get('task_id') if model_run.metadata else None
+    # 3. Get task_id from run_metadata
+    task_id = model_run.run_metadata.get('task_id') if model_run.run_metadata else None
 
     # 4. Check Celery task status if task_id exists
     celery_status = None
@@ -485,12 +485,12 @@ async def get_training_status(
             'metrics': model_run.metrics,
             'training_time': model_run.training_time,
             'model_path': model_run.model_artifact_path,
-            'feature_importance': model_run.metadata.get('feature_importance') if model_run.metadata else None
+            'feature_importance': model_run.run_metadata.get('feature_importance') if model_run.run_metadata else None
         }
 
-    # 7. If failed, include error from metadata
-    if model_run.status == "failed" and model_run.metadata:
-        error_info = model_run.metadata.get('error', {})
+    # 7. If failed, include error from run_metadata
+    if model_run.status == "failed" and model_run.run_metadata:
+        error_info = model_run.run_metadata.get('error', {})
         error = f"{error_info.get('type', 'Error')}: {error_info.get('message', 'Unknown error')}"
 
     return ModelTrainingStatus(
@@ -561,7 +561,7 @@ async def get_training_result(
         "metrics": model_run.metrics,
         "training_time": model_run.training_time,
         "model_artifact_path": model_run.model_artifact_path,
-        "feature_importance": model_run.metadata.get('feature_importance') if model_run.metadata else None,
+        "feature_importance": model_run.run_metadata.get('feature_importance') if model_run.run_metadata else None,
         "created_at": model_run.created_at.isoformat(),
         "experiment_id": str(model_run.experiment_id)
     }

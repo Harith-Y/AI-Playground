@@ -1,7 +1,7 @@
 """
 PreprocessingStep database model
 """
-from sqlalchemy import Column, String, Integer, ForeignKey
+from sqlalchemy import Column, String, Integer, Boolean, LargeBinary, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 import uuid
@@ -18,7 +18,9 @@ class PreprocessingStep(Base):
     parameters = Column(JSONB, nullable=True)  # {"strategy": "mean", "fill_value": 0, ...}
     column_name = Column(String, nullable=True)  # Column this step applies to (null for all columns)
     order = Column(Integer, nullable=False, default=0)  # Order of execution
-    
+    is_active = Column(Boolean, nullable=False, default=True)  # Whether this step is active
+    fitted_transformer = Column(LargeBinary, nullable=True)  # Serialized fitted transformer object
+
     # Relationships
     dataset = relationship("Dataset", back_populates="preprocessing_steps")
 
