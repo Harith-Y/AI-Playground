@@ -23,6 +23,8 @@ class ModelConfig:
         model_type: str,
         hyperparameters: Dict[str, Any],
         random_state: Optional[int] = None,
+        validate: bool = True,
+        strict: bool = False,
         **kwargs
     ):
         """
@@ -32,12 +34,45 @@ class ModelConfig:
             model_type: Type/name of the model (e.g., 'random_forest_classifier')
             hyperparameters: Model hyperparameters
             random_state: Random seed for reproducibility
+            validate: Whether to validate hyperparameters
+            strict: If True, reject unknown parameters during validation
             **kwargs: Additional configuration parameters
+        
+        Raises:
+            ValueError: If validation is enabled and hyperparameters are invalid
         """
         self.model_type = model_type
         self.hyperparameters = hyperparameters
         self.random_state = random_state
         self.additional_config = kwargs
+        
+        # Validate hyperparameters if requested
+        if validate:
+            self._validate_hyperparameters(strict=strict)
+    
+    def _validate_hyperparameters(self, strict: bool = False) -> None:
+        """
+        Validate hyperparameters against model schema.
+        
+        Args:
+            strict: If True, reject unknown parameters
+        
+        Raises:
+            ValueError: If validation fails
+        """
+        # Import here to avoid circular dependency
+        from app.ml_engine.models.validation import validate_model_config
+        
+        is_valid, errors = validate_model_config(
+            self.model_type,
+            self.hyperparameters,
+            strict=strict
+        )
+        
+        if not is_valid:
+            error_msg = f"Invalid hyperparameters for model '{self.model_type}':\n"
+            error_msg += "\n".join(f"  - {error}" for error in errors)
+            raise ValueError(error_msg)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary."""
@@ -49,12 +84,22 @@ class ModelConfig:
         }
 
     @classmethod
-    def from_dict(cls, config: Dict[str, Any]) -> 'ModelConfig':
-        """Create configuration from dictionary."""
+    def from_dict(cls, config: Dict[str, Any], validate: bool = True) -> 'ModelConfig':
+        """
+        Create configuration from dictionary.
+        
+        Args:
+            config: Configuration dictionary
+            validate: Whether to validate hyperparameters
+        
+        Returns:
+            ModelConfig instance
+        """
         return cls(
             model_type=config["model_type"],
             hyperparameters=config["hyperparameters"],
             random_state=config.get("random_state"),
+            validate=validate,
             **{k: v for k, v in config.items() if k not in ["model_type", "hyperparameters", "random_state"]}
         )
 

@@ -13,6 +13,13 @@ from .base import (
     TrainingMetadata
 )
 from .registry import ModelFactory, create_model
+from .validation import (
+    validate_model_config,
+    get_model_defaults,
+    get_parameter_info,
+    get_available_models_with_schemas,
+    ValidationError
+)
 
 # Import all model wrappers for convenience
 from .regression import (
@@ -59,6 +66,13 @@ __all__ = [
     # Factory
     "ModelFactory",
     "create_model",
+    
+    # Validation
+    "validate_model_config",
+    "get_model_defaults",
+    "get_parameter_info",
+    "get_available_models_with_schemas",
+    "ValidationError",
 
     # Regression wrappers
     "LinearRegressionWrapper",

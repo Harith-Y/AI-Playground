@@ -84,20 +84,28 @@ class ModelFactory:
     """
 
     @staticmethod
-    def create_model(model_id: str, config: Optional[ModelConfig] = None, **hyperparameters) -> BaseModelWrapper:
+    def create_model(
+        model_id: str,
+        config: Optional[ModelConfig] = None,
+        validate: bool = True,
+        strict: bool = False,
+        **hyperparameters
+    ) -> BaseModelWrapper:
         """
         Create a model wrapper instance.
 
         Args:
             model_id: Identifier for the model (e.g., 'random_forest_classifier')
             config: Optional ModelConfig object. If not provided, will be created from hyperparameters
+            validate: Whether to validate hyperparameters
+            strict: If True, reject unknown parameters during validation
             **hyperparameters: Hyperparameters to pass to the model (used if config is None)
 
         Returns:
             Instance of the appropriate model wrapper
 
         Raises:
-            ValueError: If model_id is not found in the registry
+            ValueError: If model_id is not found in the registry or validation fails
 
         Examples:
             # Create with hyperparameters
@@ -106,6 +114,9 @@ class ModelFactory:
             # Create with config
             config = ModelConfig(model_type='random_forest_classifier', hyperparameters={'n_estimators': 100})
             model = ModelFactory.create_model('random_forest_classifier', config=config)
+            
+            # Create without validation (not recommended)
+            model = ModelFactory.create_model('random_forest_classifier', validate=False, n_estimators=100)
         """
         if model_id not in MODEL_WRAPPER_REGISTRY:
             available_models = ", ".join(sorted(MODEL_WRAPPER_REGISTRY.keys()))
@@ -118,7 +129,9 @@ class ModelFactory:
         if config is None:
             config = ModelConfig(
                 model_type=model_id,
-                hyperparameters=hyperparameters
+                hyperparameters=hyperparameters,
+                validate=validate,
+                strict=strict
             )
 
         # Get the wrapper class and instantiate it
