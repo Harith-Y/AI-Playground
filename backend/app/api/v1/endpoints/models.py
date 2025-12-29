@@ -488,10 +488,17 @@ async def get_training_status(
             'feature_importance': model_run.run_metadata.get('feature_importance') if model_run.run_metadata else None
         }
 
-    # 7. If failed, include error from run_metadata
+    # If failed, include error from run_metadata
     if model_run.status == "failed" and model_run.run_metadata:
         error_info = model_run.run_metadata.get('error', {})
-        error = f"{error_info.get('type', 'Error')}: {error_info.get('message', 'Unknown error')}"
+        error = {
+            'type': error_info.get('type', 'Error'),
+            'code': error_info.get('code', 'UNKNOWN_ERROR'),
+            'message': error_info.get('message', 'Unknown error'),
+            'user_message': error_info.get('user_message', 'Training failed'),
+            'recoverable': error_info.get('recoverable', False),
+            'phase': error_info.get('phase', 'unknown')
+        }
 
     return ModelTrainingStatus(
         model_run_id=model_run.id,

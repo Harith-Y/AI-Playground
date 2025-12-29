@@ -31,6 +31,13 @@ from app.ml_engine.evaluation.metrics import (
 )
 from app.core.config import settings
 from app.core.logging_config import get_logger
+from app.services.training_error_handler import handle_training_error
+from app.core.training_exceptions import (
+    DataLoadError,
+    PreprocessingError,
+    ModelTrainingError,
+    ModelSerializationError
+)
 
 
 class TrainingTask(Task):
@@ -349,7 +356,23 @@ def train_model(
 
         # 2. Load dataset
         logger.info(f"Loading dataset from {dataset.file_path}")
-        df = pd.read_csv(dataset.file_path)
+        try:
+            df = pd.read_csv(dataset.file_path)
+        except FileNotFoundError:
+            raise DataLoadError(
+                message=f"Dataset file not found: {dataset.file_path}",
+                file_path=dataset.file_path
+            )
+        except pd.errors.EmptyDataError:
+            raise DataLoadError(
+                message="Dataset file is empty",
+                file_path=dataset.file_path
+            )
+        except Exception as e:
+            raise DataLoadError(
+                message=f"Failed to load dataset: {str(e)}",
+                file_path=dataset.file_path
+            )
 
         initial_shape = df.shape
         logger.info(f"Dataset loaded: {initial_shape[0]} rows, {initial_shape[1]} columns")
@@ -383,8 +406,21 @@ def train_model(
                         )
                         logger.info(f"Applied step {idx + 1}/{len(preprocessing_steps)}: {step.step_type}")
                 except Exception as e:
-                    logger.warning(f"Failed to apply preprocessing step {step.step_type}: {e}")
-                    # Continue with training even if some preprocessing fails
+                    # Log warning but continue - preprocessing errors are not fatal
+                    logger.warning(
+                        f"Failed to apply preprocessing step {step.step_type}: {e}",
+                        extra={
+                            'event': 'preprocessing_step_failed',
+                            'step_type': step.step_type,
+                            'step_order': step.order
+                        }
+                    )
+                    # Optionally raise if preprocessing is critical
+                    # raise PreprocessingError(
+                    #     message=f"Failed to apply preprocessing step: {str(e)}",
+                    #     step_type=step.step_type,
+                    #     step_order=step.order
+                    # )
 
         # Update progress: Preparing features (35%)
         update_training_progress(db, model_run_id, 35, "Preparing features and target...")
@@ -486,10 +522,16 @@ def train_model(
         # 7. Train the model
         training_start = time.time()
 
-        if task_type.value in ['classification', 'regression']:
-            model.fit(X_train, y_train)
-        else:
-            model.fit(X_train)
+        try:
+            if task_type.value in ['classification', 'regression']:
+                model.fit(X_train, y_train)
+            else:
+                model.fit(X_train)
+        except Exception as e:
+            raise ModelTrainingError(
+                message=f"Model training failed: {str(e)}",
+                model_type=model_type
+            )
 
         training_duration = time.time() - training_start
         logger.info(f"Model training completed in {training_duration:.2f} seconds")
@@ -576,14 +618,20 @@ def train_model(
             'preprocessing_steps_applied': len(preprocessing_steps)
         }
         
-        model_path = serialization_service.save_model(
-            model=model,
-            model_run_id=model_run_id,
-            experiment_id=experiment_id,
-            additional_metadata=save_metadata,
-            save_config=True,
-            save_metadata=True
-        )
+        try:
+            model_path = serialization_service.save_model(
+                model=model,
+                model_run_id=model_run_id,
+                experiment_id=experiment_id,
+                additional_metadata=save_metadata,
+                save_config=True,
+                save_metadata=True
+            )
+        except Exception as e:
+            raise ModelSerializationError(
+                message=f"Failed to save model: {str(e)}",
+                model_path=None
+            )
         
         logger.info(
             f"Model serialized successfully",
@@ -661,41 +709,32 @@ def train_model(
         return result
 
     except Exception as e:
-        # Log the error
-        logger.error(
-            f"Training failed: {e}",
-            extra={
-                'event': 'training_error',
-                'error_type': type(e).__name__,
-                'error_message': str(e),
-                'traceback': traceback.format_exc()
-            },
-            exc_info=True
+        # Use centralized error handler
+        error_report = handle_training_error(
+            db=db,
+            model_run_id=model_run_id,
+            exception=e,
+            context={
+                'phase': 'training',
+                'model_type': model_type,
+                'experiment_id': experiment_id,
+                'dataset_id': dataset_id,
+                'user_id': user_id,
+                'task_id': self.request.id
+            }
         )
-
-        # Update model run status to failed
+        
+        # Update progress to indicate failure
         try:
-            model_run = db.query(ModelRun).filter(ModelRun.id == uuid.UUID(model_run_id)).first()
-            if model_run:
-                # Update progress to indicate failure
-                current_progress = -1
-                if model_run.run_metadata and 'current_progress' in model_run.run_metadata:
-                    current_progress = model_run.run_metadata.get('current_progress', -1)
-                
-                update_training_progress(db, model_run_id, current_progress, f"Training failed: {str(e)}")
-                
-                model_run.status = "failed"
-                if not model_run.run_metadata:
-                    model_run.run_metadata = {}
-                model_run.run_metadata['error'] = {
-                    'type': type(e).__name__,
-                    'message': str(e),
-                    'traceback': traceback.format_exc()
-                }
-                db.commit()
-        except Exception as update_error:
-            logger.error(f"Failed to update model run status: {update_error}")
-
+            update_training_progress(
+                db,
+                model_run_id,
+                -1,
+                f"Training failed: {error_report['user_message']}"
+            )
+        except Exception as progress_error:
+            logger.error(f"Failed to update progress after error: {progress_error}")
+        
         # Re-raise the exception for Celery to handle
         raise
 
