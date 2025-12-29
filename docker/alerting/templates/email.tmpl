@@ -1,0 +1,211 @@
+{{ define "email.default.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #f4f4f4; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        .alert { padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .critical { background: #fee; border-left: 4px solid #d00; }
+        .warning { background: #ffc; border-left: 4px solid #fa0; }
+        .info { background: #eff; border-left: 4px solid #09f; }
+        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f4f4f4; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>ML Platform Alert</h2>
+            <p><strong>Time:</strong> {{ .CommonAnnotations.timestamp }}</p>
+        </div>
+        
+        {{ range .Alerts }}
+        <div class="alert {{ .Labels.severity }}">
+            <h3>{{ .Labels.alertname }}</h3>
+            <p>{{ .Annotations.description }}</p>
+            
+            <table>
+                <tr><th>Label</th><th>Value</th></tr>
+                {{ range .Labels.SortedPairs }}
+                <tr><td>{{ .Name }}</td><td>{{ .Value }}</td></tr>
+                {{ end }}
+            </table>
+        </div>
+        {{ end }}
+        
+        <div class="footer">
+            <p>This is an automated alert from the ML Platform.</p>
+            <p>Dashboard: <a href="http://localhost:3000">http://localhost:3000</a></p>
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "email.training.failure.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #d00; color: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        .alert-box { background: #fee; border: 2px solid #d00; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .details { background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .action-items { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f4f4f4; font-weight: bold; }
+        .button { display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
+        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Training Job Failed</h1>
+            <p><strong>{{ .GroupLabels.job_name }}</strong></p>
+        </div>
+        
+        {{ range .Alerts }}
+        <div class="alert-box">
+            <h2>{{ .Labels.alertname }}</h2>
+            <p><strong>Job ID:</strong> {{ .Labels.job_id }}</p>
+            <p><strong>Model:</strong> {{ .Labels.model_type }}</p>
+            <p><strong>Dataset:</strong> {{ .Labels.dataset_name }}</p>
+            <p><strong>Failed At:</strong> {{ .StartsAt }}</p>
+        </div>
+        
+        <div class="details">
+            <h3>Error Details</h3>
+            <p><strong>Error Type:</strong> {{ .Labels.error_type }}</p>
+            <p><strong>Error Message:</strong> {{ .Annotations.error_message }}</p>
+            <p><strong>Stack Trace:</strong></p>
+            <pre style="background: #f4f4f4; padding: 10px; overflow-x: auto;">{{ .Annotations.stack_trace }}</pre>
+        </div>
+        
+        <div class="details">
+            <h3>Job Configuration</h3>
+            <table>
+                <tr><th>Parameter</th><th>Value</th></tr>
+                <tr><td>Model Type</td><td>{{ .Labels.model_type }}</td></tr>
+                <tr><td>Dataset</td><td>{{ .Labels.dataset_name }}</td></tr>
+                <tr><td>Hyperparameters</td><td>{{ .Annotations.hyperparameters }}</td></tr>
+                <tr><td>Training Duration</td><td>{{ .Annotations.duration }}</td></tr>
+                <tr><td>Progress</td><td>{{ .Annotations.progress }}%</td></tr>
+            </table>
+        </div>
+        
+        <div class="action-items">
+            <h3>⚠️ Recommended Actions</h3>
+            <ul>
+                {{ range .Annotations.suggestions }}
+                <li>{{ . }}</li>
+                {{ end }}
+            </ul>
+        </div>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <a href="http://localhost:3000/training/{{ .Labels.job_id }}" class="button">View Job Details</a>
+            <a href="http://localhost:3000/training/{{ .Labels.job_id }}/logs" class="button">View Logs</a>
+            <a href="http://localhost:3000/training/{{ .Labels.job_id }}/retry" class="button">Retry Job</a>
+        </div>
+        {{ end }}
+        
+        <div class="footer">
+            <p>This is an automated alert from the ML Platform.</p>
+            <p>If you need assistance, contact the ML team or check the documentation.</p>
+            <p>Dashboard: <a href="http://localhost:3000">http://localhost:3000</a></p>
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "email.training.warning.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #ffc107; color: #333; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        .warning-box { background: #fff3cd; border: 2px solid #ffc107; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .details { background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f4f4f4; font-weight: bold; }
+        .button { display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
+        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ Training Job Warning</h1>
+            <p><strong>{{ .GroupLabels.job_name }}</strong></p>
+        </div>
+        
+        {{ range .Alerts }}
+        <div class="warning-box">
+            <h2>{{ .Labels.alertname }}</h2>
+            <p>{{ .Annotations.description }}</p>
+            <p><strong>Job ID:</strong> {{ .Labels.job_id }}</p>
+            <p><strong>Warning At:</strong> {{ .StartsAt }}</p>
+        </div>
+        
+        <div class="details">
+            <h3>Warning Details</h3>
+            <table>
+                <tr><th>Metric</th><th>Value</th></tr>
+                {{ range .Annotations.SortedPairs }}
+                <tr><td>{{ .Name }}</td><td>{{ .Value }}</td></tr>
+                {{ end }}
+            </table>
+        </div>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <a href="http://localhost:3000/training/{{ .Labels.job_id }}" class="button">View Job Details</a>
+        </div>
+        {{ end }}
+        
+        <div class="footer">
+            <p>This is an automated warning from the ML Platform.</p>
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "slack.training.failure" }}
+*Training Job Failed: {{ .GroupLabels.job_name }}*
+
+{{ range .Alerts }}
+*Job ID:* {{ .Labels.job_id }}
+*Model:* {{ .Labels.model_type }}
+*Dataset:* {{ .Labels.dataset_name }}
+*Error:* {{ .Annotations.error_message }}
+
+*Recommended Actions:*
+{{ range .Annotations.suggestions }}
+• {{ . }}
+{{ end }}
+
+<http://localhost:3000/training/{{ .Labels.job_id }}|View Details> | <http://localhost:3000/training/{{ .Labels.job_id }}/logs|View Logs> | <http://localhost:3000/training/{{ .Labels.job_id }}/retry|Retry>
+{{ end }}
+{{ end }}
+
+{{ define "slack.training.warning" }}
+*Training Warning: {{ .GroupLabels.job_name }}*
+
+{{ range .Alerts }}
+*Job ID:* {{ .Labels.job_id }}
+*Warning:* {{ .Annotations.description }}
+
+<http://localhost:3000/training/{{ .Labels.job_id }}|View Details>
+{{ end }}
+{{ end }}

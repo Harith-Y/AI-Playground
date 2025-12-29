@@ -1,0 +1,166 @@
+global:
+  # Global configuration for AlertManager
+  resolve_timeout: 5m
+  smtp_from: 'ml-platform-alerts@example.com'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_auth_username: 'ml-platform-alerts@example.com'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+# Templates for alert notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert routing
+route:
+  # Default receiver for all alerts
+  receiver: 'default-receiver'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'cluster', 'service']
+  
+  # Wait time before sending initial notification
+  group_wait: 10s
+  
+  # Wait time before sending notification about new alerts in group
+  group_interval: 10s
+  
+  # Wait time before re-sending notification
+  repeat_interval: 12h
+  
+  # Child routes for specific alert types
+  routes:
+    # Training job failures - high priority
+    - match:
+        severity: critical
+        alert_type: training_failure
+      receiver: 'training-alerts'
+      group_wait: 5s
+      repeat_interval: 4h
+      continue: true
+    
+    # Training job warnings
+    - match:
+        severity: warning
+        alert_type: training_warning
+      receiver: 'training-warnings'
+      group_wait: 30s
+      repeat_interval: 24h
+      continue: true
+    
+    # System resource alerts
+    - match:
+        alert_type: resource
+      receiver: 'ops-team'
+      group_wait: 1m
+      repeat_interval: 6h
+    
+    # Data quality issues
+    - match:
+        alert_type: data_quality
+      receiver: 'data-team'
+      group_wait: 5m
+      repeat_interval: 12h
+
+# Inhibition rules to prevent alert spam
+inhibit_rules:
+  # Inhibit warning if critical alert is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'job_id']
+  
+  # Inhibit training warnings if job already failed
+  - source_match:
+      alert_type: 'training_failure'
+    target_match:
+      alert_type: 'training_warning'
+    equal: ['job_id']
+
+# Receivers define notification destinations
+receivers:
+  # Default receiver
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'ml-team@example.com'
+        headers:
+          Subject: '[ML Platform] Alert: {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.default.html" . }}'
+    
+    webhook_configs:
+      - url: 'http://backend:8000/api/alerts/webhook'
+        send_resolved: true
+        http_config:
+          bearer_token: '${WEBHOOK_TOKEN}'
+  
+  # Training failure alerts - critical
+  - name: 'training-alerts'
+    email_configs:
+      - to: 'ml-team@example.com,data-scientists@example.com'
+        headers:
+          Subject: '[CRITICAL] Training Job Failed: {{ .GroupLabels.job_name }}'
+          Priority: 'urgent'
+        html: '{{ template "email.training.failure.html" . }}'
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ml-alerts'
+        title: ':rotating_light: Training Job Failed'
+        text: '{{ template "slack.training.failure" . }}'
+        send_resolved: true
+        color: 'danger'
+    
+    webhook_configs:
+      - url: 'http://backend:8000/api/alerts/training-failure'
+        send_resolved: true
+        http_config:
+          bearer_token: '${WEBHOOK_TOKEN}'
+    
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        severity: 'critical'
+        description: 'Training job {{ .GroupLabels.job_name }} failed'
+  
+  # Training warnings
+  - name: 'training-warnings'
+    email_configs:
+      - to: 'ml-team@example.com'
+        headers:
+          Subject: '[WARNING] Training Issue: {{ .GroupLabels.job_name }}'
+        html: '{{ template "email.training.warning.html" . }}'
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ml-warnings'
+        title: ':warning: Training Warning'
+        text: '{{ template "slack.training.warning" . }}'
+        color: 'warning'
+  
+  # Operations team for resource issues
+  - name: 'ops-team'
+    email_configs:
+      - to: 'ops-team@example.com'
+        headers:
+          Subject: '[OPS] Resource Alert: {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.ops.html" . }}'
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ops-alerts'
+        title: ':chart_with_upwards_trend: Resource Alert'
+        text: '{{ template "slack.ops" . }}'
+  
+  # Data team for data quality issues
+  - name: 'data-team'
+    email_configs:
+      - to: 'data-team@example.com'
+        headers:
+          Subject: '[DATA] Data Quality Alert: {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.data.html" . }}'
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#data-quality'
+        title: ':bar_chart: Data Quality Alert'
+        text: '{{ template "slack.data" . }}'

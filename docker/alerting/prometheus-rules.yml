@@ -1,0 +1,271 @@
+groups:
+  # Training Job Failure Alerts
+  - name: training_failures
+    interval: 30s
+    rules:
+      # Critical: Training job failed
+      - alert: TrainingJobFailed
+        expr: training_job_status{status="failed"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          alert_type: training_failure
+          team: ml
+        annotations:
+          summary: "Training job {{ $labels.job_name }} ({{ $labels.job_id }}) has failed"
+          description: "Training job for model {{ $labels.model_type }} on dataset {{ $labels.dataset_name }} has failed with error: {{ $labels.error_type }}"
+          error_message: "{{ $labels.error_message }}"
+          job_id: "{{ $labels.job_id }}"
+          model_type: "{{ $labels.model_type }}"
+          dataset_name: "{{ $labels.dataset_name }}"
+          runbook_url: "https://docs.example.com/runbooks/training-failure"
+      
+      # Critical: Training job timeout
+      - alert: TrainingJobTimeout
+        expr: (time() - training_job_start_time) > training_job_timeout_seconds
+        for: 5m
+        labels:
+          severity: critical
+          alert_type: training_failure
+          team: ml
+        annotations:
+          summary: "Training job {{ $labels.job_name }} has exceeded timeout"
+          description: "Training job {{ $labels.job_id }} has been running for longer than expected ({{ $value }}s)"
+          suggestions: "Check if the job is stuck, increase timeout, or use a smaller dataset"
+      
+      # Critical: Out of memory during training
+      - alert: TrainingOutOfMemory
+        expr: training_job_memory_usage_bytes / training_job_memory_limit_bytes > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          alert_type: training_failure
+          team: ml
+        annotations:
+          summary: "Training job {{ $labels.job_name }} is running out of memory"
+          description: "Memory usage is at {{ $value | humanizePercentage }} of limit"
+          suggestions: "Reduce batch size, use gradient accumulation, or request more memory"
+      
+      # Critical: Training job crashed
+      - alert: TrainingJobCrashed
+        expr: rate(training_job_restarts_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          alert_type: training_failure
+          team: ml
+        annotations:
+          summary: "Training job {{ $labels.job_name }} has crashed"
+          description: "Job has restarted {{ $value }} times in the last 5 minutes"
+          suggestions: "Check logs for segmentation faults, OOM kills, or system errors"
+
+  # Training Job Warnings
+  - name: training_warnings
+    interval: 1m
+    rules:
+      # Warning: Slow training progress
+      - alert: TrainingProgressSlow
+        expr: rate(training_job_progress[10m]) < 0.01
+        for: 15m
+        labels:
+          severity: warning
+          alert_type: training_warning
+          team: ml
+        annotations:
+          summary: "Training job {{ $labels.job_name }} is progressing slowly"
+          description: "Progress rate is {{ $value | humanizePercentage }} per minute"
+          suggestions: "Check if data loading is slow, increase batch size, or optimize model"
+      
+      # Warning: High loss value
+      - alert: TrainingLossHigh
+        expr: training_job_loss > 10
+        for: 10m
+        labels:
+          severity: warning
+          alert_type: training_warning
+          team: ml
+        annotations:
+          summary: "Training loss is unusually high for {{ $labels.job_name }}"
+          description: "Current loss value: {{ $value }}"
+          suggestions: "Check learning rate, verify data preprocessing, or review model architecture"
+      
+      # Warning: Loss not decreasing
+      - alert: TrainingLossNotDecreasing
+        expr: delta(training_job_loss[30m]) >= 0
+        for: 30m
+        labels:
+          severity: warning
+          alert_type: training_warning
+          team: ml
+        annotations:
+          summary: "Training loss is not decreasing for {{ $labels.job_name }}"
+          description: "Loss has not improved in the last 30 minutes"
+          suggestions: "Adjust learning rate, check for gradient issues, or verify data quality"
+      
+      # Warning: Validation accuracy not improving
+      - alert: ValidationAccuracyStagnant
+        expr: delta(training_job_val_accuracy[1h]) < 0.001
+        for: 1h
+        labels:
+          severity: warning
+          alert_type: training_warning
+          team: ml
+        annotations:
+          summary: "Validation accuracy stagnant for {{ $labels.job_name }}"
+          description: "Validation accuracy has not improved in the last hour"
+          suggestions: "Consider early stopping, adjust hyperparameters, or check for overfitting"
+      
+      # Warning: High CPU usage
+      - alert: TrainingHighCPU
+        expr: training_job_cpu_usage_percent > 90
+        for: 10m
+        labels:
+          severity: warning
+          alert_type: resource
+          team: ops
+        annotations:
+          summary: "Training job {{ $labels.job_name }} has high CPU usage"
+          description: "CPU usage is at {{ $value }}%"
+          suggestions: "Check for inefficient data preprocessing or CPU-bound operations"
+      
+      # Warning: High GPU memory usage
+      - alert: TrainingHighGPUMemory
+        expr: training_job_gpu_memory_usage_bytes / training_job_gpu_memory_total_bytes > 0.90
+        for: 5m
+        labels:
+          severity: warning
+          alert_type: resource
+          team: ml
+        annotations:
+          summary: "Training job {{ $labels.job_name }} has high GPU memory usage"
+          description: "GPU memory usage is at {{ $value | humanizePercentage }}"
+          suggestions: "Reduce batch size or model size to prevent OOM errors"
+
+  # Data Quality Alerts
+  - name: data_quality
+    interval: 5m
+    rules:
+      # Warning: High percentage of missing values
+      - alert: HighMissingValues
+        expr: training_job_missing_values_percent > 20
+        for: 5m
+        labels:
+          severity: warning
+          alert_type: data_quality
+          team: data
+        annotations:
+          summary: "High percentage of missing values in {{ $labels.dataset_name }}"
+          description: "{{ $value }}% of values are missing"
+          suggestions: "Apply imputation, remove columns, or check data pipeline"
+      
+      # Warning: Data distribution shift
+      - alert: DataDistributionShift
+        expr: training_job_data_drift_score > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          alert_type: data_quality
+          team: data
+        annotations:
+          summary: "Data distribution shift detected in {{ $labels.dataset_name }}"
+          description: "Drift score: {{ $value }}"
+          suggestions: "Verify data source, check for data quality issues, or retrain model"
+      
+      # Warning: Imbalanced classes
+      - alert: ImbalancedClasses
+        expr: training_job_class_imbalance_ratio > 10
+        for: 5m
+        labels:
+          severity: warning
+          alert_type: data_quality
+          team: data
+        annotations:
+          summary: "Severe class imbalance in {{ $labels.dataset_name }}"
+          description: "Imbalance ratio: {{ $value }}:1"
+          suggestions: "Apply class weighting, oversampling, or undersampling"
+
+  # System Resource Alerts
+  - name: system_resources
+    interval: 1m
+    rules:
+      # Critical: GPU unavailable
+      - alert: GPUUnavailable
+        expr: up{job="gpu-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          alert_type: resource
+          team: ops
+        annotations:
+          summary: "GPU is unavailable"
+          description: "GPU exporter is down or GPU is not accessible"
+          suggestions: "Check GPU status, restart GPU services, or contact ops team"
+      
+      # Warning: Disk space low
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          alert_type: resource
+          team: ops
+        annotations:
+          summary: "Disk space is running low"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+          suggestions: "Clean up old training artifacts, increase disk size, or archive data"
+      
+      # Warning: High network latency
+      - alert: HighNetworkLatency
+        expr: training_job_data_load_latency_seconds > 1
+        for: 10m
+        labels:
+          severity: warning
+          alert_type: resource
+          team: ops
+        annotations:
+          summary: "High network latency for data loading"
+          description: "Data loading latency: {{ $value }}s"
+          suggestions: "Check network connection, use local cache, or optimize data pipeline"
+
+  # Model Performance Alerts
+  - name: model_performance
+    interval: 5m
+    rules:
+      # Warning: Low accuracy
+      - alert: LowModelAccuracy
+        expr: training_job_accuracy < 0.5
+        for: 30m
+        labels:
+          severity: warning
+          alert_type: training_warning
+          team: ml
+        annotations:
+          summary: "Low accuracy for {{ $labels.job_name }}"
+          description: "Current accuracy: {{ $value | humanizePercentage }}"
+          suggestions: "Review model architecture, check data quality, or adjust hyperparameters"
+      
+      # Warning: Overfitting detected
+      - alert: OverfittingDetected
+        expr: (training_job_train_accuracy - training_job_val_accuracy) > 0.15
+        for: 20m
+        labels:
+          severity: warning
+          alert_type: training_warning
+          team: ml
+        annotations:
+          summary: "Overfitting detected in {{ $labels.job_name }}"
+          description: "Train-val accuracy gap: {{ $value | humanizePercentage }}"
+          suggestions: "Add regularization, increase dropout, or use more training data"
+      
+      # Warning: Underfitting detected
+      - alert: UnderfittingDetected
+        expr: training_job_train_accuracy < 0.6
+        for: 1h
+        labels:
+          severity: warning
+          alert_type: training_warning
+          team: ml
+        annotations:
+          summary: "Underfitting detected in {{ $labels.job_name }}"
+          description: "Training accuracy: {{ $value | humanizePercentage }}"
+          suggestions: "Increase model complexity, train longer, or improve features"
