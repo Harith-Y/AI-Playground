@@ -188,6 +188,15 @@ async def tune_model_hyperparameters(
         user_id=user_id
     )
     
+    # Store task_id in tuning_run for status tracking
+    if not tuning_run.results:
+        tuning_run.results = {}
+    tuning_run.results['task_id'] = task.id
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(tuning_run, 'results')
+    db.commit()
+    
     logger.info(
         f"Tuning task triggered",
         extra={
@@ -215,6 +224,16 @@ async def get_tuning_status(
     """
     Get the status of a hyperparameter tuning task.
     
+    This endpoint provides real-time status information about a tuning run,
+    including progress updates from the Celery task if available.
+    
+    **Status Values:**
+    - **PENDING**: Task is queued but not started
+    - **PROGRESS**: Task is actively running
+    - **SUCCESS**: Task completed successfully
+    - **FAILURE**: Task failed with error
+    - **REVOKED**: Task was cancelled
+    
     Args:
         tuning_run_id: UUID of the tuning run
         db: Database session
@@ -224,12 +243,37 @@ async def get_tuning_status(
         HyperparameterTuningStatus with current status and progress
     
     Raises:
+        HTTPException 400: If invalid UUID format
         HTTPException 404: If tuning run not found
         HTTPException 403: If user doesn't have permission
     
     Example:
         GET /api/v1/tuning/tune/abc-123/status
+        
+        Response:
+        {
+            "tuning_run_id": "abc-123",
+            "task_id": "xyz-789",
+            "status": "PROGRESS",
+            "progress": {
+                "current": 15,
+                "total": 36,
+                "status": "Testing parameter combination 15/36...",
+                "percentage": 41.67
+            },
+            "result": null,
+            "error": null
+        }
     """
+    logger.info(
+        f"Tuning status requested",
+        extra={
+            'event': 'tuning_status_request',
+            'tuning_run_id': tuning_run_id,
+            'user_id': user_id
+        }
+    )
+    
     # 1. Fetch tuning run
     try:
         tuning_run = db.query(TuningRun).filter(
@@ -269,37 +313,130 @@ async def get_tuning_status(
             detail="You don't have permission to access this tuning run"
         )
     
-    # 3. Get task_id from tuning_run (if stored)
-    # For now, we'll use the status from the database
-    # In a full implementation, you'd track the Celery task_id
+    # 3. Get task_id from tuning_run results
+    task_id = None
+    if tuning_run.results and isinstance(tuning_run.results, dict):
+        task_id = tuning_run.results.get('task_id')
     
-    # Map TuningStatus to Celery-like status
-    status_map = {
-        TuningStatus.RUNNING: "PROGRESS",
-        TuningStatus.COMPLETED: "SUCCESS",
-        TuningStatus.FAILED: "FAILURE"
-    }
+    # 4. Check Celery task status if task_id exists
+    celery_status = None
+    progress = None
+    result = None
+    error = None
     
-    celery_status = status_map.get(tuning_run.status, "PENDING")
+    if task_id:
+        try:
+            from celery.result import AsyncResult
+            task_result = AsyncResult(task_id, app=celery_app)
+            
+            celery_status = task_result.state
+            
+            logger.debug(
+                f"Celery task status: {celery_status}",
+                extra={
+                    'event': 'celery_status_check',
+                    'task_id': task_id,
+                    'status': celery_status
+                }
+            )
+            
+            # Get progress information if task is running
+            if celery_status == 'PROGRESS':
+                task_info = task_result.info
+                if isinstance(task_info, dict):
+                    progress = {
+                        'current': task_info.get('current', 0),
+                        'total': task_info.get('total', 100),
+                        'status': task_info.get('status', 'Processing...'),
+                        'percentage': round((task_info.get('current', 0) / task_info.get('total', 100)) * 100, 2) if task_info.get('total', 0) > 0 else 0
+                    }
+            
+            # Get result if task completed
+            elif celery_status == 'SUCCESS':
+                task_result_data = task_result.result
+                if isinstance(task_result_data, dict):
+                    result = {
+                        'best_params': task_result_data.get('best_params'),
+                        'best_score': task_result_data.get('best_score'),
+                        'total_combinations': task_result_data.get('total_combinations'),
+                        'tuning_time': task_result_data.get('tuning_time')
+                    }
+            
+            # Get error if task failed
+            elif celery_status == 'FAILURE':
+                error_info = task_result.info
+                if isinstance(error_info, Exception):
+                    error = {
+                        'type': type(error_info).__name__,
+                        'message': str(error_info)
+                    }
+                elif isinstance(error_info, dict):
+                    error = error_info
+                else:
+                    error = {'message': str(error_info)}
+        
+        except Exception as e:
+            logger.warning(
+                f"Failed to get Celery task status: {e}",
+                extra={
+                    'event': 'celery_status_error',
+                    'task_id': task_id,
+                    'error': str(e)
+                }
+            )
+            # Continue with database status if Celery check fails
     
-    # Build response
-    response = {
-        "tuning_run_id": tuning_run.id,
-        "task_id": None,  # Would be stored in tuning_run metadata
-        "status": celery_status,
-        "progress": None,
-        "result": None,
-        "error": None
-    }
-    
-    # If completed, include results
-    if tuning_run.status == TuningStatus.COMPLETED and tuning_run.best_params:
-        response["result"] = {
-            "best_params": tuning_run.best_params,
-            "best_score": tuning_run.results.get("best_score") if tuning_run.results else None
+    # 5. Determine overall status
+    # Priority: Celery status > Database status
+    if celery_status:
+        final_status = celery_status
+    else:
+        # Map TuningStatus to Celery-like status
+        status_map = {
+            TuningStatus.RUNNING: "PROGRESS",
+            TuningStatus.COMPLETED: "SUCCESS",
+            TuningStatus.FAILED: "FAILURE"
         }
+        final_status = status_map.get(tuning_run.status, "PENDING")
     
-    return HyperparameterTuningStatus(**response)
+    # 6. If completed in database, include results
+    if tuning_run.status == TuningStatus.COMPLETED and not result:
+        if tuning_run.best_params:
+            result = {
+                "best_params": tuning_run.best_params,
+                "best_score": tuning_run.results.get("best_score") if tuning_run.results else None,
+                "total_combinations": tuning_run.results.get("total_combinations") if tuning_run.results else None,
+                "tuning_time": tuning_run.results.get("tuning_time") if tuning_run.results else None
+            }
+    
+    # 7. If failed in database, include error
+    if tuning_run.status == TuningStatus.FAILED and not error:
+        if tuning_run.results and isinstance(tuning_run.results, dict):
+            error_data = tuning_run.results.get('error')
+            if error_data:
+                if isinstance(error_data, dict):
+                    error = error_data
+                else:
+                    error = {'message': str(error_data)}
+    
+    logger.info(
+        f"Tuning status retrieved",
+        extra={
+            'event': 'tuning_status_retrieved',
+            'tuning_run_id': tuning_run_id,
+            'status': final_status,
+            'has_progress': progress is not None
+        }
+    )
+    
+    return HyperparameterTuningStatus(
+        tuning_run_id=tuning_run.id,
+        task_id=task_id,
+        status=final_status,
+        progress=progress,
+        result=result,
+        error=error
+    )
 
 
 @router.get("/tune/{tuning_run_id}/results", response_model=HyperparameterTuningResults)
