@@ -24,6 +24,7 @@ from app.schemas.model import (
 from app.tasks.training_tasks import train_model
 from app.celery_app import celery_app
 from app.db.session import SessionLocal
+from app.services.training_validation_service import get_training_validator, ValidationError
 
 router = APIRouter()
 
@@ -309,49 +310,43 @@ async def train_model_endpoint(
     Raises:
         HTTPException 404: If experiment or dataset not found
         HTTPException 400: If invalid request
+        HTTPException 403: If user doesn't have permission
     """
-    # 1. Validate experiment exists and belongs to user
-    experiment = db.query(Experiment).filter(
-        Experiment.id == request.experiment_id,
-        Experiment.user_id == uuid.UUID(user_id)
-    ).first()
-
-    if not experiment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Experiment with id {request.experiment_id} not found"
+    try:
+        # Validate training configuration using validation service
+        validator = get_training_validator(db)
+        experiment, dataset, model_info = validator.validate_training_config(
+            experiment_id=request.experiment_id,
+            dataset_id=request.dataset_id,
+            model_type=request.model_type,
+            user_id=user_id,
+            target_column=request.target_column,
+            feature_columns=request.feature_columns,
+            test_size=request.test_size,
+            hyperparameters=request.hyperparameters
         )
-
-    # 2. Validate dataset exists and belongs to user
-    dataset = db.query(Dataset).filter(
-        Dataset.id == request.dataset_id,
-        Dataset.user_id == uuid.UUID(user_id)
-    ).first()
-
-    if not dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with id {request.dataset_id} not found"
-        )
-
-    # 3. Validate model type exists in registry
-    registry = ModelRegistry()
-    model_info = registry.get_model(request.model_type)
-    if not model_info:
+        
+    except ValidationError as e:
+        # Return appropriate HTTP error based on validation failure
+        if e.field in ['experiment_id', 'dataset_id']:
+            if 'not found' in e.message:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=e.message
+                )
+            elif 'does not belong' in e.message:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=e.message
+                )
+        
+        # All other validation errors are bad requests
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Model type '{request.model_type}' not found in registry"
+            detail=e.message
         )
 
-    # 4. Validate target column for supervised learning
-    if model_info.task_type.value in ['classification', 'regression']:
-        if not request.target_column:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="target_column is required for supervised learning tasks"
-            )
-
-    # 5. Create ModelRun record
+    # Create ModelRun record
     model_run = ModelRun(
         id=uuid4(),
         experiment_id=request.experiment_id,
@@ -365,12 +360,12 @@ async def train_model_endpoint(
     db.commit()
     db.refresh(model_run)
 
-    # 6. Update experiment status to running
+    # Update experiment status to running
     if experiment.status != "running":
         experiment.status = "running"
         db.commit()
 
-    # 7. Trigger Celery task
+    # Trigger Celery task
     task = train_model.delay(
         model_run_id=str(model_run.id),
         experiment_id=str(request.experiment_id),
@@ -384,7 +379,7 @@ async def train_model_endpoint(
         user_id=user_id
     )
 
-    # 8. Store task_id in model_run run_metadata
+    # Store task_id in model_run run_metadata
     if not model_run.run_metadata:
         model_run.run_metadata = {}
     model_run.run_metadata['task_id'] = task.id
