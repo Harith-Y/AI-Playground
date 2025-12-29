@@ -545,8 +545,6 @@ def train_model(
         except Exception as e:
             logger.warning(f"Could not calculate feature importance: {e}")
 
-        # Update progress: Saving model
-        self.update_state(
         # Update progress: Saving model (90%)
         update_training_progress(db, model_run_id, 90, "Saving model artifact...")
         self.update_state(
@@ -558,13 +556,44 @@ def train_model(
             }
         )
 
-        # 10. Save model artifact
-        model_dir = Path(settings.UPLOAD_DIR) / "models" / str(experiment_id)
-        model_dir.mkdir(parents=True, exist_ok=True)
-
-        model_path = model_dir / f"{model_run_id}.joblib"
-        model.save(str(model_path))
-        logger.info(f"Model saved to {model_path}")
+        # 10. Save model artifact using ModelSerializationService
+        from app.services.storage_service import get_model_serialization_service
+        
+        serialization_service = get_model_serialization_service()
+        
+        # Prepare additional metadata to save with model
+        save_metadata = {
+            'metrics': metrics,
+            'feature_importance': feature_importance,
+            'train_samples': len(X_train),
+            'test_samples': len(X_test) if X_test is not None else 0,
+            'n_features': X_train.shape[1],
+            'target_column': target_column,
+            'feature_columns': feature_columns or list(X_train.columns) if isinstance(X_train, pd.DataFrame) else None,
+            'test_size': test_size,
+            'random_state': random_state,
+            'task_type': task_type.value,
+            'preprocessing_steps_applied': len(preprocessing_steps)
+        }
+        
+        model_path = serialization_service.save_model(
+            model=model,
+            model_run_id=model_run_id,
+            experiment_id=experiment_id,
+            additional_metadata=save_metadata,
+            save_config=True,
+            save_metadata=True
+        )
+        
+        logger.info(
+            f"Model serialized successfully",
+            extra={
+                'event': 'model_serialization_complete',
+                'model_path': model_path,
+                'model_type': model_type,
+                'has_metadata': True
+            }
+        )
 
         # 11. Update ModelRun with results
         model_run.metrics = metrics
@@ -644,9 +673,6 @@ def train_model(
             exc_info=True
         )
 
-        # Update model run status to failed
-        try:
-            model_run = db.query(ModelRun).filter(ModelRun.id == uuid.UUID(model_run_id)).first()
         # Update model run status to failed
         try:
             model_run = db.query(ModelRun).filter(ModelRun.id == uuid.UUID(model_run_id)).first()
