@@ -35,7 +35,7 @@ from app.schemas.preprocessing import (
     PreprocessingHistoryList,
 )
 from app.ml_engine.preprocessing.imputer import MeanImputer, MedianImputer
-from app.ml_engine.preprocessing.scaler import StandardScaler, MinMaxScaler
+from app.ml_engine.preprocessing.scaler import StandardScaler, MinMaxScaler, RobustScaler
 from app.ml_engine.preprocessing.cleaner import IQROutlierDetector, ZScoreOutlierDetector
 from app.tasks.preprocessing_tasks import apply_preprocessing_pipeline as apply_preprocessing_task
 from celery.result import AsyncResult

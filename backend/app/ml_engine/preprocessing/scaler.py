@@ -462,3 +462,261 @@ class MinMaxScaler(PreprocessingStep):
             "mins": self.mins_.copy(),
             "maxs": self.maxs_.copy()
         }
+
+
+class RobustScaler(PreprocessingStep):
+    """
+    Scales features using statistics that are robust to outliers.
+
+    This scaler removes the median and scales the data according to the
+    Interquartile Range (IQR). The IQR is the range between the 1st quartile
+    (25th quantile) and the 3rd quartile (75th quantile).
+
+    The transformation is calculated as:
+        X_scaled = (X - median) / IQR
+
+    This scaler is particularly useful when your data contains outliers,
+    as it uses the median and IQR which are not influenced by extreme values.
+
+    Example:
+        data: [1, 2, 3, 4, 5, 100]  # 100 is an outlier
+        median: 3.5, IQR: 3
+        scaled: [-0.833, -0.5, -0.167, 0.167, 0.5, 32.167]
+        (Note: outlier is scaled but doesn't affect the scaling of other values)
+
+    Attributes:
+        medians_: Median values for each column (learned during fit)
+        iqrs_: Interquartile range values for each column (learned during fit)
+        with_centering: Whether to center data by subtracting the median
+        with_scaling: Whether to scale data to IQR
+        quantile_range: Quantile range used to calculate IQR (default: 25.0, 75.0)
+    """
+
+    def __init__(
+        self,
+        columns: Optional[List[str]] = None,
+        with_centering: bool = True,
+        with_scaling: bool = True,
+        quantile_range: tuple = (25.0, 75.0),
+        name: Optional[str] = None
+    ):
+        """
+        Initialize RobustScaler.
+
+        Args:
+            columns: List of columns to scale.
+                     If None, all numeric columns are used.
+            with_centering: If True, center the data before scaling (subtract median).
+                           Default is True.
+            with_scaling: If True, scale the data to IQR.
+                         Default is True.
+            quantile_range: Quantile range used to calculate scale (IQR).
+                           Default is (25.0, 75.0) for standard IQR.
+            name: Optional custom name for this preprocessing step.
+
+        Raises:
+            ValueError: If both with_centering and with_scaling are False
+            ValueError: If quantile_range is invalid
+        """
+        if not with_centering and not with_scaling:
+            raise ValueError("At least one of with_centering or with_scaling must be True")
+
+        if len(quantile_range) != 2:
+            raise ValueError("quantile_range must be a tuple of (lower, upper)")
+
+        if quantile_range[0] >= quantile_range[1]:
+            raise ValueError("quantile_range lower must be less than upper")
+
+        if quantile_range[0] < 0 or quantile_range[1] > 100:
+            raise ValueError("quantile_range values must be between 0 and 100")
+
+        super().__init__(
+            name=name,
+            columns=columns,
+            with_centering=with_centering,
+            with_scaling=with_scaling,
+            quantile_range=quantile_range
+        )
+        self.medians_: Dict[str, float] = {}
+        self.iqrs_: Dict[str, float] = {}
+
+    def fit(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        y: Optional[Union[pd.Series, np.ndarray]] = None
+    ) -> "RobustScaler":
+        """
+        Compute the median and IQR for each column from training data.
+
+        Args:
+            X: Training features (must be a pandas DataFrame)
+            y: Optional training labels (not used, present for API consistency)
+
+        Returns:
+            Self (for method chaining)
+
+        Raises:
+            TypeError: If X is not a pandas DataFrame
+        """
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("RobustScaler expects a pandas DataFrame")
+
+        columns = self.params["columns"]
+        with_centering = self.params["with_centering"]
+        with_scaling = self.params["with_scaling"]
+        quantile_range = self.params["quantile_range"]
+
+        # Auto-detect numeric columns if not specified
+        if columns is None:
+            columns = X.select_dtypes(include=[np.number]).columns.tolist()
+            logger.debug(f"Auto-detected numeric columns: {columns}")
+
+        if not columns:
+            logger.warning("No numeric columns found or specified for scaling")
+            self.fitted = True
+            return self
+
+        # Learn median and IQR for each column
+        self.medians_ = {}
+        self.iqrs_ = {}
+
+        for col in columns:
+            if col not in X.columns:
+                raise ValueError(f"Column '{col}' not found in DataFrame")
+
+            if with_centering:
+                self.medians_[col] = X[col].median()
+
+            if with_scaling:
+                q_lower = X[col].quantile(quantile_range[0] / 100.0)
+                q_upper = X[col].quantile(quantile_range[1] / 100.0)
+                iqr = q_upper - q_lower
+
+                # Handle constant columns (IQR = 0)
+                if iqr == 0:
+                    logger.warning(
+                        f"Column '{col}' has zero IQR (constant or near-constant values). "
+                        f"Setting IQR to 1 to avoid division by zero."
+                    )
+                    iqr = 1.0
+
+                self.iqrs_[col] = iqr
+
+        logger.debug(f"Fitted RobustScaler on {len(columns)} columns")
+        if with_centering:
+            logger.debug(f"Learned medians for columns: {list(self.medians_.keys())}")
+        if with_scaling:
+            logger.debug(f"Learned IQRs for columns: {list(self.iqrs_.keys())}")
+
+        self.fitted = True
+        return self
+
+    def transform(
+        self,
+        X: Union[pd.DataFrame, np.ndarray]
+    ) -> pd.DataFrame:
+        """
+        Scale features using robust statistics (median and IQR).
+
+        Args:
+            X: Data to transform (must be a pandas DataFrame)
+
+        Returns:
+            Transformed DataFrame with robustly scaled numeric columns
+
+        Raises:
+            TypeError: If X is not a pandas DataFrame
+            RuntimeError: If scaler has not been fitted
+        """
+        self._check_fitted()
+
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("RobustScaler expects a pandas DataFrame")
+
+        # If no columns were fitted, return copy unchanged
+        if not self.medians_ and not self.iqrs_:
+            return X.copy()
+
+        X = X.copy()
+        with_centering = self.params["with_centering"]
+        with_scaling = self.params["with_scaling"]
+
+        # Determine which columns to transform
+        columns = list(self.medians_.keys() if with_centering else self.iqrs_.keys())
+
+        for col in columns:
+            if col not in X.columns:
+                raise ValueError(f"Column '{col}' not found in DataFrame during transform")
+
+            # Apply robust scaling
+            if with_centering and with_scaling:
+                X[col] = (X[col] - self.medians_[col]) / self.iqrs_[col]
+            elif with_centering:
+                X[col] = X[col] - self.medians_[col]
+            elif with_scaling:
+                X[col] = X[col] / self.iqrs_[col]
+
+        return X
+
+    def inverse_transform(
+        self,
+        X: Union[pd.DataFrame, np.ndarray]
+    ) -> pd.DataFrame:
+        """
+        Scale data back to original representation.
+
+        Args:
+            X: Data to inverse transform (must be a pandas DataFrame)
+
+        Returns:
+            DataFrame with values scaled back to original range
+
+        Raises:
+            TypeError: If X is not a pandas DataFrame
+            RuntimeError: If scaler has not been fitted
+        """
+        self._check_fitted()
+
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("RobustScaler expects a pandas DataFrame")
+
+        # If no columns were fitted, return copy unchanged
+        if not self.medians_ and not self.iqrs_:
+            return X.copy()
+
+        X = X.copy()
+        with_centering = self.params["with_centering"]
+        with_scaling = self.params["with_scaling"]
+
+        # Determine which columns to inverse transform
+        columns = list(self.medians_.keys() if with_centering else self.iqrs_.keys())
+
+        for col in columns:
+            if col not in X.columns:
+                raise ValueError(f"Column '{col}' not found in DataFrame during inverse_transform")
+
+            # Apply inverse transformation (reverse order of transform)
+            if with_centering and with_scaling:
+                X[col] = (X[col] * self.iqrs_[col]) + self.medians_[col]
+            elif with_scaling:
+                X[col] = X[col] * self.iqrs_[col]
+            elif with_centering:
+                X[col] = X[col] + self.medians_[col]
+
+        return X
+
+    def get_statistics(self) -> Dict[str, Dict[str, float]]:
+        """
+        Get the learned median and IQR statistics.
+
+        Returns:
+            Dictionary with 'medians' and 'iqrs' keys containing column statistics
+
+        Raises:
+            RuntimeError: If scaler has not been fitted
+        """
+        self._check_fitted()
+        return {
+            "medians": self.medians_.copy(),
+            "iqrs": self.iqrs_.copy()
+        }
