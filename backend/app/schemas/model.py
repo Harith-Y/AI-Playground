@@ -248,3 +248,149 @@ class FeatureImportanceResponse(BaseModel):
 				"message": None
 			}
 		}
+
+
+# ============================================================================
+# Hyperparameter Tuning Schemas
+# ============================================================================
+
+
+class HyperparameterTuningRequest(BaseModel):
+	"""Request schema for hyperparameter tuning"""
+	model_run_id: UUID
+	tuning_method: str = Field(default="grid_search", pattern="^(grid_search|random_search|bayesian)$")
+	param_grid: Dict[str, List[Any]]
+	cv_folds: int = Field(default=5, ge=2, le=10)
+	scoring_metric: Optional[str] = None
+	n_iter: Optional[int] = Field(default=10, ge=1, le=100)  # For random_search and bayesian
+	n_jobs: int = Field(default=-1, ge=-1)
+	random_state: int = 42
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"model_run_id": "123e4567-e89b-12d3-a456-426614174002",
+				"tuning_method": "grid_search",
+				"param_grid": {
+					"n_estimators": [50, 100, 200],
+					"max_depth": [5, 10, 15, None],
+					"min_samples_split": [2, 5, 10]
+				},
+				"cv_folds": 5,
+				"scoring_metric": "accuracy",
+				"n_jobs": -1,
+				"random_state": 42
+			}
+		}
+
+
+class HyperparameterTuningResponse(BaseModel):
+	"""Response schema after initiating tuning"""
+	tuning_run_id: UUID
+	task_id: str
+	status: str
+	message: str
+	created_at: datetime
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"tuning_run_id": "123e4567-e89b-12d3-a456-426614174003",
+				"task_id": "xyz789abc123",
+				"status": "PENDING",
+				"message": "Hyperparameter tuning initiated successfully",
+				"created_at": "2025-12-29T10:00:00Z"
+			}
+		}
+
+
+class TuningResultItem(BaseModel):
+	"""Individual tuning result"""
+	rank: int
+	params: Dict[str, Any]
+	mean_score: float
+	std_score: float
+	scores: List[float]
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"rank": 1,
+				"params": {
+					"n_estimators": 100,
+					"max_depth": 10,
+					"min_samples_split": 2
+				},
+				"mean_score": 0.95,
+				"std_score": 0.02,
+				"scores": [0.94, 0.96, 0.95, 0.94, 0.96]
+			}
+		}
+
+
+class HyperparameterTuningStatus(BaseModel):
+	"""Status of a tuning task"""
+	tuning_run_id: UUID
+	task_id: Optional[str] = None
+	status: str  # PENDING, PROGRESS, SUCCESS, FAILURE
+	progress: Optional[Dict[str, Any]] = None
+	result: Optional[Dict[str, Any]] = None
+	error: Optional[str] = None
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"tuning_run_id": "123e4567-e89b-12d3-a456-426614174003",
+				"task_id": "xyz789abc123",
+				"status": "PROGRESS",
+				"progress": {
+					"current": 15,
+					"total": 36,
+					"status": "Testing parameter combination 15/36..."
+				}
+			}
+		}
+
+
+class HyperparameterTuningResults(BaseModel):
+	"""Complete tuning results"""
+	tuning_run_id: str
+	model_run_id: str
+	tuning_method: str
+	best_params: Dict[str, Any]
+	best_score: float
+	total_combinations: int
+	top_results: List[TuningResultItem]
+	cv_folds: int
+	scoring_metric: str
+	tuning_time: Optional[float] = None
+	created_at: str
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"tuning_run_id": "123e4567-e89b-12d3-a456-426614174003",
+				"model_run_id": "123e4567-e89b-12d3-a456-426614174002",
+				"tuning_method": "grid_search",
+				"best_params": {
+					"n_estimators": 100,
+					"max_depth": 10,
+					"min_samples_split": 2
+				},
+				"best_score": 0.95,
+				"total_combinations": 36,
+				"top_results": [
+					{
+						"rank": 1,
+						"params": {"n_estimators": 100, "max_depth": 10},
+						"mean_score": 0.95,
+						"std_score": 0.02,
+						"scores": [0.94, 0.96, 0.95, 0.94, 0.96]
+					}
+				],
+				"cv_folds": 5,
+				"scoring_metric": "accuracy",
+				"tuning_time": 120.5,
+				"created_at": "2025-12-29T10:00:00Z"
+			}
+		}
