@@ -449,23 +449,88 @@ async def get_tuning_results(
     """
     Get the complete results of a hyperparameter tuning run.
     
+    This endpoint returns comprehensive tuning results including the best parameters
+    found, performance scores, and top N parameter combinations with their scores.
+    
+    **Use Cases:**
+    - View best hyperparameters to apply to model
+    - Compare top parameter combinations
+    - Analyze which parameters had most impact
+    - Export results for documentation
+    
+    **Result Ranking:**
+    Results are ranked by cross-validation score (descending), with rank 1 being
+    the best performing combination.
+    
     Args:
         tuning_run_id: UUID of the tuning run
-        top_n: Number of top parameter combinations to return (default: 10)
+        top_n: Number of top parameter combinations to return (default: 10, max: 100)
         db: Database session
         user_id: Current user ID
     
     Returns:
-        Complete tuning results including best parameters and top N combinations
+        Complete tuning results including:
+        - Best parameters and score
+        - Top N parameter combinations with CV scores
+        - Tuning metadata (method, folds, metric, duration)
     
     Raises:
-        HTTPException 404: If tuning run not found
-        HTTPException 400: If tuning not completed
+        HTTPException 400: If invalid UUID or tuning not completed
+        HTTPException 404: If tuning run not found or no results available
         HTTPException 403: If user doesn't have permission
     
     Example:
         GET /api/v1/tuning/tune/abc-123/results?top_n=5
+        
+        Response:
+        {
+            "tuning_run_id": "abc-123",
+            "model_run_id": "def-456",
+            "tuning_method": "grid_search",
+            "best_params": {
+                "n_estimators": 100,
+                "max_depth": 10
+            },
+            "best_score": 0.9567,
+            "total_combinations": 36,
+            "top_results": [
+                {
+                    "rank": 1,
+                    "params": {"n_estimators": 100, "max_depth": 10},
+                    "mean_score": 0.9567,
+                    "std_score": 0.0123,
+                    "scores": [0.95, 0.96, 0.97, 0.94, 0.96]
+                }
+            ],
+            "cv_folds": 5,
+            "scoring_metric": "accuracy",
+            "tuning_time": 120.5,
+            "created_at": "2025-12-29T10:00:00Z"
+        }
     """
+    logger.info(
+        f"Tuning results requested",
+        extra={
+            'event': 'tuning_results_request',
+            'tuning_run_id': tuning_run_id,
+            'top_n': top_n,
+            'user_id': user_id
+        }
+    )
+    
+    # Validate top_n parameter
+    if top_n < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="top_n must be at least 1"
+        )
+    
+    if top_n > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="top_n cannot exceed 100"
+        )
+    
     # 1. Fetch tuning run
     try:
         tuning_run = db.query(TuningRun).filter(
@@ -507,32 +572,110 @@ async def get_tuning_results(
     
     # 3. Check if completed
     if tuning_run.status != TuningStatus.COMPLETED:
+        # Provide helpful message based on current status
+        status_messages = {
+            TuningStatus.RUNNING: "Tuning is still in progress. Please check status endpoint for updates.",
+            TuningStatus.FAILED: "Tuning failed. Please check status endpoint for error details."
+        }
+        message = status_messages.get(
+            tuning_run.status,
+            f"Tuning run is not completed yet. Current status: {tuning_run.status.value}"
+        )
+        
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Tuning run is not completed yet. Current status: {tuning_run.status.value}"
+            detail=message
         )
     
     # 4. Check if results exist
-    if not tuning_run.best_params or not tuning_run.results:
+    if not tuning_run.best_params:
+        logger.error(
+            f"Tuning run completed but no best_params found",
+            extra={
+                'event': 'tuning_results_missing',
+                'tuning_run_id': tuning_run_id,
+                'status': tuning_run.status.value
+            }
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No best parameters available for this tuning run"
+        )
+    
+    if not tuning_run.results:
+        logger.error(
+            f"Tuning run completed but no results found",
+            extra={
+                'event': 'tuning_results_missing',
+                'tuning_run_id': tuning_run_id,
+                'status': tuning_run.status.value
+            }
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No results available for this tuning run"
         )
     
-    # 5. Extract top N results
-    all_results = tuning_run.results.get("all_results", [])
-    top_results = all_results[:top_n] if all_results else []
+    # 5. Extract and validate results data
+    results_data = tuning_run.results
+    
+    # Get best score
+    best_score = results_data.get("best_score")
+    if best_score is None:
+        logger.warning(
+            f"Best score not found in results",
+            extra={
+                'event': 'best_score_missing',
+                'tuning_run_id': tuning_run_id
+            }
+        )
+        best_score = 0.0
+    
+    # Get total combinations
+    total_combinations = results_data.get("total_combinations", 0)
+    
+    # Get all results and extract top N
+    all_results = results_data.get("all_results", [])
+    
+    if not all_results:
+        logger.warning(
+            f"No detailed results found, returning summary only",
+            extra={
+                'event': 'detailed_results_missing',
+                'tuning_run_id': tuning_run_id
+            }
+        )
+    
+    # Limit to requested top_n
+    top_results = all_results[:min(top_n, len(all_results))] if all_results else []
+    
+    # Get metadata with defaults
+    cv_folds = results_data.get("cv_folds", 5)
+    scoring_metric = results_data.get("scoring_metric", "accuracy")
+    tuning_time = results_data.get("tuning_time")
+    tuning_method = results_data.get("tuning_method", tuning_run.tuning_method)
+    
+    logger.info(
+        f"Tuning results retrieved",
+        extra={
+            'event': 'tuning_results_retrieved',
+            'tuning_run_id': tuning_run_id,
+            'best_score': best_score,
+            'total_combinations': total_combinations,
+            'top_n_returned': len(top_results)
+        }
+    )
     
     return HyperparameterTuningResults(
         tuning_run_id=str(tuning_run.id),
         model_run_id=str(tuning_run.model_run_id),
-        tuning_method=tuning_run.tuning_method,
+        tuning_method=tuning_method,
         best_params=tuning_run.best_params,
-        best_score=tuning_run.results.get("best_score", 0.0),
-        total_combinations=tuning_run.results.get("total_combinations", 0),
+        best_score=float(best_score),
+        total_combinations=total_combinations,
         top_results=top_results,
-        cv_folds=tuning_run.results.get("cv_folds", 5),
-        scoring_metric=tuning_run.results.get("scoring_metric", "accuracy"),
-        tuning_time=tuning_run.results.get("tuning_time"),
+        cv_folds=cv_folds,
+        scoring_metric=scoring_metric,
+        tuning_time=tuning_time,
         created_at=tuning_run.created_at.isoformat()
     )
