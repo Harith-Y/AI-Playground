@@ -74,3 +74,49 @@ class ModelTrainingStatus(BaseModel):
 				}
 			}
 		}
+
+
+
+class ModelRunDeletionSummary(BaseModel):
+	"""Summary of model run deletion operations"""
+	model_run_id: str
+	model_type: str
+	status: str
+	task_revoked: bool
+	artifact_deleted: bool
+	database_record_deleted: bool
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"model_run_id": "123e4567-e89b-12d3-a456-426614174002",
+				"model_type": "random_forest_classifier",
+				"status": "completed",
+				"task_revoked": False,
+				"artifact_deleted": True,
+				"database_record_deleted": True
+			}
+		}
+
+
+class ModelRunDeletionResponse(BaseModel):
+	"""Response schema for model run deletion"""
+	message: str
+	deletion_summary: ModelRunDeletionSummary
+	timestamp: str
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"message": "Model run deleted successfully",
+				"deletion_summary": {
+					"model_run_id": "123e4567-e89b-12d3-a456-426614174002",
+					"model_type": "random_forest_classifier",
+					"status": "completed",
+					"task_revoked": False,
+					"artifact_deleted": True,
+					"database_record_deleted": True
+				},
+				"timestamp": "2025-12-29T10:00:00Z"
+			}
+		}

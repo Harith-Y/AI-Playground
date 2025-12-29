@@ -19,14 +19,19 @@ from app.models.dataset import Dataset
 from app.schemas.model import (
     ModelTrainingRequest,
     ModelTrainingResponse,
-    ModelTrainingStatus
+    ModelTrainingStatus,
+    ModelRunDeletionResponse
 )
 from app.tasks.training_tasks import train_model
 from app.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.services.training_validation_service import get_training_validator, ValidationError
+from app.services.storage_service import get_model_serialization_service
+from app.core.logging_config import get_logger
 
 router = APIRouter()
+
+logger = get_logger(__name__)
 
 
 # Helper functions
@@ -559,4 +564,197 @@ async def get_training_result(
         "feature_importance": model_run.run_metadata.get('feature_importance') if model_run.run_metadata else None,
         "created_at": model_run.created_at.isoformat(),
         "experiment_id": str(model_run.experiment_id)
+    }
+
+
+@router.delete("/train/{model_run_id}", response_model=ModelRunDeletionResponse, status_code=status.HTTP_200_OK)
+async def delete_model_run(
+    model_run_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Delete a model run and its associated artifacts.
+    
+    This endpoint:
+    1. Verifies user owns the model run (through experiment)
+    2. Revokes the Celery task if still running
+    3. Deletes the model artifact file from storage
+    4. Deletes the ModelRun database record
+    
+    Args:
+        model_run_id: UUID of the model run to delete
+        db: Database session
+        user_id: Current user ID
+    
+    Returns:
+        Success message with deletion details
+    
+    Raises:
+        HTTPException 404: If model run not found
+        HTTPException 403: If user doesn't have permission
+        HTTPException 500: If deletion fails
+    
+    Example:
+        DELETE /api/v1/models/train/123e4567-e89b-12d3-a456-426614174002
+    """
+    logger.info(
+        f"Delete model run requested",
+        extra={
+            'event': 'model_run_delete_start',
+            'model_run_id': model_run_id,
+            'user_id': user_id
+        }
+    )
+    
+    # 1. Fetch model run
+    try:
+        model_run = db.query(ModelRun).filter(
+            ModelRun.id == uuid.UUID(model_run_id)
+        ).first()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid model_run_id format: {model_run_id}"
+        )
+    
+    if not model_run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model run with id {model_run_id} not found"
+        )
+    
+    # 2. Verify user owns this model run through experiment
+    experiment = db.query(Experiment).filter(
+        Experiment.id == model_run.experiment_id,
+        Experiment.user_id == uuid.UUID(user_id)
+    ).first()
+    
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to delete this model run"
+        )
+    
+    # Store info for response
+    model_type = model_run.model_type
+    model_status = model_run.status
+    model_artifact_path = model_run.model_artifact_path
+    task_id = model_run.run_metadata.get('task_id') if model_run.run_metadata else None
+    
+    deletion_summary = {
+        "model_run_id": model_run_id,
+        "model_type": model_type,
+        "status": model_status,
+        "task_revoked": False,
+        "artifact_deleted": False,
+        "database_record_deleted": False
+    }
+    
+    # 3. Revoke Celery task if still running
+    if task_id and model_status in ['pending', 'running']:
+        try:
+            from celery.result import AsyncResult
+            task_result = AsyncResult(task_id, app=celery_app)
+            
+            # Check if task is still active
+            if task_result.state in ['PENDING', 'STARTED', 'RETRY', 'PROGRESS']:
+                task_result.revoke(terminate=True, signal='SIGTERM')
+                deletion_summary["task_revoked"] = True
+                logger.info(
+                    f"Revoked Celery task",
+                    extra={
+                        'event': 'task_revoked',
+                        'task_id': task_id,
+                        'model_run_id': model_run_id
+                    }
+                )
+        except Exception as e:
+            logger.warning(
+                f"Failed to revoke Celery task: {e}",
+                extra={
+                    'event': 'task_revoke_failed',
+                    'task_id': task_id,
+                    'model_run_id': model_run_id,
+                    'error': str(e)
+                }
+            )
+            # Continue with deletion even if task revocation fails
+    
+    # 4. Delete model artifact file if it exists
+    if model_artifact_path:
+        try:
+            serialization_service = get_model_serialization_service()
+            success = serialization_service.delete_model(
+                model_path=model_artifact_path,
+                delete_metadata=True
+            )
+            
+            if success:
+                deletion_summary["artifact_deleted"] = True
+                logger.info(
+                    f"Deleted model artifact",
+                    extra={
+                        'event': 'artifact_deleted',
+                        'model_run_id': model_run_id,
+                        'artifact_path': model_artifact_path
+                    }
+                )
+            else:
+                logger.warning(
+                    f"Model artifact not found or already deleted",
+                    extra={
+                        'event': 'artifact_not_found',
+                        'model_run_id': model_run_id,
+                        'artifact_path': model_artifact_path
+                    }
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to delete model artifact: {e}",
+                extra={
+                    'event': 'artifact_delete_failed',
+                    'model_run_id': model_run_id,
+                    'artifact_path': model_artifact_path,
+                    'error': str(e)
+                },
+                exc_info=True
+            )
+            # Continue with database deletion even if file deletion fails
+    
+    # 5. Delete ModelRun database record
+    try:
+        db.delete(model_run)
+        db.commit()
+        deletion_summary["database_record_deleted"] = True
+        
+        logger.info(
+            f"Deleted model run database record",
+            extra={
+                'event': 'model_run_deleted',
+                'model_run_id': model_run_id,
+                'experiment_id': str(experiment.id)
+            }
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Failed to delete model run from database: {e}",
+            extra={
+                'event': 'database_delete_failed',
+                'model_run_id': model_run_id,
+                'error': str(e)
+            },
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete model run: {str(e)}"
+        )
+    
+    # 6. Return success response
+    return {
+        "message": "Model run deleted successfully",
+        "deletion_summary": deletion_summary,
+        "timestamp": datetime.utcnow().isoformat()
     }
