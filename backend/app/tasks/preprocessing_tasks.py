@@ -19,7 +19,7 @@ from app.db.session import SessionLocal
 from app.models.preprocessing_step import PreprocessingStep
 from app.models.dataset import Dataset
 from app.ml_engine.preprocessing.imputer import MeanImputer, MedianImputer
-from app.ml_engine.preprocessing.scaler import StandardScaler, MinMaxScaler, RobustScaler
+from app.ml_engine.preprocessing.scaler import StandardScaler, MinMaxScaler
 from app.ml_engine.preprocessing.cleaner import IQROutlierDetector, ZScoreOutlierDetector
 from app.core.logging_config import get_preprocessing_logger, log_preprocessing_metrics
 
