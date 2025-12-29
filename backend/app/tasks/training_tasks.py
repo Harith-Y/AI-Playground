@@ -64,6 +64,193 @@ class TrainingTask(Task):
         )
 
 
+# ============================================================================
+# Progress Tracking Helper Functions
+# ============================================================================
+
+def initialize_progress_tracking(db: Session, model_run_id: str) -> bool:
+    """
+    Initialize progress tracking structure in ModelRun.run_metadata.
+    
+    Args:
+        db: Database session
+        model_run_id: UUID of the model run
+        
+    Returns:
+        bool: True if initialization succeeded, False otherwise
+    """
+    try:
+        model_run = db.query(ModelRun).filter(ModelRun.id == uuid.UUID(model_run_id)).first()
+        if not model_run:
+            return False
+        
+        # Initialize run_metadata if it doesn't exist
+        if not model_run.run_metadata:
+            model_run.run_metadata = {}
+        
+        # Set initial progress tracking fields
+        from datetime import datetime
+        now = datetime.utcnow()
+        
+        model_run.run_metadata['started_at'] = now.isoformat()
+        model_run.run_metadata['current_progress'] = 0
+        model_run.run_metadata['total_progress'] = 100
+        model_run.run_metadata['current_phase'] = "Initializing"
+        model_run.run_metadata['last_updated'] = now.isoformat()
+        model_run.run_metadata['progress_history'] = []
+        model_run.run_metadata['stalled'] = False
+        
+        # Mark as modified for JSONB field
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(model_run, 'run_metadata')
+        
+        db.commit()
+        return True
+        
+    except Exception as e:
+        db.rollback()
+        logger = get_logger()
+        logger.error(f"Failed to initialize progress tracking: {e}")
+        return False
+
+
+def update_training_progress(
+    db: Session,
+    model_run_id: str,
+    progress_percentage: int,
+    phase_description: str,
+    max_retries: int = 3
+) -> bool:
+    """
+    Update training progress in the database with retry logic.
+    
+    This function updates the ModelRun.run_metadata JSONB field with current
+    progress information, appends to progress history, and implements exponential
+    backoff retry logic for reliability.
+    
+    Args:
+        db: Database session
+        model_run_id: UUID of the model run
+        progress_percentage: Progress from 0 to 100 (-1 for failure state)
+        phase_description: Description of current phase
+        max_retries: Maximum number of retry attempts (default: 3)
+        
+    Returns:
+        bool: True if update succeeded, False otherwise
+        
+    Example:
+        >>> update_training_progress(db, run_id, 50, "Training model...")
+        True
+    """
+    logger = get_logger()
+    
+    for attempt in range(max_retries):
+        try:
+            # Fetch model run
+            model_run = db.query(ModelRun).filter(ModelRun.id == uuid.UUID(model_run_id)).first()
+            if not model_run:
+                logger.error(f"ModelRun {model_run_id} not found")
+                return False
+            
+            # Initialize run_metadata if needed
+            if not model_run.run_metadata:
+                model_run.run_metadata = {}
+            
+            # Update progress fields
+            from datetime import datetime
+            now = datetime.utcnow()
+            
+            model_run.run_metadata['current_progress'] = progress_percentage
+            model_run.run_metadata['current_phase'] = phase_description
+            model_run.run_metadata['last_updated'] = now.isoformat()
+            
+            # Initialize started_at on first update if not exists
+            if 'started_at' not in model_run.run_metadata:
+                model_run.run_metadata['started_at'] = now.isoformat()
+            
+            # Calculate elapsed time
+            started_at = datetime.fromisoformat(model_run.run_metadata['started_at'])
+            elapsed_seconds = (now - started_at).total_seconds()
+            
+            # Initialize progress_history if needed
+            if 'progress_history' not in model_run.run_metadata:
+                model_run.run_metadata['progress_history'] = []
+            
+            # Append to progress history
+            progress_snapshot = {
+                'timestamp': now.isoformat(),
+                'percentage': progress_percentage,
+                'phase': phase_description,
+                'elapsed_seconds': elapsed_seconds
+            }
+            model_run.run_metadata['progress_history'].append(progress_snapshot)
+            
+            # Prune history to last 20 entries (keep first and last)
+            history = model_run.run_metadata['progress_history']
+            if len(history) > 20:
+                # Keep first entry, last 19 entries
+                model_run.run_metadata['progress_history'] = [
+                    history[0],  # Keep first
+                    *history[-19:]  # Keep last 19
+                ]
+            
+            # Reset stalled flag on successful update
+            model_run.run_metadata['stalled'] = False
+            
+            # Mark as modified (required for JSONB updates in SQLAlchemy)
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(model_run, 'run_metadata')
+            
+            # Commit transaction
+            db.commit()
+            
+            logger.info(
+                f"Progress updated: {model_run_id} -> {progress_percentage}% ({phase_description})",
+                extra={
+                    'event': 'progress_update',
+                    'model_run_id': model_run_id,
+                    'progress': progress_percentage,
+                    'phase': phase_description,
+                    'elapsed_seconds': elapsed_seconds
+                }
+            )
+            return True
+            
+        except Exception as e:
+            logger.warning(
+                f"Progress update attempt {attempt + 1}/{max_retries} failed: {e}",
+                extra={
+                    'event': 'progress_update_retry',
+                    'model_run_id': model_run_id,
+                    'attempt': attempt + 1,
+                    'error': str(e)
+                }
+            )
+            db.rollback()
+            
+            if attempt < max_retries - 1:
+                # Exponential backoff: 1s, 2s, 4s
+                backoff_time = 2 ** attempt
+                time.sleep(backoff_time)
+            else:
+                logger.error(
+                    f"Failed to update progress after {max_retries} attempts",
+                    extra={
+                        'event': 'progress_update_failed',
+                        'model_run_id': model_run_id,
+                        'error': str(e)
+                    }
+                )
+                return False
+    
+    return False
+
+
+# ============================================================================
+# Training Task
+# ============================================================================
+
+
 @celery_app.task(
     base=TrainingTask,
     bind=True,
@@ -122,7 +309,11 @@ def train_model(
     db: Session = SessionLocal()
 
     try:
-        # Update progress: Initializing
+        # Initialize progress tracking in database
+        initialize_progress_tracking(db, model_run_id)
+        
+        # Update progress: Initializing (0%)
+        update_training_progress(db, model_run_id, 0, "Initializing training...")
         self.update_state(
             state='PROGRESS',
             meta={
@@ -145,7 +336,8 @@ def train_model(
         if not dataset:
             raise ValueError(f"Dataset with id {dataset_id} not found")
 
-        # Update progress: Loading data
+        # Update progress: Loading data (10%)
+        update_training_progress(db, model_run_id, 10, "Loading dataset...")
         self.update_state(
             state='PROGRESS',
             meta={
@@ -162,7 +354,8 @@ def train_model(
         initial_shape = df.shape
         logger.info(f"Dataset loaded: {initial_shape[0]} rows, {initial_shape[1]} columns")
 
-        # Update progress: Applying preprocessing
+        # Update progress: Applying preprocessing (20%)
+        update_training_progress(db, model_run_id, 20, "Applying preprocessing steps...")
         self.update_state(
             state='PROGRESS',
             meta={
@@ -193,7 +386,8 @@ def train_model(
                     logger.warning(f"Failed to apply preprocessing step {step.step_type}: {e}")
                     # Continue with training even if some preprocessing fails
 
-        # Update progress: Preparing features
+        # Update progress: Preparing features (35%)
+        update_training_progress(db, model_run_id, 35, "Preparing features and target...")
         self.update_state(
             state='PROGRESS',
             meta={
@@ -256,7 +450,8 @@ def train_model(
             y_train = None
             y_test = None
 
-        # Update progress: Training model
+        # Update progress: Training model (50%)
+        update_training_progress(db, model_run_id, 50, f"Training {model_info.name}...")
         self.update_state(
             state='PROGRESS',
             meta={
@@ -299,7 +494,8 @@ def train_model(
         training_duration = time.time() - training_start
         logger.info(f"Model training completed in {training_duration:.2f} seconds")
 
-        # Update progress: Evaluating model
+        # Update progress: Evaluating model (75%)
+        update_training_progress(db, model_run_id, 75, "Evaluating model performance...")
         self.update_state(
             state='PROGRESS',
             meta={
@@ -351,6 +547,9 @@ def train_model(
 
         # Update progress: Saving model
         self.update_state(
+        # Update progress: Saving model (90%)
+        update_training_progress(db, model_run_id, 90, "Saving model artifact...")
+        self.update_state(
             state='PROGRESS',
             meta={
                 'current': 90,
@@ -395,7 +594,8 @@ def train_model(
         # Calculate total execution time
         total_execution_time = time.time() - task_start_time
 
-        # Update progress: Complete
+        # Update progress: Complete (100%)
+        update_training_progress(db, model_run_id, 100, "Training completed successfully!")
         self.update_state(
             state='PROGRESS',
             meta={
@@ -447,7 +647,17 @@ def train_model(
         # Update model run status to failed
         try:
             model_run = db.query(ModelRun).filter(ModelRun.id == uuid.UUID(model_run_id)).first()
+        # Update model run status to failed
+        try:
+            model_run = db.query(ModelRun).filter(ModelRun.id == uuid.UUID(model_run_id)).first()
             if model_run:
+                # Update progress to indicate failure
+                current_progress = -1
+                if model_run.run_metadata and 'current_progress' in model_run.run_metadata:
+                    current_progress = model_run.run_metadata.get('current_progress', -1)
+                
+                update_training_progress(db, model_run_id, current_progress, f"Training failed: {str(e)}")
+                
                 model_run.status = "failed"
                 if not model_run.run_metadata:
                     model_run.run_metadata = {}
