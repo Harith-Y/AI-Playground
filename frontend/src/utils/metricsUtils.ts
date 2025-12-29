@@ -291,7 +291,7 @@ export const clusteringMetricsUtils = {
 /**
  * Compare two metric values and return trend
  */
-export const compareMet rics = (
+export const compareMetrics = (
   current: number,
   previous: number
 ): { trend: 'up' | 'down' | 'neutral'; change: number; changePercent: number } => {
