@@ -120,3 +120,71 @@ class ModelRunDeletionResponse(BaseModel):
 				"timestamp": "2025-12-29T10:00:00Z"
 			}
 		}
+
+
+
+class TrainingMetadata(BaseModel):
+	"""Training metadata for metrics response"""
+	training_time: Optional[float] = None
+	created_at: str
+	hyperparameters: Dict[str, Any]
+	train_samples: Optional[int] = None
+	test_samples: Optional[int] = None
+	n_features: Optional[int] = None
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"training_time": 45.5,
+				"created_at": "2025-12-29T10:00:00Z",
+				"hyperparameters": {
+					"n_estimators": 100,
+					"max_depth": 10
+				},
+				"train_samples": 120,
+				"test_samples": 30,
+				"n_features": 4
+			}
+		}
+
+
+class ModelMetricsResponse(BaseModel):
+	"""Response schema for model metrics endpoint"""
+	model_run_id: str
+	model_type: str
+	task_type: str
+	metrics: Dict[str, Any]
+	training_metadata: TrainingMetadata
+	feature_importance: Optional[Dict[str, float]] = None
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"model_run_id": "123e4567-e89b-12d3-a456-426614174002",
+				"model_type": "random_forest_classifier",
+				"task_type": "classification",
+				"metrics": {
+					"accuracy": 0.95,
+					"precision": 0.94,
+					"recall": 0.93,
+					"f1_score": 0.935
+				},
+				"training_metadata": {
+					"training_time": 45.5,
+					"created_at": "2025-12-29T10:00:00Z",
+					"hyperparameters": {
+						"n_estimators": 100,
+						"max_depth": 10
+					},
+					"train_samples": 120,
+					"test_samples": 30,
+					"n_features": 4
+				},
+				"feature_importance": {
+					"sepal_length": 0.35,
+					"sepal_width": 0.25,
+					"petal_length": 0.30,
+					"petal_width": 0.10
+				}
+			}
+		}

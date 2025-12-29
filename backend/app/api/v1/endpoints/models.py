@@ -20,7 +20,8 @@ from app.schemas.model import (
     ModelTrainingRequest,
     ModelTrainingResponse,
     ModelTrainingStatus,
-    ModelRunDeletionResponse
+    ModelRunDeletionResponse,
+    ModelMetricsResponse
 )
 from app.tasks.training_tasks import train_model
 from app.celery_app import celery_app
@@ -765,3 +766,156 @@ async def delete_model_run(
         "deletion_summary": deletion_summary,
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+
+@router.get("/train/{model_run_id}/metrics", response_model=ModelMetricsResponse)
+async def get_model_metrics(
+    model_run_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get detailed metrics for a completed model run.
+    
+    This endpoint returns comprehensive evaluation metrics including:
+    - Performance metrics (accuracy, precision, recall, F1, etc.)
+    - Training metadata (samples, features, training time)
+    - Feature importance (if available)
+    - Confusion matrix data (for classification)
+    - Error distributions (for regression)
+    
+    Args:
+        model_run_id: UUID of the model run
+        db: Database session
+        user_id: Current user ID
+    
+    Returns:
+        Detailed metrics and evaluation data
+    
+    Raises:
+        HTTPException 404: If model run not found
+        HTTPException 403: If user doesn't have permission
+        HTTPException 400: If training not completed
+    
+    Example:
+        GET /api/v1/models/train/abc-123/metrics
+    """
+    # Fetch model run
+    try:
+        model_run = db.query(ModelRun).filter(
+            ModelRun.id == uuid.UUID(model_run_id)
+        ).first()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid model_run_id format: {model_run_id}"
+        )
+    
+    if not model_run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model run with id {model_run_id} not found"
+        )
+    
+    # Verify permissions
+    experiment = db.query(Experiment).filter(
+        Experiment.id == model_run.experiment_id,
+        Experiment.user_id == uuid.UUID(user_id)
+    ).first()
+    
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access this model run"
+        )
+    
+    # Check if completed
+    if model_run.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Model run is not completed yet. Current status: {model_run.status}"
+        )
+    
+    # Check if metrics exist
+    if not model_run.metrics:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No metrics available for this model run"
+        )
+    
+    # Build comprehensive metrics response
+    response = {
+        "model_run_id": str(model_run.id),
+        "model_type": model_run.model_type,
+        "task_type": _get_task_type_from_model(model_run.model_type),
+        "metrics": model_run.metrics,
+        "training_metadata": {
+            "training_time": model_run.training_time,
+            "created_at": model_run.created_at.isoformat(),
+            "hyperparameters": model_run.hyperparameters
+        }
+    }
+    
+    # Add feature importance if available
+    if model_run.run_metadata and 'feature_importance' in model_run.run_metadata:
+        response["feature_importance"] = model_run.run_metadata['feature_importance']
+    
+    # Add training samples info if available in run_metadata
+    if model_run.run_metadata:
+        if 'train_samples' in model_run.run_metadata:
+            response["training_metadata"]["train_samples"] = model_run.run_metadata['train_samples']
+        if 'test_samples' in model_run.run_metadata:
+            response["training_metadata"]["test_samples"] = model_run.run_metadata['test_samples']
+        if 'n_features' in model_run.run_metadata:
+            response["training_metadata"]["n_features"] = model_run.run_metadata['n_features']
+    
+    return response
+
+
+def _get_task_type_from_model(model_type: str) -> str:
+    """
+    Determine task type from model type.
+    
+    Args:
+        model_type: Model type identifier
+    
+    Returns:
+        Task type (classification, regression, or clustering)
+    """
+    # Classification models
+    classification_keywords = [
+        'classifier', 'classification', 'logistic', 'naive_bayes',
+        'svc', 'decision_tree_class', 'random_forest_class', 'gradient_boosting_class',
+        'ada_boost_class', 'extra_trees_class', 'xgb_class', 'lgbm_class', 'catboost_class'
+    ]
+    
+    # Regression models
+    regression_keywords = [
+        'regressor', 'regression', 'linear_reg', 'ridge', 'lasso', 'elastic',
+        'svr', 'decision_tree_reg', 'random_forest_reg', 'gradient_boosting_reg',
+        'ada_boost_reg', 'extra_trees_reg', 'xgb_reg', 'lgbm_reg', 'catboost_reg'
+    ]
+    
+    # Clustering models
+    clustering_keywords = [
+        'kmeans', 'dbscan', 'hierarchical', 'agglomerative', 'spectral',
+        'mean_shift', 'birch', 'optics', 'gaussian_mixture'
+    ]
+    
+    model_type_lower = model_type.lower()
+    
+    for keyword in classification_keywords:
+        if keyword in model_type_lower:
+            return "classification"
+    
+    for keyword in regression_keywords:
+        if keyword in model_type_lower:
+            return "regression"
+    
+    for keyword in clustering_keywords:
+        if keyword in model_type_lower:
+            return "clustering"
+    
+    # Default to classification if unknown
+    return "unknown"

@@ -904,3 +904,202 @@ class TestModelTrainingIntegration:
         assert call_kwargs["test_size"] == 0.3
         assert call_kwargs["random_state"] == 123
         assert call_kwargs["hyperparameters"]["n_estimators"] == 200
+
+
+
+# ============================================================================
+# Test GET /api/v1/models/train/{model_run_id}/metrics
+# ============================================================================
+
+class TestGetModelMetrics:
+    """Tests for getting model metrics."""
+    
+    def test_get_metrics_success(
+        self,
+        client: TestClient,
+        test_model_run: ModelRun
+    ):
+        """Test getting metrics of completed model run."""
+        response = client.get(f"/api/v1/models/train/{test_model_run.id}/metrics")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert data["model_run_id"] == str(test_model_run.id)
+        assert data["model_type"] == "random_forest_classifier"
+        assert data["task_type"] == "classification"
+        assert "metrics" in data
+        assert data["metrics"]["accuracy"] == 0.95
+        assert data["metrics"]["f1_score"] == 0.93
+        assert "training_metadata" in data
+        assert data["training_metadata"]["training_time"] == 45.5
+    
+    def test_get_metrics_with_feature_importance(
+        self,
+        client: TestClient,
+        db: Session,
+        test_experiment: Experiment
+    ):
+        """Test getting metrics with feature importance."""
+        model_run = ModelRun(
+            id=uuid.uuid4(),
+            experiment_id=test_experiment.id,
+            model_type="random_forest_classifier",
+            hyperparameters={"n_estimators": 100},
+            status="completed",
+            metrics={"accuracy": 0.92, "f1_score": 0.90},
+            training_time=30.0,
+            run_metadata={
+                "feature_importance": {
+                    "feature1": 0.4,
+                    "feature2": 0.3,
+                    "feature3": 0.2,
+                    "feature4": 0.1
+                },
+                "train_samples": 100,
+                "test_samples": 25,
+                "n_features": 4
+            },
+            created_at=datetime.utcnow()
+        )
+        db.add(model_run)
+        db.commit()
+        
+        response = client.get(f"/api/v1/models/train/{model_run.id}/metrics")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "feature_importance" in data
+        assert data["feature_importance"]["feature1"] == 0.4
+        assert data["training_metadata"]["train_samples"] == 100
+        assert data["training_metadata"]["test_samples"] == 25
+        assert data["training_metadata"]["n_features"] == 4
+    
+    def test_get_metrics_nonexistent(self, client: TestClient):
+        """Test getting metrics of non-existent model run."""
+        fake_id = str(uuid.uuid4())
+        response = client.get(f"/api/v1/models/train/{fake_id}/metrics")
+        
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+    
+    def test_get_metrics_not_completed(
+        self,
+        client: TestClient,
+        db: Session,
+        test_experiment: Experiment
+    ):
+        """Test getting metrics of non-completed model run."""
+        model_run = ModelRun(
+            id=uuid.uuid4(),
+            experiment_id=test_experiment.id,
+            model_type="random_forest_classifier",
+            hyperparameters={},
+            status="running",
+            created_at=datetime.utcnow()
+        )
+        db.add(model_run)
+        db.commit()
+        
+        response = client.get(f"/api/v1/models/train/{model_run.id}/metrics")
+        
+        assert response.status_code == 400
+        assert "not completed" in response.json()["detail"]
+    
+    def test_get_metrics_no_metrics_available(
+        self,
+        client: TestClient,
+        db: Session,
+        test_experiment: Experiment
+    ):
+        """Test getting metrics when no metrics are stored."""
+        model_run = ModelRun(
+            id=uuid.uuid4(),
+            experiment_id=test_experiment.id,
+            model_type="random_forest_classifier",
+            hyperparameters={},
+            status="completed",
+            metrics=None,  # No metrics
+            created_at=datetime.utcnow()
+        )
+        db.add(model_run)
+        db.commit()
+        
+        response = client.get(f"/api/v1/models/train/{model_run.id}/metrics")
+        
+        assert response.status_code == 404
+        assert "No metrics available" in response.json()["detail"]
+    
+    def test_get_metrics_invalid_uuid(self, client: TestClient):
+        """Test getting metrics with invalid UUID format."""
+        response = client.get("/api/v1/models/train/invalid-uuid/metrics")
+        
+        assert response.status_code == 400
+        assert "Invalid model_run_id format" in response.json()["detail"]
+    
+    def test_get_metrics_regression_model(
+        self,
+        client: TestClient,
+        db: Session,
+        test_experiment: Experiment
+    ):
+        """Test getting metrics for regression model."""
+        model_run = ModelRun(
+            id=uuid.uuid4(),
+            experiment_id=test_experiment.id,
+            model_type="random_forest_regressor",
+            hyperparameters={"n_estimators": 50},
+            status="completed",
+            metrics={
+                "mae": 2.5,
+                "mse": 8.3,
+                "rmse": 2.88,
+                "r2": 0.85
+            },
+            training_time=25.0,
+            created_at=datetime.utcnow()
+        )
+        db.add(model_run)
+        db.commit()
+        
+        response = client.get(f"/api/v1/models/train/{model_run.id}/metrics")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert data["task_type"] == "regression"
+        assert data["metrics"]["mae"] == 2.5
+        assert data["metrics"]["r2"] == 0.85
+    
+    def test_get_metrics_clustering_model(
+        self,
+        client: TestClient,
+        db: Session,
+        test_experiment: Experiment
+    ):
+        """Test getting metrics for clustering model."""
+        model_run = ModelRun(
+            id=uuid.uuid4(),
+            experiment_id=test_experiment.id,
+            model_type="kmeans",
+            hyperparameters={"n_clusters": 3},
+            status="completed",
+            metrics={
+                "silhouette_score": 0.65,
+                "davies_bouldin_score": 0.8,
+                "calinski_harabasz_score": 150.5
+            },
+            training_time=15.0,
+            created_at=datetime.utcnow()
+        )
+        db.add(model_run)
+        db.commit()
+        
+        response = client.get(f"/api/v1/models/train/{model_run.id}/metrics")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert data["task_type"] == "clustering"
+        assert data["metrics"]["silhouette_score"] == 0.65
