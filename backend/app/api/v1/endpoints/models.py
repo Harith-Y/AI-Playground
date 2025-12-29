@@ -21,7 +21,9 @@ from app.schemas.model import (
     ModelTrainingResponse,
     ModelTrainingStatus,
     ModelRunDeletionResponse,
-    ModelMetricsResponse
+    ModelMetricsResponse,
+    FeatureImportanceResponse,
+    FeatureImportanceItem
 )
 from app.tasks.training_tasks import train_model
 from app.celery_app import celery_app
@@ -919,3 +921,216 @@ def _get_task_type_from_model(model_type: str) -> str:
     
     # Default to classification if unknown
     return "unknown"
+
+
+def _get_importance_method(model_type: str) -> str:
+    """
+    Determine the method used to calculate feature importance.
+    
+    Args:
+        model_type: Model type identifier
+    
+    Returns:
+        Method name (e.g., 'feature_importances_', 'coef_', 'permutation')
+    """
+    model_type_lower = model_type.lower()
+    
+    # Tree-based models use feature_importances_
+    tree_based = ['forest', 'tree', 'xgb', 'lgbm', 'catboost', 'gradient_boosting', 'ada_boost', 'extra_trees']
+    if any(keyword in model_type_lower for keyword in tree_based):
+        return "feature_importances_"
+    
+    # Linear models use coef_
+    linear_models = ['linear', 'ridge', 'lasso', 'elastic', 'logistic', 'sgd']
+    if any(keyword in model_type_lower for keyword in linear_models):
+        return "coef_"
+    
+    # SVM models use coef_ (for linear kernel)
+    if 'svm' in model_type_lower or 'svc' in model_type_lower or 'svr' in model_type_lower:
+        return "coef_"
+    
+    return "unknown"
+
+
+@router.get("/train/{model_run_id}/feature-importance", response_model=FeatureImportanceResponse)
+async def get_feature_importance(
+    model_run_id: str,
+    top_n: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get feature importance for a completed model run.
+    
+    This endpoint returns feature importance scores that indicate which features
+    had the most impact on the model's predictions. Feature importance is available
+    for models that support it (tree-based models, linear models, etc.).
+    
+    **Supported Models:**
+    - Tree-based: Random Forest, Decision Tree, Gradient Boosting, XGBoost, LightGBM, CatBoost
+    - Linear: Linear Regression, Ridge, Lasso, Logistic Regression
+    - SVM: Support Vector Machines (with linear kernel)
+    
+    **Not Supported:**
+    - K-Nearest Neighbors
+    - Naive Bayes
+    - Clustering models (K-Means, DBSCAN, etc.)
+    
+    Args:
+        model_run_id: UUID of the model run
+        top_n: Optional number of top features to return (default: all features)
+        db: Database session
+        user_id: Current user ID
+    
+    Returns:
+        Feature importance data with rankings and scores
+    
+    Raises:
+        HTTPException 404: If model run not found or no feature importance available
+        HTTPException 403: If user doesn't have permission
+        HTTPException 400: If training not completed or model doesn't support feature importance
+    
+    Example:
+        GET /api/v1/models/train/abc-123/feature-importance
+        GET /api/v1/models/train/abc-123/feature-importance?top_n=10
+    """
+    logger.info(
+        f"Feature importance requested",
+        extra={
+            'event': 'feature_importance_request',
+            'model_run_id': model_run_id,
+            'top_n': top_n,
+            'user_id': user_id
+        }
+    )
+    
+    # Fetch model run
+    try:
+        model_run = db.query(ModelRun).filter(
+            ModelRun.id == uuid.UUID(model_run_id)
+        ).first()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid model_run_id format: {model_run_id}"
+        )
+    
+    if not model_run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model run with id {model_run_id} not found"
+        )
+    
+    # Verify permissions
+    experiment = db.query(Experiment).filter(
+        Experiment.id == model_run.experiment_id,
+        Experiment.user_id == uuid.UUID(user_id)
+    ).first()
+    
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access this model run"
+        )
+    
+    # Check if completed
+    if model_run.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Model run is not completed yet. Current status: {model_run.status}"
+        )
+    
+    # Get task type
+    task_type = _get_task_type_from_model(model_run.model_type)
+    
+    # Check if feature importance exists in run_metadata
+    feature_importance_dict = None
+    if model_run.run_metadata and 'feature_importance' in model_run.run_metadata:
+        feature_importance_dict = model_run.run_metadata['feature_importance']
+    
+    # If no feature importance available
+    if not feature_importance_dict:
+        logger.warning(
+            f"No feature importance available",
+            extra={
+                'event': 'feature_importance_not_available',
+                'model_run_id': model_run_id,
+                'model_type': model_run.model_type
+            }
+        )
+        
+        # Determine why feature importance is not available
+        unsupported_models = ['knn', 'k_nearest', 'naive_bayes', 'kmeans', 'dbscan', 'hierarchical']
+        is_unsupported = any(keyword in model_run.model_type.lower() for keyword in unsupported_models)
+        
+        if is_unsupported:
+            message = f"Model type '{model_run.model_type}' does not support feature importance"
+        else:
+            message = "Feature importance was not calculated during training"
+        
+        return FeatureImportanceResponse(
+            model_run_id=str(model_run.id),
+            model_type=model_run.model_type,
+            task_type=task_type,
+            has_feature_importance=False,
+            feature_importance=None,
+            feature_importance_dict=None,
+            total_features=0,
+            top_features=None,
+            importance_method=None,
+            message=message
+        )
+    
+    # Convert dict to sorted list of FeatureImportanceItem
+    feature_importance_list = [
+        {"feature": feature, "importance": float(importance)}
+        for feature, importance in feature_importance_dict.items()
+    ]
+    
+    # Sort by importance (descending)
+    feature_importance_list.sort(key=lambda x: x['importance'], reverse=True)
+    
+    # Add rank
+    for rank, item in enumerate(feature_importance_list, start=1):
+        item['rank'] = rank
+    
+    # Convert to FeatureImportanceItem objects
+    feature_importance_items = [
+        FeatureImportanceItem(**item) for item in feature_importance_list
+    ]
+    
+    # Get top N features if requested
+    top_features = None
+    if top_n is not None and top_n > 0:
+        top_features = feature_importance_items[:top_n]
+    else:
+        # Default: top 10 or all if less than 10
+        top_features = feature_importance_items[:min(10, len(feature_importance_items))]
+    
+    # Determine importance method
+    importance_method = _get_importance_method(model_run.model_type)
+    
+    logger.info(
+        f"Feature importance retrieved",
+        extra={
+            'event': 'feature_importance_retrieved',
+            'model_run_id': model_run_id,
+            'total_features': len(feature_importance_items),
+            'top_n_requested': top_n,
+            'importance_method': importance_method
+        }
+    )
+    
+    return FeatureImportanceResponse(
+        model_run_id=str(model_run.id),
+        model_type=model_run.model_type,
+        task_type=task_type,
+        has_feature_importance=True,
+        feature_importance=feature_importance_items,
+        feature_importance_dict=feature_importance_dict,
+        total_features=len(feature_importance_items),
+        top_features=top_features,
+        importance_method=importance_method,
+        message=None
+    )
+

@@ -188,3 +188,63 @@ class ModelMetricsResponse(BaseModel):
 				}
 			}
 		}
+
+
+class FeatureImportanceItem(BaseModel):
+	"""Individual feature importance item"""
+	feature: str
+	importance: float
+	rank: int
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"feature": "sepal_length",
+				"importance": 0.35,
+				"rank": 1
+			}
+		}
+
+
+class FeatureImportanceResponse(BaseModel):
+	"""Response schema for feature importance endpoint"""
+	model_run_id: str
+	model_type: str
+	task_type: str
+	has_feature_importance: bool
+	feature_importance: Optional[List[FeatureImportanceItem]] = None
+	feature_importance_dict: Optional[Dict[str, float]] = None
+	total_features: int
+	top_features: Optional[List[FeatureImportanceItem]] = None
+	importance_method: Optional[str] = None
+	message: Optional[str] = None
+
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"model_run_id": "123e4567-e89b-12d3-a456-426614174002",
+				"model_type": "random_forest_classifier",
+				"task_type": "classification",
+				"has_feature_importance": True,
+				"feature_importance": [
+					{"feature": "sepal_length", "importance": 0.35, "rank": 1},
+					{"feature": "petal_length", "importance": 0.30, "rank": 2},
+					{"feature": "sepal_width", "importance": 0.25, "rank": 3},
+					{"feature": "petal_width", "importance": 0.10, "rank": 4}
+				],
+				"feature_importance_dict": {
+					"sepal_length": 0.35,
+					"petal_length": 0.30,
+					"sepal_width": 0.25,
+					"petal_width": 0.10
+				},
+				"total_features": 4,
+				"top_features": [
+					{"feature": "sepal_length", "importance": 0.35, "rank": 1},
+					{"feature": "petal_length", "importance": 0.30, "rank": 2},
+					{"feature": "sepal_width", "importance": 0.25, "rank": 3}
+				],
+				"importance_method": "feature_importances_",
+				"message": None
+			}
+		}
