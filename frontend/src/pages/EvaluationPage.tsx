@@ -4,7 +4,7 @@
  * Standalone evaluation screen with tabs for classification, regression, clustering, and comparison
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -22,6 +22,13 @@ import {
   FormControl,
   InputLabel,
   SelectChangeEvent,
+  TextField,
+  InputAdornment,
+  Autocomplete,
+  IconButton,
+  Tooltip,
+  Collapse,
+  Divider,
 } from '@mui/material';
 import {
   Assessment as AssessmentIcon,
@@ -32,6 +39,10 @@ import {
   Refresh as RefreshIcon,
   ScienceOutlined as ScienceIcon,
   TrendingUp as TrendingUpIcon,
+  FilterList as FilterListIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon,
+  Sort as SortIcon,
 } from '@mui/icons-material';
 import type {
   EvaluationTab,
@@ -75,6 +86,13 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(runId);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filter states
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [modelTypeFilter, setModelTypeFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('date-desc');
 
   // Load runs from sessionStorage or API
   useEffect(() => {
@@ -141,10 +159,69 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
     loadRuns();
   };
 
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setModelTypeFilter('all');
+    setSortBy('date-desc');
+  };
+
+  // Filter and sort runs
+  const filteredRuns = useMemo(() => {
+    let filtered = [...runs];
+
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (run) =>
+          run.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          run.modelType?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          run.id.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((run) => run.status === statusFilter);
+    }
+
+    // Model type filter
+    if (modelTypeFilter !== 'all') {
+      filtered = filtered.filter((run) => run.modelType === modelTypeFilter);
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'date-desc':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'date-asc':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'name-asc':
+          return a.name.localeCompare(b.name);
+        case 'name-desc':
+          return b.name.localeCompare(a.name);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [runs, searchQuery, statusFilter, modelTypeFilter, sortBy]);
+
+  // Get unique model types and statuses for filters
+  const uniqueModelTypes = useMemo(() => {
+    return Array.from(new Set(runs.map((r) => r.modelType).filter(Boolean)));
+  }, [runs]);
+
+  const uniqueStatuses = useMemo(() => {
+    return Array.from(new Set(runs.map((r) => r.status).filter(Boolean)));
+  }, [runs]);
+
   // Filter runs by task type for each tab
-  const classificationRuns = runs.filter((r) => r.taskType === TaskTypeEnum.CLASSIFICATION);
-  const regressionRuns = runs.filter((r) => r.taskType === TaskTypeEnum.REGRESSION);
-  const clusteringRuns = runs.filter((r) => r.taskType === TaskTypeEnum.CLUSTERING);
+  const classificationRuns = filteredRuns.filter((r) => r.taskType === TaskTypeEnum.CLASSIFICATION);
+  const regressionRuns = filteredRuns.filter((r) => r.taskType === TaskTypeEnum.REGRESSION);
+  const clusteringRuns = filteredRuns.filter((r) => r.taskType === TaskTypeEnum.CLUSTERING);
 
   // Get icon for tab
   const getTabIcon = (tab: EvaluationTab) => {
@@ -175,15 +252,162 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
           </Typography>
         </Box>
 
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={handleRefresh}
-          disabled={isLoading}
-        >
-          Refresh
-        </Button>
+        <Box display="flex" gap={1}>
+          <Tooltip title={showFilters ? 'Hide Filters' : 'Show Filters'}>
+            <IconButton
+              onClick={() => setShowFilters(!showFilters)}
+              color={showFilters ? 'primary' : 'default'}
+            >
+              <FilterListIcon />
+            </IconButton>
+          </Tooltip>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={isLoading}
+          >
+            Refresh
+          </Button>
+        </Box>
       </Box>
+
+      {/* Filters Panel */}
+      <Collapse in={showFilters}>
+        <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+            <Typography variant="h6" display="flex" alignItems="center" gap={1}>
+              <FilterListIcon />
+              Filters & Search
+            </Typography>
+            <Button
+              size="small"
+              startIcon={<ClearIcon />}
+              onClick={handleClearFilters}
+            >
+              Clear All
+            </Button>
+          </Box>
+
+          <Box display="flex" flexWrap="wrap" gap={2}>
+            {/* Search */}
+            <Box sx={{ flex: '1 1 300px', minWidth: '250px' }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search models by name, type, or ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchQuery && (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setSearchQuery('')}>
+                        <ClearIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+
+            {/* Model Type Filter */}
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel>Model Type</InputLabel>
+              <Select
+                value={modelTypeFilter}
+                onChange={(e) => setModelTypeFilter(e.target.value)}
+                label="Model Type"
+              >
+                <MenuItem value="all">All Types</MenuItem>
+                {uniqueModelTypes.map((type) => (
+                  <MenuItem key={type} value={type}>
+                    {type}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Status Filter */}
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                label="Status"
+              >
+                <MenuItem value="all">All Status</MenuItem>
+                {uniqueStatuses.map((status) => (
+                  <MenuItem key={status} value={status}>
+                    <Chip
+                      label={status}
+                      size="small"
+                      color={status === 'completed' ? 'success' : status === 'failed' ? 'error' : 'default'}
+                    />
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Sort By */}
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel>Sort By</InputLabel>
+              <Select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                label="Sort By"
+                startAdornment={
+                  <InputAdornment position="start">
+                    <SortIcon fontSize="small" />
+                  </InputAdornment>
+                }
+              >
+                <MenuItem value="date-desc">Newest First</MenuItem>
+                <MenuItem value="date-asc">Oldest First</MenuItem>
+                <MenuItem value="name-asc">Name (A-Z)</MenuItem>
+                <MenuItem value="name-desc">Name (Z-A)</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          {/* Active Filters Summary */}
+          {(searchQuery || statusFilter !== 'all' || modelTypeFilter !== 'all') && (
+            <Box mt={2} display="flex" alignItems="center" gap={1} flexWrap="wrap">
+              <Typography variant="caption" color="text.secondary">
+                Active filters:
+              </Typography>
+              {searchQuery && (
+                <Chip
+                  size="small"
+                  label={`Search: "${searchQuery}"`}
+                  onDelete={() => setSearchQuery('')}
+                />
+              )}
+              {statusFilter !== 'all' && (
+                <Chip
+                  size="small"
+                  label={`Status: ${statusFilter}`}
+                  onDelete={() => setStatusFilter('all')}
+                />
+              )}
+              {modelTypeFilter !== 'all' && (
+                <Chip
+                  size="small"
+                  label={`Type: ${modelTypeFilter}`}
+                  onDelete={() => setModelTypeFilter('all')}
+                />
+              )}
+              <Typography variant="caption" color="primary" fontWeight="bold">
+                ({filteredRuns.length} of {runs.length} models)
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+      </Collapse>
 
       {/* Error Alert */}
       {error && (
@@ -199,6 +423,58 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
         >
           {error}
         </Alert>
+      )}
+
+      {/* Results Summary Banner */}
+      {!isLoading && filteredRuns.length > 0 && (
+        <Paper elevation={0} sx={{ p: 2, mb: 3, bgcolor: 'primary.50', borderLeft: 4, borderColor: 'primary.main' }}>
+          <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
+            <Box display="flex" alignItems="center" gap={3}>
+              <Box>
+                <Typography variant="h4" fontWeight="bold" color="primary">
+                  {filteredRuns.length}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Total Models
+                </Typography>
+              </Box>
+              <Divider orientation="vertical" flexItem />
+              <Box>
+                <Typography variant="h6" fontWeight="bold" color="success.main">
+                  {classificationRuns.length}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Classification
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="h6" fontWeight="bold" color="info.main">
+                  {regressionRuns.length}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Regression
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="h6" fontWeight="bold" color="warning.main">
+                  {clusteringRuns.length}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Clustering
+                </Typography>
+              </Box>
+            </Box>
+            
+            {filteredRuns.length !== runs.length && (
+              <Chip
+                label={`Filtered: ${filteredRuns.length} of ${runs.length}`}
+                color="primary"
+                size="small"
+                variant="outlined"
+              />
+            )}
+          </Box>
+        </Paper>
       )}
 
       {/* Loading State */}
@@ -282,22 +558,44 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
           {/* Tab Panels */}
           <Box sx={{ p: 3 }}>
             {/* Model Run Selector */}
-            {selectedRunId && (
+            {selectedRunId && filteredRuns.length > 0 && (
               <Box mb={3}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Select Model Run</InputLabel>
-                  <Select
-                    value={selectedRunId}
-                    onChange={(e: SelectChangeEvent<string>) => setSelectedRunId(e.target.value)}
-                    label="Select Model Run"
-                  >
-                    {runs.map((run) => (
-                      <MenuItem key={run.id} value={run.id}>
-                        {run.name} - {run.modelType} ({run.taskType})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  value={filteredRuns.find((run) => run.id === selectedRunId) || null}
+                  onChange={(_event, newValue) => {
+                    setSelectedRunId(newValue?.id);
+                  }}
+                  options={filteredRuns}
+                  getOptionLabel={(option) => option.name}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Select Model Run"
+                      placeholder="Choose a model to evaluate"
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <li {...props}>
+                      <Box display="flex" flexDirection="column" width="100%">
+                        <Box display="flex" alignItems="center" justifyContent="space-between">
+                          <Typography variant="body2" fontWeight="medium">
+                            {option.name}
+                          </Typography>
+                          <Chip
+                            label={option.status}
+                            size="small"
+                            color={option.status === 'completed' ? 'success' : 'default'}
+                          />
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          {option.modelType} • {option.taskType} • {new Date(option.createdAt).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                    </li>
+                  )}
+                  fullWidth
+                  size="small"
+                />
               </Box>
             )}
 
@@ -481,7 +779,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
 
             {/* Comparison Tab */}
             <TabPanel value={EvaluationTabEnum.COMPARISON} currentValue={currentTab}>
-              {runs.length === 0 ? (
+              {filteredRuns.length === 0 ? (
                 <Box display="flex" flexDirection="column" alignItems="center" py={8}>
                   <CompareArrowsIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
                   <Typography variant="h5" gutterBottom>
@@ -500,14 +798,14 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                     Start Training
                   </Button>
                 </Box>
-              ) : runs.length < 2 ? (
+              ) : filteredRuns.length < 2 ? (
                 <Box display="flex" flexDirection="column" alignItems="center" py={8}>
                   <CompareArrowsIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
                   <Typography variant="h5" gutterBottom>
                     Need More Models
                   </Typography>
                   <Typography variant="body1" color="text.secondary" textAlign="center" mb={3}>
-                    You have {runs.length} model. Train at least one more model
+                    You have {filteredRuns.length} model. Train at least one more model
                     <br />
                     to enable model comparison features.
                   </Typography>
@@ -531,7 +829,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                     </Typography>
                   </Alert>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    {runs.length} model run(s) available for comparison across all task types.
+                    {filteredRuns.length} model run(s) available for comparison across all task types.
                   </Typography>
                 </Box>
               )}
