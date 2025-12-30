@@ -88,11 +88,11 @@ receivers:
           Subject: '[ML Platform] Alert: {{ .GroupLabels.alertname }}'
         html: '{{ template "email.default.html" . }}'
     
-    webhook_configs:
-      - url: 'http://backend:8000/api/alerts/webhook'
-        send_resolved: true
-        http_config:
-          bearer_token: '${WEBHOOK_TOKEN}'
+    # webhook_configs:
+    #   - url: 'http://backend:8000/api/alerts/webhook'
+    #     send_resolved: true
+    #     http_config:
+    #       bearer_token: '${WEBHOOK_TOKEN}'
   
   # Training failure alerts - critical
   - name: 'training-alerts'
@@ -103,24 +103,24 @@ receivers:
           Priority: 'urgent'
         html: '{{ template "email.training.failure.html" . }}'
     
-    slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
-        channel: '#ml-alerts'
-        title: ':rotating_light: Training Job Failed'
-        text: '{{ template "slack.training.failure" . }}'
-        send_resolved: true
-        color: 'danger'
+    # Slack notifications (commented out - see SLACK_SETUP.md for configuration)
+    # slack_configs:
+    #   - api_url: '${SLACK_WEBHOOK_URL}'
+    #     channel: '#ml-alerts'
+    #     title: ':rotating_light: Training Job Failed'
+    #     text: 'Job: {{ .GroupLabels.job_name }} | Status: FAILED | Time: {{ .StartsAt }}'
+    #     send_resolved: true
     
-    webhook_configs:
-      - url: 'http://backend:8000/api/alerts/training-failure'
-        send_resolved: true
-        http_config:
-          bearer_token: '${WEBHOOK_TOKEN}'
+    # webhook_configs:
+    #   - url: 'http://backend:8000/api/alerts/training-failure'
+    #     send_resolved: true
+    #     http_config:
+    #       bearer_token: '${WEBHOOK_TOKEN}'
     
-    pagerduty_configs:
-      - service_key: '${PAGERDUTY_SERVICE_KEY}'
-        severity: 'critical'
-        description: 'Training job {{ .GroupLabels.job_name }} failed'
+    # pagerduty_configs:
+    #   - service_key: '${PAGERDUTY_SERVICE_KEY}'
+    #     severity: 'critical'
+    #     description: 'Training job {{ .GroupLabels.job_name }} failed'
   
   # Training warnings
   - name: 'training-warnings'
@@ -130,12 +130,12 @@ receivers:
           Subject: '[WARNING] Training Issue: {{ .GroupLabels.job_name }}'
         html: '{{ template "email.training.warning.html" . }}'
     
-    slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
-        channel: '#ml-warnings'
-        title: ':warning: Training Warning'
-        text: '{{ template "slack.training.warning" . }}'
-        color: 'warning'
+    # Slack notifications (commented out - see SLACK_SETUP.md for configuration)
+    # slack_configs:
+    #   - api_url: '${SLACK_WEBHOOK_URL}'
+    #     channel: '#ml-warnings'
+    #     title: ':warning: Training Warning'
+    #     text: 'Job: {{ .GroupLabels.job_name }} | Issue: {{ .GroupLabels.alertname }} | Time: {{ .StartsAt }}'
   
   # Operations team for resource issues
   - name: 'ops-team'
@@ -145,11 +145,12 @@ receivers:
           Subject: '[OPS] Resource Alert: {{ .GroupLabels.alertname }}'
         html: '{{ template "email.ops.html" . }}'
     
-    slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
-        channel: '#ops-alerts'
-        title: ':chart_with_upwards_trend: Resource Alert'
-        text: '{{ template "slack.ops" . }}'
+    # Slack notifications (commented out - see SLACK_SETUP.md for configuration)
+    # slack_configs:
+    #   - api_url: '${SLACK_WEBHOOK_URL}'
+    #     channel: '#ops-alerts'
+    #     title: ':chart_with_upwards_trend: Resource Alert'
+    #     text: 'Alert: {{ .GroupLabels.alertname }} | Severity: {{ .GroupLabels.severity }} | Time: {{ .StartsAt }}'
   
   # Data team for data quality issues
   - name: 'data-team'
@@ -159,8 +160,9 @@ receivers:
           Subject: '[DATA] Data Quality Alert: {{ .GroupLabels.alertname }}'
         html: '{{ template "email.data.html" . }}'
     
-    slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
-        channel: '#data-quality'
-        title: ':bar_chart: Data Quality Alert'
-        text: '{{ template "slack.data" . }}'
+    # Slack notifications (commented out - see SLACK_SETUP.md for configuration)
+    # slack_configs:
+    #   - api_url: '${SLACK_WEBHOOK_URL}'
+    #     channel: '#data-quality'
+    #     title: ':bar_chart: Data Quality Alert'
+    #     text: 'Alert: {{ .GroupLabels.alertname }} | Dataset: {{ .GroupLabels.dataset }} | Time: {{ .StartsAt }}'

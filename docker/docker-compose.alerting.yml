@@ -46,9 +46,6 @@ services:
       - ml-platform
     environment:
       - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
-      - WEBHOOK_TOKEN=${WEBHOOK_TOKEN}
-      - PAGERDUTY_SERVICE_KEY=${PAGERDUTY_SERVICE_KEY}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
@@ -60,9 +57,8 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: ml-platform-grafana
+    platform: linux/amd64
     volumes:
-      - ./alerting/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./alerting/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     ports:
       - "3001:3000"
@@ -110,6 +106,7 @@ services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: ml-platform-cadvisor
+    platform: linux/amd64
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
