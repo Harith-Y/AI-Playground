@@ -1,0 +1,546 @@
+"""
+Example: Complete Modular ML Pipeline Code Generation
+
+This script demonstrates how to generate a complete, modular ML pipeline
+with separate modules for preprocessing, training, and evaluation that can
+be imported and reused.
+"""
+
+from app.ml_engine.code_generation import (
+    generate_preprocessing_code,
+    generate_training_code,
+    generate_evaluation_code
+)
+import os
+
+print("=" * 80)
+print("COMPLETE MODULAR ML PIPELINE CODE GENERATION")
+print("=" * 80)
+
+# Create output directory
+os.makedirs('ml_pipeline_modules', exist_ok=True)
+
+# ============================================================================
+# Step 1: Generate Preprocessing Module
+# ============================================================================
+print("\n" + "=" * 80)
+print("Step 1: Generate Preprocessing Module")
+print("=" * 80)
+
+preprocessing_config = {
+    'experiment_name': 'Customer Churn Prediction',
+    'task_type': 'classification',
+    'random_state': 42,
+    'dataset_info': {
+        'file_path': 'customer_data.csv',
+        'file_format': 'csv'
+    },
+    'preprocessing_steps': [
+        {
+            'type': 'missing_value_imputation',
+            'name': 'Impute Missing Values',
+            'parameters': {
+                'strategy': 'mean',
+                'columns': ['age', 'income', 'tenure']
+            }
+        },
+        {
+            'type': 'scaling',
+            'name': 'Standard Scaling',
+            'parameters': {
+                'scaler': 'standard',
+                'columns': ['age', 'income', 'tenure']
+            }
+        },
+        {
+            'type': 'encoding',
+            'name': 'OneHot Encoding',
+            'parameters': {
+                'encoder': 'onehot',
+                'columns': ['gender', 'contract_type']
+            }
+        }
+    ]
+}
+
+# Generate preprocessing function (modular)
+preprocess_code = generate_preprocessing_code(
+    preprocessing_config,
+    output_format='function'
+)
+
+# Save as module
+with open('ml_pipeline_modules/preprocess.py', 'w', encoding='utf-8') as f:
+    f.write('"""Preprocessing Module - Auto-generated"""\n\n')
+    f.write('import pandas as pd\nimport numpy as np\n')
+    f.write('from sklearn.preprocessing import StandardScaler, OneHotEncoder\n')
+    f.write('from sklearn.impute import SimpleImputer\n\n')
+    f.write(preprocess_code)
+
+print("[OK] Preprocessing module saved to 'ml_pipeline_modules/preprocess.py'")
+
+# ============================================================================
+# Step 2: Generate Training Module
+# ============================================================================
+print("\n" + "=" * 80)
+print("Step 2: Generate Training Module")
+print("=" * 80)
+
+training_config = {
+    'experiment_name': 'Customer Churn Prediction',
+    'model_type': 'random_forest_classifier',
+    'task_type': 'classification',
+    'hyperparameters': {
+        'n_estimators': 100,
+        'max_depth': 10,
+        'min_samples_split': 5
+    },
+    'target_column': 'churn',
+    'random_state': 42,
+    'test_size': 0.2,
+    'model_path': 'models/churn_model.pkl'
+}
+
+# Generate training module
+train_code = generate_training_code(
+    training_config,
+    output_format='module'
+)
+
+# Save as module
+with open('ml_pipeline_modules/train.py', 'w', encoding='utf-8') as f:
+    f.write(train_code)
+
+print("[OK] Training module saved to 'ml_pipeline_modules/train.py'")
+
+# ============================================================================
+# Step 3: Generate Evaluation Module
+# ============================================================================
+print("\n" + "=" * 80)
+print("Step 3: Generate Evaluation Module")
+print("=" * 80)
+
+evaluation_config = {
+    'experiment_name': 'Customer Churn Prediction',
+    'task_type': 'classification',
+    'metrics': ['accuracy', 'precision', 'recall', 'f1', 'roc_auc'],
+    'include_confusion_matrix': True,
+    'include_roc_curve': True,
+    'save_results': True,
+    'results_path': 'results/evaluation_results.json',
+    'random_state': 42
+}
+
+# Generate evaluation module
+evaluate_code = generate_evaluation_code(
+    evaluation_config,
+    output_format='module'
+)
+
+# Save as module
+with open('ml_pipeline_modules/evaluate.py', 'w', encoding='utf-8') as f:
+    f.write(evaluate_code)
+
+print("[OK] Evaluation module saved to 'ml_pipeline_modules/evaluate.py'")
+
+# ============================================================================
+# Step 4: Generate Main Pipeline Orchestrator
+# ============================================================================
+print("\n" + "=" * 80)
+print("Step 4: Generate Main Pipeline Orchestrator")
+print("=" * 80)
+
+main_pipeline = f"""\"\"\"
+Main ML Pipeline - Customer Churn Prediction
+
+This script orchestrates the complete ML pipeline by importing
+the generated preprocessing, training, and evaluation modules.
+
+Auto-generated by AI-Playground
+\"\"\"
+
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import pickle
+
+# Import generated modules
+from preprocess import preprocess_data
+from train import split_data, train_model, save_model, load_model, predict
+from evaluate import evaluate_model, save_results
+
+# Configuration
+DATA_PATH = 'customer_data.csv'
+MODEL_PATH = 'models/churn_model.pkl'
+RESULTS_PATH = 'results/evaluation_results.json'
+RANDOM_STATE = 42
+
+
+def run_complete_pipeline(data_path: str = DATA_PATH):
+    \"\"\"
+    Run the complete ML pipeline from data loading to evaluation.
+    
+    Args:
+        data_path: Path to the input data CSV
+    
+    Returns:
+        Dictionary containing model and evaluation results
+    \"\"\"
+    print("=" * 80)
+    print("Customer Churn Prediction - Complete ML Pipeline")
+    print("=" * 80)
+    
+    # Step 1: Load data
+    print("\\n[1/5] Loading data...")
+    df = pd.read_csv(data_path)
+    print(f"Loaded {{len(df)}} rows, {{len(df.columns)}} columns")
+    
+    # Step 2: Preprocess data
+    print("\\n[2/5] Preprocessing data...")
+    df_processed = preprocess_data(df)
+    print(f"Processed shape: {{df_processed.shape}}")
+    
+    # Step 3: Split data
+    print("\\n[3/5] Splitting data...")
+    X_train, X_test, y_train, y_test = split_data(df_processed, target_column='churn')
+    print(f"Train: {{len(X_train)}} samples, Test: {{len(X_test)}} samples")
+    
+    # Step 4: Train model
+    print("\\n[4/5] Training model...")
+    model = train_model(X_train, y_train, verbose=True)
+    
+    # Save model
+    save_model(model, MODEL_PATH)
+    
+    # Step 5: Evaluate model
+    print("\\n[5/5] Evaluating model...")
+    y_pred = predict(model, X_test)
+    y_proba = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
+    
+    results = evaluate_model(model, X_test, y_test, y_pred=y_pred, y_proba=y_proba)
+    
+    # Save evaluation results
+    save_results(results, RESULTS_PATH)
+    
+    print("\\n" + "=" * 80)
+    print("Pipeline completed successfully!")
+    print("=" * 80)
+    print(f"\\nModel saved to: {{MODEL_PATH}}")
+    print(f"Results saved to: {{RESULTS_PATH}}")
+    
+    return {{
+        'model': model,
+        'results': results,
+        'test_data': (X_test, y_test)
+    }}
+
+
+def predict_new_data(data_path: str, model_path: str = MODEL_PATH):
+    \"\"\"
+    Load a trained model and make predictions on new data.
+    
+    Args:
+        data_path: Path to new data CSV
+        model_path: Path to saved model
+    
+    Returns:
+        Predictions array
+    \"\"\"
+    print(f"Loading model from {{model_path}}...")
+    model = load_model(model_path)
+    
+    print(f"Loading data from {{data_path}}...")
+    df = pd.read_csv(data_path)
+    
+    print("Preprocessing data...")
+    df_processed = preprocess_data(df)
+    
+    print("Making predictions...")
+    predictions = predict(model, df_processed)
+    
+    # Get probabilities if available
+    if hasattr(model, 'predict_proba'):
+        probabilities = model.predict_proba(df_processed)
+        return predictions, probabilities
+    
+    return predictions
+
+
+def retrain_model(data_path: str = DATA_PATH):
+    \"\"\"
+    Retrain the model with new data.
+    
+    Args:
+        data_path: Path to the training data CSV
+    
+    Returns:
+        Trained model
+    \"\"\"
+    print("Retraining model...")
+    
+    # Load and preprocess data
+    df = pd.read_csv(data_path)
+    df_processed = preprocess_data(df)
+    
+    # Split data
+    X_train, X_test, y_train, y_test = split_data(df_processed, target_column='churn')
+    
+    # Train model
+    model = train_model(X_train, y_train, X_val=X_test, y_val=y_test, verbose=True)
+    
+    # Save model
+    save_model(model, MODEL_PATH)
+    
+    print(f"Model retrained and saved to {{MODEL_PATH}}")
+    return model
+
+
+if __name__ == '__main__':
+    import sys
+    
+    if len(sys.argv) > 1:
+        command = sys.argv[1]
+        
+        if command == 'train':
+            # Run complete pipeline
+            run_complete_pipeline()
+        
+        elif command == 'predict':
+            # Make predictions on new data
+            if len(sys.argv) < 3:
+                print("Usage: python main.py predict <data_path>")
+                sys.exit(1)
+            
+            data_path = sys.argv[2]
+            predictions = predict_new_data(data_path)
+            print(f"\\nPredictions: {{predictions}}")
+        
+        elif command == 'retrain':
+            # Retrain model
+            retrain_model()
+        
+        else:
+            print(f"Unknown command: {{command}}")
+            print("Available commands: train, predict, retrain")
+    
+    else:
+        # Default: run complete pipeline
+        run_complete_pipeline()
+"""
+
+# Save main pipeline
+with open('ml_pipeline_modules/main.py', 'w', encoding='utf-8') as f:
+    f.write(main_pipeline)
+
+print("[OK] Main pipeline script saved to 'ml_pipeline_modules/main.py'")
+
+# ============================================================================
+# Step 5: Generate __init__.py for Package
+# ============================================================================
+print("\n" + "=" * 80)
+print("Step 5: Generate Package __init__.py")
+print("=" * 80)
+
+init_file = """\"\"\"
+ML Pipeline Package - Customer Churn Prediction
+
+Auto-generated modular ML pipeline.
+
+Modules:
+    preprocess: Data preprocessing functions
+    train: Model training functions
+    evaluate: Model evaluation functions
+    main: Pipeline orchestration
+
+Usage:
+    # Import individual modules
+    from ml_pipeline_modules.preprocess import preprocess_data
+    from ml_pipeline_modules.train import train_model
+    from ml_pipeline_modules.evaluate import evaluate_model
+    
+    # Or run the complete pipeline
+    from ml_pipeline_modules.main import run_complete_pipeline
+    results = run_complete_pipeline('data.csv')
+\"\"\"
+
+from .preprocess import preprocess_data
+from .train import train_model, save_model, load_model, predict, split_data
+from .evaluate import evaluate_model, save_results
+
+__all__ = [
+    'preprocess_data',
+    'train_model',
+    'save_model',
+    'load_model',
+    'predict',
+    'split_data',
+    'evaluate_model',
+    'save_results',
+]
+"""
+
+with open('ml_pipeline_modules/__init__.py', 'w', encoding='utf-8') as f:
+    f.write(init_file)
+
+print("[OK] Package __init__.py saved to 'ml_pipeline_modules/__init__.py'")
+
+# ============================================================================
+# Step 6: Generate README
+# ============================================================================
+print("\n" + "=" * 80)
+print("Step 6: Generate README")
+print("=" * 80)
+
+readme = """# Customer Churn Prediction - Modular ML Pipeline
+
+Auto-generated by AI-Playground
+
+## Project Structure
+
+ml_pipeline_modules/
+  - __init__.py          # Package initialization
+  - preprocess.py        # Data preprocessing module
+  - train.py            # Model training module
+  - evaluate.py         # Model evaluation module
+  - main.py             # Pipeline orchestrator
+  - README.md           # This file
+
+## Modules
+
+### preprocess.py
+Contains the `preprocess_data()` function that applies all preprocessing steps:
+- Missing value imputation (mean strategy)
+- Standard scaling for numerical features
+- OneHot encoding for categorical features
+
+### train.py
+Contains training utilities:
+- `split_data()` - Split data into train/test sets
+- `create_model()` - Create model instance
+- `train_model()` - Train the model
+- `save_model()` - Save trained model
+- `load_model()` - Load saved model
+- `predict()` - Make predictions
+
+### evaluate.py
+Contains evaluation utilities:
+- `evaluate_model()` - Evaluate model performance
+- `plot_confusion_matrix()` - Visualize confusion matrix
+- `plot_roc_curve()` - Plot ROC curve
+- `save_results()` - Save evaluation results to JSON
+
+### main.py
+Orchestrates the complete pipeline by importing and using the above modules.
+
+## Usage
+
+### Run Complete Pipeline
+python ml_pipeline_modules/main.py train
+
+### Make Predictions on New Data
+python ml_pipeline_modules/main.py predict new_data.csv
+
+### Retrain Model
+python ml_pipeline_modules/main.py retrain
+
+### Use as Python Package
+```python
+# Import the package
+from ml_pipeline_modules import preprocess_data, train_model, evaluate_model
+
+# Use individual functions
+df_clean = preprocess_data(df)
+model = train_model(X_train, y_train)
+results = evaluate_model(model, X_test, y_test)
+```
+
+### Use Individual Modules
+```python
+# Import preprocessing
+from ml_pipeline_modules.preprocess import preprocess_data
+df_processed = preprocess_data(df)
+
+# Import training
+from ml_pipeline_modules.train import train_model, save_model
+model = train_model(X_train, y_train)
+save_model(model, 'my_model.pkl')
+
+# Import evaluation
+from ml_pipeline_modules.evaluate import evaluate_model, save_results
+results = evaluate_model(model, X_test, y_test)
+save_results(results, 'results.json')
+```
+
+## Requirements
+
+pandas, numpy, scikit-learn, matplotlib, seaborn
+
+Install with: pip install pandas numpy scikit-learn matplotlib seaborn
+
+## Model Details
+
+- **Model Type**: Random Forest Classifier
+- **Task**: Classification (Customer Churn)
+- **Hyperparameters**:
+  - n_estimators: 100
+  - max_depth: 10
+  - min_samples_split: 5
+- **Random State**: 42
+
+## Pipeline Steps
+
+1. **Data Loading**: Load CSV data
+2. **Preprocessing**: Imputation, scaling, encoding
+3. **Data Splitting**: 80/20 train/test split
+4. **Model Training**: Train Random Forest classifier
+5. **Model Evaluation**: Compute metrics, generate visualizations
+6. **Results Saving**: Save model and evaluation results
+
+## Benefits of Modular Approach
+
+- Each module can be imported independently
+- Easy to test individual components
+- Reusable across different projects
+- Clear separation of concerns
+- Production-ready structure
+- Can be deployed as a Python package
+
+## Generated Files
+
+All code in this directory was auto-generated by AI-Playground.
+You can modify the code as needed for your specific use case.
+"""
+
+with open('ml_pipeline_modules/README.md', 'w', encoding='utf-8') as f:
+    f.write(readme)
+
+print("[OK] README saved to 'ml_pipeline_modules/README.md'")
+
+# ============================================================================
+# Summary
+# ============================================================================
+print("\n" + "=" * 80)
+print("COMPLETE MODULAR ML PIPELINE GENERATED!")
+print("=" * 80)
+print("\nGenerated modular ML pipeline:")
+print("  - preprocess.py: Reusable preprocessing module")
+print("  - train.py: Reusable training module")
+print("  - evaluate.py: Reusable evaluation module")
+print("  - main.py: Pipeline orchestrator")
+print("  - __init__.py: Package initialization")
+print("  - README.md: Documentation")
+print("\nBenefits of modular approach:")
+print("  [+] Each module can be imported independently")
+print("  [+] Easy to test individual components")
+print("  [+] Reusable across different projects")
+print("  [+] Clear separation of concerns")
+print("  [+] Production-ready structure")
+print("  [+] Can be deployed as a Python package")
+print("\nUsage:")
+print("  # Run complete pipeline")
+print("  python ml_pipeline_modules/main.py train")
+print("\n  # Make predictions")
+print("  python ml_pipeline_modules/main.py predict new_data.csv")
+print("\n  # Use as package")
+print("  from ml_pipeline_modules import train_model, evaluate_model")
+print("=" * 80)
