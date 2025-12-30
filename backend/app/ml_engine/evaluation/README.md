@@ -7,7 +7,8 @@ Comprehensive model evaluation metrics and visualizations for machine learning m
 The evaluation module provides tools to assess model performance across different ML tasks:
 
 - ✅ **Classification Metrics** - Accuracy, precision, recall, F1, AUC-ROC, confusion matrix
-- 🚧 **Regression Metrics** - MAE, MSE, RMSE, R², MAPE, residual analysis (Coming Soon)
+- 🚧 **Regression Metrics** - MAE, MSE, RMSE, R², MAPE (Coming Soon)
+- ✅ **Residual Analysis Utilities** - Residual stats, standardized residuals, outlier detection
 - 🚧 **Clustering Metrics** - Silhouette score, inertia, Davies-Bouldin index (Coming Soon)
 - 🚧 **Visualizations** - ROC curves, PR curves, confusion matrices, residual plots (Coming Soon)
 
@@ -16,22 +17,26 @@ The evaluation module provides tools to assess model performance across differen
 ### Features
 
 #### Basic Metrics
+
 - **Accuracy**: Overall correctness (correct predictions / total predictions)
 - **Precision**: Positive predictive value (TP / (TP + FP))
 - **Recall**: Sensitivity/True positive rate (TP / (TP + FN))
 - **F1 Score**: Harmonic mean of precision and recall
 
 #### Probability-Based Metrics
+
 - **AUC-ROC**: Area under Receiver Operating Characteristic curve
 - **AUC-PR**: Area under Precision-Recall curve
 - **Log Loss**: Logarithmic loss for probability predictions
 
 #### Advanced Metrics
+
 - **Balanced Accuracy**: Average recall per class (handles imbalanced data)
 - **Matthews Correlation Coefficient (MCC)**: Correlation between predictions and truth
 - **Cohen's Kappa**: Agreement between predictions and truth, accounting for chance
 
 #### Multi-Class Support
+
 - **Averaging Strategies**: binary, micro, macro, weighted
 - **Per-Class Metrics**: Individual metrics for each class
 - **Confusion Matrix**: With optional normalization
@@ -197,6 +202,7 @@ print(f"Recall: {metrics.recall:.4f}")
 Main class for calculating classification metrics.
 
 **Constructor Parameters:**
+
 - `average` (str): Averaging strategy - 'binary', 'micro', 'macro', 'weighted'
 - `pos_label` (int/str): Positive class label for binary classification (default: 1)
 - `labels` (list): List of class labels (auto-detected if None)
@@ -205,6 +211,7 @@ Main class for calculating classification metrics.
 **Methods:**
 
 ##### `calculate_metrics()`
+
 Calculate comprehensive classification metrics.
 
 ```python
@@ -219,6 +226,7 @@ def calculate_metrics(
 ```
 
 **Parameters:**
+
 - `y_true`: True labels
 - `y_pred`: Predicted labels
 - `y_proba`: Predicted probabilities (optional, for AUC metrics)
@@ -229,6 +237,7 @@ def calculate_metrics(
 **Returns:** `ClassificationMetrics` object
 
 ##### `calculate_confusion_matrix()`
+
 Calculate confusion matrix with optional normalization.
 
 ```python
@@ -241,6 +250,7 @@ def calculate_confusion_matrix(
 ```
 
 ##### `get_classification_report()`
+
 Generate sklearn classification report.
 
 ```python
@@ -257,6 +267,7 @@ def get_classification_report(
 Dataclass containing all calculated metrics.
 
 **Attributes:**
+
 - `accuracy` (float): Overall accuracy
 - `precision` (float): Precision score
 - `recall` (float): Recall score
@@ -274,6 +285,7 @@ Dataclass containing all calculated metrics.
 - `n_classes` (int, optional): Number of classes
 
 **Methods:**
+
 - `to_dict()`: Convert to dictionary (JSON-serializable)
 - `__repr__()`: String representation
 
@@ -296,6 +308,7 @@ def calculate_classification_metrics(
 ### Averaging Strategies
 
 #### Binary
+
 For binary classification only. Calculates metrics for the positive class.
 
 ```python
@@ -307,6 +320,7 @@ metrics = calculate_classification_metrics(
 ```
 
 #### Micro
+
 Calculate metrics globally by counting total TP, FP, FN.
 
 ```python
@@ -318,6 +332,7 @@ metrics = calculate_classification_metrics(
 ```
 
 #### Macro
+
 Calculate metrics for each class, then take unweighted mean.
 
 ```python
@@ -329,6 +344,7 @@ metrics = calculate_classification_metrics(
 ```
 
 #### Weighted
+
 Calculate metrics for each class, then take weighted mean by support.
 
 ```python
@@ -422,6 +438,38 @@ metrics = calculate_classification_metrics(
 metrics_dict = metrics.to_dict()
 ```
 
+## 📉 Residual Analysis (ML-51)
+
+Features:
+
+- Residual statistics: mean, median, std dev, MAE, MSE, RMSE, MAPE (safe when targets contain zeros)
+- Distribution insights: min/max, five quantiles (5th/25th/50th/75th/95th percentiles), skewness, kurtosis
+- Standardized residuals with configurable z-score threshold for outlier flags
+- Optional Shapiro-Wilk normality test and correlation between |residuals| and predictions to hint at heteroscedasticity
+
+### Quick Start
+
+```python
+from app.ml_engine.evaluation import analyze_residuals
+
+actual = [3.0, -0.5, 2.0, 7.0]
+predicted = [2.5, 0.0, 2.0, 8.0]
+
+result = analyze_residuals(actual, predicted, zscore_threshold=2.0)
+
+print(result.mae)                # 0.5
+print(result.outlier_indices)    # []
+plot_payload = result.residual_series  # ready for plotting
+```
+
+### Returned Fields
+
+- `residuals`, `predicted`, `actual`
+- `standardized_residuals` (optional), `outlier_indices`, `outlier_threshold`
+- `quantiles`, `mean_error`, `median_error`, `std_error`, `mae`, `mse`, `rmse`, `mape`
+- `skewness`, `kurtosis`, `normality_test` (Shapiro statistic and p-value)
+- `correlation_abs_residuals_predicted` to flag potential heteroscedasticity patterns
+
 ## 🧪 Testing
 
 Comprehensive test suite with 80+ test cases covering:
@@ -434,6 +482,7 @@ Comprehensive test suite with 80+ test cases covering:
 - Input validation and error handling
 
 Run tests:
+
 ```bash
 pytest backend/tests/ml_engine/evaluation/test_classification_metrics.py -v
 pytest backend/tests/ml_engine/evaluation/test_classification_metrics.py --cov=app.ml_engine.evaluation

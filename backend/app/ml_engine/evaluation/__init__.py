@@ -26,6 +26,12 @@ from app.ml_engine.evaluation.confusion_matrix import (
     compute_confusion_matrix,
 )
 
+from app.ml_engine.evaluation.residual_analysis import (
+    ResidualAnalysisCalculator,
+    ResidualAnalysisResult,
+    analyze_residuals,
+)
+
 __all__ = [
     # Classification metrics
     "ClassificationMetricsCalculator",
@@ -35,4 +41,8 @@ __all__ = [
     "ConfusionMatrixCalculator",
     "ConfusionMatrixResult",
     "compute_confusion_matrix",
+    # Residual analysis
+    "ResidualAnalysisCalculator",
+    "ResidualAnalysisResult",
+    "analyze_residuals",
 ]
