@@ -60,6 +60,7 @@ from app.ml_engine.evaluation.feature_importance import (
     FeatureImportanceCalculator,
     FeatureImportanceResult,
     calculate_feature_importance,
+    calculate_permutation_importance,
 )
 
 from app.ml_engine.evaluation.clustering_metrics import (
@@ -103,4 +104,5 @@ __all__ = [
     "FeatureImportanceCalculator",
     "FeatureImportanceResult",
     "calculate_feature_importance",
+    "calculate_permutation_importance",
 ]

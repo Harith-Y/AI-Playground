@@ -288,3 +288,30 @@ def calculate_feature_importance(
         feature_names=feature_names,
         method=method,
     )
+
+
+def calculate_permutation_importance(
+    estimator: Any,
+    X: Union[np.ndarray, "pd.DataFrame"],
+    y: ArrayLike,
+    feature_names: Optional[Sequence[str]] = None,
+    scoring: Optional[str] = None,
+    n_repeats: int = 5,
+    random_state: Optional[int] = None,
+    n_jobs: int = 1,
+) -> FeatureImportanceResult:
+    """Convenience wrapper to compute permutation importance directly."""
+
+    calculator = FeatureImportanceCalculator(
+        scoring=scoring,
+        n_repeats=n_repeats,
+        random_state=random_state,
+        n_jobs=n_jobs,
+    )
+    return calculator.calculate(
+        estimator=estimator,
+        X=X,
+        y=y,
+        feature_names=feature_names,
+        method="permutation",
+    )

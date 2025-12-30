@@ -10,6 +10,7 @@ from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from app.ml_engine.evaluation import (
     FeatureImportanceCalculator,
     calculate_feature_importance,
+    calculate_permutation_importance,
 )
 
 
@@ -53,6 +54,24 @@ def test_permutation_importance_explicit():
     assert result.method == "permutation"
     assert result.metadata["n_repeats"] == 3
     assert len(result.importances) == X.shape[1]
+
+
+def test_permutation_importance_helper_function():
+    X, y = load_iris(return_X_y=True)
+    model = KNeighborsClassifier(n_neighbors=3).fit(X, y)
+
+    result = calculate_permutation_importance(
+        estimator=model,
+        X=X,
+        y=y,
+        scoring="accuracy",
+        n_repeats=4,
+        random_state=123,
+    )
+
+    assert result.method == "permutation"
+    assert result.metadata["n_repeats"] == 4
+    assert result.n_features == X.shape[1]
 
 
 def test_auto_fallback_to_permutation_when_no_native_importance():

@@ -535,7 +535,7 @@ Features:
 ```python
 from sklearn.datasets import load_iris
 from sklearn.ensemble import RandomForestClassifier
-from app.ml_engine.evaluation import calculate_feature_importance
+from app.ml_engine.evaluation import calculate_feature_importance, calculate_permutation_importance
 
 X, y = load_iris(return_X_y=True)
 model = RandomForestClassifier(random_state=42, n_estimators=50).fit(X, y)
@@ -545,6 +545,10 @@ print(result.method)          # feature_importances_
 print(result.importances)     # {'sepal length (cm)': 0.34, ...}
 ranked = result.to_ranked_list()
 # [{'feature': 'sepal length (cm)', 'importance': 0.34, 'rank': 1}, ...]
+
+# Permutation importance (works for any estimator with score/predict)
+perm_result = calculate_permutation_importance(model, X, y, scoring="accuracy", n_repeats=5)
+print(perm_result.method)     # permutation
 ```
 
 ## 🧪 Testing
