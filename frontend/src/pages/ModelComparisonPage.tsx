@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Container,
   Box,
@@ -10,6 +10,12 @@ import {
   Breadcrumbs,
   Link,
   Divider,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Paper,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -17,70 +23,113 @@ import {
   Compare as CompareIcon,
 } from '@mui/icons-material';
 import ModelListSelector from '../components/model/ModelListSelector';
-import ModelComparisonView from '../components/model/ModelComparisonView';
+import ModelComparisonViewEnhanced from '../components/model/ModelComparisonViewEnhanced';
 import type { ModelComparisonData } from '../types/modelComparison';
+import { modelComparisonService } from '../services/modelComparisonService';
 
 const ModelComparisonPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
   const [models, setModels] = useState<ModelComparisonData[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Comparison options
+  const [comparisonMetrics, setComparisonMetrics] = useState<string>('');
+  const [rankingCriteria, setRankingCriteria] = useState<string>('');
 
   // Fetch models on component mount
   useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // TODO: Replace with actual API call
-        const response = await fetch('/api/models/comparison');
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch models');
-        }
-
-        const data = await response.json();
-        setModels(data.models || []);
-      } catch (err) {
-        console.error('Error fetching models:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load models');
-        
-        // For demo purposes, create mock data
-        setModels(createMockModels());
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchModels();
+    
+    // Check for pre-selected models from URL params
+    const preselected = searchParams.get('models');
+    if (preselected) {
+      setSelectedModels(preselected.split(','));
+    }
   }, []);
+
+  const fetchModels = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch model runs from backend
+      const modelRuns = await modelComparisonService.listModelRuns(
+        undefined, // experiment_id
+        'completed', // only completed models
+        undefined, // model_type
+        100, // limit
+        0 // offset
+      );
+
+      // Transform backend data to frontend format
+      const transformedModels: ModelComparisonData[] = modelRuns.map((run: any) => ({
+        id: run.id,
+        name: run.model_type || `Model ${run.id.slice(0, 8)}`,
+        type: run.model_type,
+        status: run.status,
+        createdAt: run.created_at,
+        trainingTime: run.training_time,
+        hyperparameters: run.hyperparameters || {},
+        datasetId: run.dataset_id || '',
+        datasetName: run.dataset_name || 'Unknown Dataset',
+        metrics: run.metrics || {},
+        featureImportance: run.feature_importance,
+      }));
+
+      setModels(transformedModels);
+    } catch (err: any) {
+      console.error('Error fetching models:', err);
+      setError(err.response?.data?.detail || 'Failed to load models');
+      
+      // Fallback: Load mock data for development
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Loading mock data for development');
+        setModels(createMockModels());
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSelectionChange = (selectedIds: string[]) => {
     setSelectedModels(selectedIds);
-  };
-
-  const handleRemoveModel = (modelId: string) => {
-    setSelectedModels(prev => prev.filter(id => id !== modelId));
   };
 
   const handleBack = () => {
     navigate('/modeling');
   };
 
-  const selectedModelData = models.filter(model => selectedModels.includes(model.id));
+  const handleCompare = () => {
+    // Trigger comparison by updating URL params
+    const params = new URLSearchParams();
+    params.set('models', selectedModels.join(','));
+    navigate(`?${params.toString()}`, { replace: true });
+  };
+
+  const getMetricsArray = (): string[] | undefined => {
+    if (!comparisonMetrics.trim()) return undefined;
+    return comparisonMetrics.split(',').map(m => m.trim()).filter(Boolean);
+  };
 
   if (loading) {
     return (
       <Container maxWidth="xl">
         <Box
           display="flex"
+          flexDirection="column"
           justifyContent="center"
           alignItems="center"
           minHeight="60vh"
+          gap={2}
         >
-          <CircularProgress />
+          <CircularProgress size={60} />
+          <Typography variant="h6" color="text.secondary">
+            Loading models...
+          </Typography>
         </Box>
       </Container>
     );
@@ -113,10 +162,15 @@ const ModelComparisonPage: React.FC = () => {
         {/* Header */}
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Box display="flex" alignItems="center" gap={2}>
-            <CompareIcon color="primary" sx={{ fontSize: 32 }} />
-            <Typography variant="h4" component="h1">
-              Model Comparison
-            </Typography>
+            <CompareIcon color="primary" sx={{ fontSize: 40 }} />
+            <Box>
+              <Typography variant="h4" component="h1">
+                Model Comparison
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Compare multiple models side-by-side to analyze performance
+              </Typography>
+            </Box>
           </Box>
           <Button
             variant="outlined"
@@ -127,18 +181,53 @@ const ModelComparisonPage: React.FC = () => {
           </Button>
         </Box>
 
-        {/* Description */}
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Compare multiple models side-by-side to analyze their performance metrics,
-          training characteristics, and make informed decisions about model selection.
-        </Typography>
-
         {/* Error Alert */}
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert severity="warning" sx={{ mb: 3 }} onClose={() => setError(null)}>
             {error}
+            {models.length > 0 && (
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                Showing mock data for demonstration
+              </Typography>
+            )}
           </Alert>
         )}
+
+        {/* Comparison Options */}
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Comparison Options
+          </Typography>
+          <Box display="flex" gap={2} flexWrap="wrap">
+            <TextField
+              label="Comparison Metrics (comma-separated)"
+              placeholder="e.g., accuracy, f1_score, precision"
+              value={comparisonMetrics}
+              onChange={(e) => setComparisonMetrics(e.target.value)}
+              size="small"
+              sx={{ flexGrow: 1, minWidth: 300 }}
+              helperText="Leave empty for auto-detection"
+            />
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Ranking Criteria</InputLabel>
+              <Select
+                value={rankingCriteria}
+                onChange={(e) => setRankingCriteria(e.target.value)}
+                label="Ranking Criteria"
+              >
+                <MenuItem value="">
+                  <em>Auto-detect</em>
+                </MenuItem>
+                <MenuItem value="accuracy">Accuracy</MenuItem>
+                <MenuItem value="f1_score">F1 Score</MenuItem>
+                <MenuItem value="precision">Precision</MenuItem>
+                <MenuItem value="recall">Recall</MenuItem>
+                <MenuItem value="r2_score">R² Score</MenuItem>
+                <MenuItem value="rmse">RMSE</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </Paper>
 
         {/* Model Selection */}
         <Box mb={4}>
@@ -146,13 +235,28 @@ const ModelComparisonPage: React.FC = () => {
             models={models}
             selectedModels={selectedModels}
             onSelectionChange={handleSelectionChange}
-            maxSelection={4}
+            maxSelection={10}
             loading={loading}
           />
         </Box>
 
+        {/* Compare Button */}
+        {selectedModels.length >= 2 && (
+          <Box mb={3} display="flex" justifyContent="center">
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<CompareIcon />}
+              onClick={handleCompare}
+              disabled={selectedModels.length < 2 || selectedModels.length > 10}
+            >
+              Compare {selectedModels.length} Models
+            </Button>
+          </Box>
+        )}
+
         {/* Divider */}
-        {selectedModels.length > 0 && (
+        {selectedModels.length >= 2 && (
           <Divider sx={{ mb: 4 }}>
             <Typography variant="h6" color="primary">
               Comparison Results
@@ -160,18 +264,34 @@ const ModelComparisonPage: React.FC = () => {
           </Divider>
         )}
 
-        {/* Model Comparison */}
-        <ModelComparisonView
-          models={selectedModelData}
-          onRemoveModel={handleRemoveModel}
-          maxModels={4}
-        />
+        {/* Model Comparison View */}
+        {selectedModels.length >= 2 ? (
+          <ModelComparisonViewEnhanced
+            modelRunIds={selectedModels}
+            comparisonMetrics={getMetricsArray()}
+            rankingCriteria={rankingCriteria || undefined}
+            onRefresh={fetchModels}
+          />
+        ) : (
+          <Alert severity="info" sx={{ mt: 4 }}>
+            <Typography variant="body1" gutterBottom>
+              <strong>Get Started:</strong>
+            </Typography>
+            <Typography variant="body2" component="div">
+              1. Select at least 2 models from the list above
+              <br />
+              2. (Optional) Configure comparison metrics and ranking criteria
+              <br />
+              3. Click "Compare" to see detailed analysis
+            </Typography>
+          </Alert>
+        )}
       </Box>
     </Container>
   );
 };
 
-// Mock data generator for demo purposes
+// Mock data generator for demo/development purposes
 function createMockModels(): ModelComparisonData[] {
   return [
     {
