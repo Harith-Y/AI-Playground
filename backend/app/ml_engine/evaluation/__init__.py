@@ -56,6 +56,12 @@ from app.ml_engine.evaluation.actual_vs_predicted import (
     aggregate_actual_vs_predicted,
 )
 
+from app.ml_engine.evaluation.feature_importance import (
+    FeatureImportanceCalculator,
+    FeatureImportanceResult,
+    calculate_feature_importance,
+)
+
 from app.ml_engine.evaluation.clustering_metrics import (
     ClusteringMetricsCalculator,
     ClusteringMetricsResult,
@@ -93,4 +99,8 @@ __all__ = [
     "ClusteringMetricsCalculator",
     "ClusteringMetricsResult",
     "calculate_clustering_metrics",
+    # Feature importance
+    "FeatureImportanceCalculator",
+    "FeatureImportanceResult",
+    "calculate_feature_importance",
 ]

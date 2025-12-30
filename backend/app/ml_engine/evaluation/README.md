@@ -11,6 +11,7 @@ The evaluation module provides tools to assess model performance across differen
 - ✅ **Residual Analysis Utilities** - Residual stats, standardized residuals, outlier detection
 - ✅ **Actual vs Predicted Aggregation** - Scatter-ready payload with error stats and correlations
 - ✅ **Clustering Metrics** - Silhouette, Calinski-Harabasz, Davies-Bouldin, inertia
+- ✅ **Feature Importance** - Native importances, permutation importance, optional SHAP
 - 🚧 **Visualizations** - ROC curves, PR curves, confusion matrices, residual plots (Coming Soon)
 
 ## 🎯 Classification Metrics (ML-46)
@@ -520,6 +521,32 @@ print(metrics.cluster_sizes)  # {'0': 25, '1': 25}
 payload = metrics.to_dict()
 ```
 
+## 🔍 Feature Importance (ML-54-55)
+
+Features:
+
+- Native model importances via `feature_importances_` (tree models) and `coef_` (linear models)
+- Permutation importance fallback for any estimator with `score`/`predict`
+- Optional SHAP-based importances (install `shap` to enable)
+- Ranked output helper for API payloads and plots
+
+### Quick Start
+
+```python
+from sklearn.datasets import load_iris
+from sklearn.ensemble import RandomForestClassifier
+from app.ml_engine.evaluation import calculate_feature_importance
+
+X, y = load_iris(return_X_y=True)
+model = RandomForestClassifier(random_state=42, n_estimators=50).fit(X, y)
+
+result = calculate_feature_importance(model, X, y)
+print(result.method)          # feature_importances_
+print(result.importances)     # {'sepal length (cm)': 0.34, ...}
+ranked = result.to_ranked_list()
+# [{'feature': 'sepal length (cm)', 'importance': 0.34, 'rank': 1}, ...]
+```
+
 ## 🧪 Testing
 
 Comprehensive test suite with 80+ test cases covering:
@@ -548,9 +575,7 @@ pytest backend/tests/ml_engine/evaluation/test_classification_metrics.py --cov=a
 ## 🚀 Coming Soon
 
 - **Regression Metrics** (ML-47-50): MAE, MSE, RMSE, R², MAPE, residual analysis
-- **Clustering Metrics** (ML-53): Silhouette score, inertia, Davies-Bouldin index
 - **Visualizations** (ML-48-49): ROC curves, PR curves, confusion matrix heatmaps
-- **Feature Importance** (ML-54-55): Permutation importance, SHAP values
 
 ## 📝 Notes
 
