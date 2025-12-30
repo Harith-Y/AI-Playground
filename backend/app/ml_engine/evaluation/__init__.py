@@ -50,6 +50,13 @@ from app.ml_engine.evaluation.pr_curve import (
     compute_pr_curve,
 )
 
+from app.ml_engine.evaluation.regression_metrics import (
+    RegressionMetricsCalculator,
+    RegressionMetrics,
+    ResidualAnalysis,
+    calculate_regression_metrics,
+)
+
 from app.ml_engine.evaluation.actual_vs_predicted import (
     ActualVsPredictedAggregator,
     ActualVsPredictedResult,
@@ -92,6 +99,11 @@ __all__ = [
     "PRCurveResult",
     "MultiClassPRResult",
     "compute_pr_curve",
+    # Regression metrics
+    "RegressionMetricsCalculator",
+    "RegressionMetrics",
+    "ResidualAnalysis",
+    "calculate_regression_metrics",
     # Actual vs predicted aggregation
     "ActualVsPredictedAggregator",
     "ActualVsPredictedResult",
