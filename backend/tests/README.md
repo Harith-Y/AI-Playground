@@ -6,9 +6,21 @@ This directory contains comprehensive tests for the AI Playground backend API.
 
 ```
 tests/
-├── conftest.py              # Pytest fixtures and configuration
-├── test_datasets.py         # Dataset endpoint tests
-└── README.md               # This file
+├── conftest.py                      # Pytest fixtures and configuration
+├── conftest_ml.py                   # ML-specific fixtures
+├── test_datasets.py                 # Dataset endpoint tests
+├── test_preprocessing_endpoints.py  # Preprocessing CRUD endpoint tests
+├── test_model_training_api.py       # Model training endpoint tests
+├── test_feature_importance_endpoint.py  # Feature importance tests
+├── test_model_comparison.py         # Model comparison endpoint tests
+├── test_tuning_api.py              # ✨ Hyperparameter tuning API tests (NEW)
+├── test_evaluation_api.py          # ✨ Evaluation & metrics API tests (NEW)
+├── test_cache.py                    # Redis caching tests
+├── test_tuning_orchestration.py    # Tuning orchestration service tests
+├── test_tuning_tasks.py             # Tuning Celery tasks tests
+├── ml_engine/                       # ML engine component tests
+│   ├── test_*.py                    # Various ML component tests
+└── README.md                        # This file
 ```
 
 ## Running Tests
@@ -113,44 +125,58 @@ def test_new_endpoint(client: TestClient, sample_csv_file: Path):
 ## Test Classes
 
 ### TestDatasetUpload
+
 Tests for POST /api/v1/datasets/upload
+
 - Upload success cases (CSV, Excel, JSON)
 - Upload failure cases (invalid type, corrupted file)
 - File size validation
 - Missing values handling
 
 ### TestDatasetList
+
 Tests for GET /api/v1/datasets/
+
 - Empty list
 - List with data
 - Pagination
 
 ### TestDatasetGet
+
 Tests for GET /api/v1/datasets/{id}
+
 - Get existing dataset
 - Get non-existent dataset
 
 ### TestDatasetPreview
+
 Tests for GET /api/v1/datasets/{id}/preview
+
 - Preview with default rows
 - Preview with custom row limit
 - Preview when file is deleted
 - Column metadata validation
 
 ### TestDatasetStats
+
 Tests for GET /api/v1/datasets/{id}/stats
+
 - Statistics calculation
 - Duplicate detection
 - Missing values tracking
 
 ### TestDatasetDelete
+
 Tests for DELETE /api/v1/datasets/{id}
+
 - Successful deletion
 - Delete non-existent dataset
 - Delete when file already gone
 
 ### TestDatasetIntegration
+
 Integration tests for complete workflows
+
 - Full dataset lifecycle
 - Multiple datasets handling
 
@@ -174,6 +200,7 @@ These tests are designed to run in CI/CD pipelines:
 ### Database Issues
 
 If you get database connection errors:
+
 ```bash
 # Check database is running
 # For tests, SQLite is used automatically (no setup needed)
@@ -182,6 +209,7 @@ If you get database connection errors:
 ### Import Errors
 
 If you get import errors:
+
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -194,6 +222,7 @@ set PYTHONPATH=%PYTHONPATH%;%CD%  # Windows
 ### File Permission Errors
 
 If you get permission errors with temp files:
+
 ```bash
 # Tests use temp directories which are cleaned up automatically
 # If cleanup fails, manually remove test.db and __pycache__
@@ -202,15 +231,43 @@ If you get permission errors with temp files:
 ## Performance
 
 Current test suite performance:
-- **Total tests**: 30+ tests
-- **Execution time**: ~5-10 seconds
-- **Coverage**: 90%+ of dataset endpoints
+
+- **Total tests**: 140+ tests
+- **API Integration Tests**: 59 tests
+  - Tuning API: 30 tests
+  - Evaluation API: 29 tests
+- **ML Engine Tests**: 50+ tests
+- **Execution time**: ~30-45 seconds
+- **Coverage**: 85%+ of API endpoints
+
+## Recent Additions
+
+### ✨ Tuning & Evaluation API Tests (59 tests)
+
+Comprehensive integration tests for hyperparameter tuning and model evaluation endpoints.
+
+**New Test Files:**
+
+- `test_tuning_api.py` (30 tests) - POST /tune, GET /tune/{id}/status, GET /tune/{id}/results
+- `test_evaluation_api.py` (29 tests) - GET /metrics, GET /feature-importance
+
+**Coverage:**
+
+- ✅ Successful operations (happy path)
+- ✅ Error handling (404, 400, 422)
+- ✅ Authorization & security
+- ✅ Cache behavior (hit/miss/bypass)
+- ✅ Edge cases & boundary conditions
+- ✅ Performance benchmarks
+
+See [TEST_COVERAGE_EVALUATION_TUNING.md](../../TEST_COVERAGE_EVALUATION_TUNING.md) for detailed documentation.
 
 ## Future Tests
 
 Planned additions:
-- [ ] Preprocessing endpoint tests
-- [ ] Model training endpoint tests
+
+- [ ] Model deployment endpoint tests
+- [ ] Code generation endpoint tests
 - [ ] WebSocket connection tests
 - [ ] Performance/load tests
 - [ ] Security tests (SQL injection, XSS, etc.)
