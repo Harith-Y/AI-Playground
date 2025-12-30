@@ -8,7 +8,8 @@ Modules:
     preprocessing_generator: Generate preprocessing code
     training_generator: Generate model training code
     evaluation_generator: Generate model evaluation code
-    generator: Main code generation logic [Coming in ML-66-67]
+    prediction_generator: Generate prediction/inference code
+    generator: Main code generation logic [Coming in ML-67]
 """
 
 from app.ml_engine.code_generation.templates import (
@@ -33,6 +34,11 @@ from app.ml_engine.code_generation.evaluation_generator import (
     generate_evaluation_code,
 )
 
+from app.ml_engine.code_generation.prediction_generator import (
+    PredictionCodeGenerator,
+    generate_prediction_code,
+)
+
 __all__ = [
     "TEMPLATES",
     "get_template",
@@ -44,4 +50,6 @@ __all__ = [
     "generate_training_code",
     "EvaluationCodeGenerator",
     "generate_evaluation_code",
+    "PredictionCodeGenerator",
+    "generate_prediction_code",
 ]
