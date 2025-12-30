@@ -41,6 +41,12 @@ from app.ml_engine.evaluation.residual_analysis import (
     analyze_residuals,
 )
 
+from app.ml_engine.evaluation.actual_vs_predicted import (
+    ActualVsPredictedAggregator,
+    ActualVsPredictedResult,
+    aggregate_actual_vs_predicted,
+)
+
 __all__ = [
     # Classification metrics
     "ClassificationMetricsCalculator",
@@ -59,4 +65,8 @@ __all__ = [
     "ResidualAnalysisCalculator",
     "ResidualAnalysisResult",
     "analyze_residuals",
+    # Actual vs predicted aggregation
+    "ActualVsPredictedAggregator",
+    "ActualVsPredictedResult",
+    "aggregate_actual_vs_predicted",
 ]

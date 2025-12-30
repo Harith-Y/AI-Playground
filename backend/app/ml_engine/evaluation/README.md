@@ -9,6 +9,7 @@ The evaluation module provides tools to assess model performance across differen
 - ✅ **Classification Metrics** - Accuracy, precision, recall, F1, AUC-ROC, confusion matrix
 - 🚧 **Regression Metrics** - MAE, MSE, RMSE, R², MAPE (Coming Soon)
 - ✅ **Residual Analysis Utilities** - Residual stats, standardized residuals, outlier detection
+- ✅ **Actual vs Predicted Aggregation** - Scatter-ready payload with error stats and correlations
 - 🚧 **Clustering Metrics** - Silhouette score, inertia, Davies-Bouldin index (Coming Soon)
 - 🚧 **Visualizations** - ROC curves, PR curves, confusion matrices, residual plots (Coming Soon)
 
@@ -469,6 +470,30 @@ plot_payload = result.residual_series  # ready for plotting
 - `quantiles`, `mean_error`, `median_error`, `std_error`, `mae`, `mse`, `rmse`, `mape`
 - `skewness`, `kurtosis`, `normality_test` (Shapiro statistic and p-value)
 - `correlation_abs_residuals_predicted` to flag potential heteroscedasticity patterns
+
+## 🎯 Actual vs Predicted Aggregation (ML-52)
+
+Features:
+
+- Validated scatter payload of `actual`, `predicted`, and `residuals`
+- Error stats: MAE, MSE, RMSE, MAPE, mean/median error
+- Fit diagnostics: Pearson correlation, optional Spearman rank, simple best-fit line (slope/intercept)
+- R² when computable; guards against degenerate inputs
+
+### Quick Start
+
+```python
+from app.ml_engine.evaluation import aggregate_actual_vs_predicted
+
+actual = [3.0, -0.5, 2.0, 7.0]
+predicted = [2.5, 0.0, 2.0, 8.0]
+
+result = aggregate_actual_vs_predicted(actual, predicted)
+print(result.mae)         # 0.5
+print(result.pearson_r)   # correlation
+print(result.best_fit)    # {'slope': ..., 'intercept': ...}
+scatter = result.series   # ready for plotting
+```
 
 ## 🧪 Testing
 
