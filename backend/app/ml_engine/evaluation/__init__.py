@@ -5,6 +5,7 @@ Provides comprehensive model evaluation metrics and visualizations for:
 - Classification models (accuracy, precision, recall, F1, AUC-ROC, etc.)
 - Confusion matrices with detailed statistics
 - ROC curves for binary and multi-class classification
+- PR curves for binary and multi-class classification
 - Regression models (MAE, MSE, RMSE, R², etc.) [Coming Soon]
 - Clustering models (silhouette, inertia, etc.) [Coming Soon]
 
@@ -12,6 +13,7 @@ Modules:
     classification_metrics: Classification evaluation metrics
     confusion_matrix: Confusion matrix computation and analysis
     roc_curve: ROC curve data generation
+    pr_curve: Precision-Recall curve data generation
     metrics: General metrics utilities [Placeholder]
     visualizations: Evaluation visualizations [Placeholder]
 """
@@ -41,6 +43,13 @@ from app.ml_engine.evaluation.residual_analysis import (
     analyze_residuals,
 )
 
+from app.ml_engine.evaluation.pr_curve import (
+    PRCurveCalculator,
+    PRCurveResult,
+    MultiClassPRResult,
+    compute_pr_curve,
+)
+
 __all__ = [
     # Classification metrics
     "ClassificationMetricsCalculator",
@@ -59,4 +68,9 @@ __all__ = [
     "ResidualAnalysisCalculator",
     "ResidualAnalysisResult",
     "analyze_residuals",
+    # PR curve
+    "PRCurveCalculator",
+    "PRCurveResult",
+    "MultiClassPRResult",
+    "compute_pr_curve",
 ]
