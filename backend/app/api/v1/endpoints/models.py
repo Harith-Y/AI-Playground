@@ -23,13 +23,18 @@ from app.schemas.model import (
     ModelRunDeletionResponse,
     ModelMetricsResponse,
     FeatureImportanceResponse,
-    FeatureImportanceItem
+    FeatureImportanceItem,
+    CompareModelsRequest,
+    ModelComparisonResponse,
+    ModelRankingRequest,
+    ModelRankingResponse
 )
 from app.tasks.training_tasks import train_model
 from app.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.services.training_validation_service import get_training_validator, ValidationError
 from app.services.storage_service import get_model_serialization_service
+from app.services.model_comparison_service import ModelComparisonService
 from app.utils.logger import get_logger
 
 router = APIRouter()
@@ -1133,4 +1138,236 @@ async def get_feature_importance(
         importance_method=importance_method,
         message=None
     )
+
+
+# ============================================================================
+# Model Comparison Endpoints
+# ============================================================================
+
+
+@router.post("/compare", response_model=ModelComparisonResponse)
+async def compare_models(
+    request: CompareModelsRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Compare multiple model runs across various metrics.
+    
+    This endpoint allows you to:
+    - Compare 2-10 model runs simultaneously
+    - Auto-detect appropriate comparison metrics based on task type
+    - Rank models by a primary metric (or auto-detect best metric)
+    - Get statistical summaries for each metric
+    - Receive recommendations for model selection
+    
+    Args:
+        request: Comparison request with model run IDs and options
+        db: Database session
+        user_id: Current user ID
+    
+    Returns:
+        Comprehensive comparison report with rankings and recommendations
+    
+    Raises:
+        HTTPException 400: If models are not comparable or invalid request
+        HTTPException 404: If model runs not found
+    
+    Example:
+        POST /api/v1/models/compare
+        {
+            "model_run_ids": ["abc-123", "def-456", "ghi-789"],
+            "ranking_criteria": "f1_score"
+        }
+    """
+    try:
+        comparison_service = ModelComparisonService(db)
+        result = comparison_service.compare_models(request, user_id)
+        
+        logger.info(
+            f"Model comparison completed",
+            extra={
+                'event': 'models_compared',
+                'comparison_id': result.comparison_id,
+                'total_models': result.total_models,
+                'best_model': result.best_model.model_run_id,
+                'ranking_criteria': result.ranking_criteria
+            }
+        )
+        
+        return result
+        
+    except ValueError as e:
+        logger.error(f"Validation error in model comparison: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error comparing models: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to compare models: {str(e)}"
+        )
+
+
+@router.post("/rank", response_model=ModelRankingResponse)
+async def rank_models(
+    request: ModelRankingRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Rank models using custom weighted criteria.
+    
+    This endpoint allows you to:
+    - Rank up to 20 models using custom metric weights
+    - Specify which metrics should be maximized vs minimized
+    - Get composite scores and individual contributions
+    - Understand relative performance differences
+    
+    The composite score is calculated as a weighted sum of normalized metrics.
+    All metrics are normalized to 0-1 range before weighting.
+    
+    Args:
+        request: Ranking request with model IDs and weights
+        db: Database session
+        user_id: Current user ID
+    
+    Returns:
+        Ranked models with composite scores and contributions
+    
+    Raises:
+        HTTPException 400: If weights invalid or models not found
+        HTTPException 404: If model runs not found
+    
+    Example:
+        POST /api/v1/models/rank
+        {
+            "model_run_ids": ["abc-123", "def-456"],
+            "ranking_weights": {
+                "f1_score": 0.5,
+                "precision": 0.3,
+                "recall": 0.2
+            }
+        }
+    """
+    try:
+        comparison_service = ModelComparisonService(db)
+        result = comparison_service.rank_models(request, user_id)
+        
+        logger.info(
+            f"Model ranking completed",
+            extra={
+                'event': 'models_ranked',
+                'ranking_id': result.ranking_id,
+                'total_models': len(result.ranked_models),
+                'best_model': result.best_model.model_run_id if result.best_model else None,
+                'weights': result.ranking_weights
+            }
+        )
+        
+        return result
+        
+    except ValueError as e:
+        logger.error(f"Validation error in model ranking: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error ranking models: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to rank models: {str(e)}"
+        )
+
+
+@router.get("/runs", response_model=List[Dict[str, Any]])
+async def list_model_runs(
+    experiment_id: Optional[UUID] = None,
+    status: Optional[str] = None,
+    model_type: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    List model runs with optional filtering.
+    
+    This endpoint allows you to:
+    - List all model runs for an experiment
+    - Filter by status (completed, failed, running, etc.)
+    - Filter by model type
+    - Paginate results
+    
+    Args:
+        experiment_id: Filter by experiment ID
+        status: Filter by status (completed, failed, running, pending, cancelled)
+        model_type: Filter by model type
+        limit: Maximum number of results (default 50, max 100)
+        offset: Offset for pagination
+        db: Database session
+        user_id: Current user ID
+    
+    Returns:
+        List of model runs with metadata
+    
+    Example:
+        GET /api/v1/models/runs?experiment_id=abc-123&status=completed&limit=10
+    """
+    try:
+        query = db.query(ModelRun)
+        
+        # Apply filters
+        if experiment_id:
+            query = query.filter(ModelRun.experiment_id == experiment_id)
+        
+        if status:
+            query = query.filter(ModelRun.status == status)
+        
+        if model_type:
+            query = query.filter(ModelRun.model_type == model_type)
+        
+        # Apply pagination
+        limit = min(limit, 100)  # Cap at 100
+        query = query.order_by(ModelRun.created_at.desc())
+        query = query.limit(limit).offset(offset)
+        
+        model_runs = query.all()
+        
+        # Build response
+        results = []
+        for mr in model_runs:
+            results.append({
+                "model_run_id": str(mr.id),
+                "experiment_id": str(mr.experiment_id),
+                "model_type": mr.model_type,
+                "status": mr.status,
+                "metrics": mr.metrics,
+                "hyperparameters": mr.hyperparameters,
+                "training_time": mr.training_time,
+                "created_at": mr.created_at.isoformat() if mr.created_at else None
+            })
+        
+        logger.info(
+            f"Listed {len(results)} model runs",
+            extra={
+                'event': 'model_runs_listed',
+                'total': len(results),
+                'experiment_id': str(experiment_id) if experiment_id else None,
+                'status_filter': status,
+                'model_type_filter': model_type
+            }
+        )
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error listing model runs: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list model runs: {str(e)}"
+        )
 

@@ -394,3 +394,253 @@ class HyperparameterTuningResults(BaseModel):
 				"created_at": "2025-12-29T10:00:00Z"
 			}
 		}
+
+
+# ============================================================================
+# Model Comparison Schemas
+# ============================================================================
+
+
+class CompareModelsRequest(BaseModel):
+	"""Request schema for comparing multiple model runs."""
+	
+	model_run_ids: List[UUID] = Field(..., min_length=2, max_length=10)
+	comparison_metrics: Optional[List[str]] = None  # Metrics to compare (auto-detected if None)
+	ranking_criteria: Optional[str] = None  # Primary metric for ranking
+	include_statistical_tests: bool = Field(default=False)
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"model_run_ids": [
+					"123e4567-e89b-12d3-a456-426614174001",
+					"123e4567-e89b-12d3-a456-426614174002",
+					"123e4567-e89b-12d3-a456-426614174003"
+				],
+				"comparison_metrics": ["accuracy", "f1_score", "precision", "recall"],
+				"ranking_criteria": "f1_score",
+				"include_statistical_tests": True
+			}
+		}
+
+
+class ModelComparisonItem(BaseModel):
+	"""Comparison data for a single model run."""
+	
+	model_run_id: str
+	model_type: str
+	experiment_id: str
+	status: str
+	metrics: Dict[str, Any]
+	hyperparameters: Dict[str, Any]
+	training_time: Optional[float] = None
+	created_at: str
+	rank: Optional[int] = None
+	ranking_score: Optional[float] = None
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"model_run_id": "123e4567-e89b-12d3-a456-426614174001",
+				"model_type": "random_forest_classifier",
+				"experiment_id": "123e4567-e89b-12d3-a456-426614174000",
+				"status": "completed",
+				"metrics": {
+					"accuracy": 0.95,
+					"precision": 0.94,
+					"recall": 0.93,
+					"f1_score": 0.935
+				},
+				"hyperparameters": {
+					"n_estimators": 100,
+					"max_depth": 10
+				},
+				"training_time": 45.5,
+				"created_at": "2025-12-29T10:00:00Z",
+				"rank": 1,
+				"ranking_score": 0.935
+			}
+		}
+
+
+class MetricStatistics(BaseModel):
+	"""Statistical summary for a metric across models."""
+	
+	metric_name: str
+	mean: float
+	std: float
+	min: float
+	max: float
+	best_model_id: str
+	worst_model_id: str
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"metric_name": "accuracy",
+				"mean": 0.93,
+				"std": 0.02,
+				"min": 0.90,
+				"max": 0.95,
+				"best_model_id": "123e4567-e89b-12d3-a456-426614174001",
+				"worst_model_id": "123e4567-e89b-12d3-a456-426614174003"
+			}
+		}
+
+
+class ModelComparisonResponse(BaseModel):
+	"""Response schema for model comparison."""
+	
+	comparison_id: str
+	task_type: str
+	total_models: int
+	compared_models: List[ModelComparisonItem]
+	best_model: ModelComparisonItem
+	metric_statistics: List[MetricStatistics]
+	ranking_criteria: str
+	recommendations: List[str]
+	timestamp: str
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"comparison_id": "comp-abc-123",
+				"task_type": "classification",
+				"total_models": 3,
+				"compared_models": [
+					{
+						"model_run_id": "123e4567-e89b-12d3-a456-426614174001",
+						"model_type": "random_forest_classifier",
+						"status": "completed",
+						"metrics": {"accuracy": 0.95, "f1_score": 0.935},
+						"rank": 1,
+						"ranking_score": 0.935
+					}
+				],
+				"best_model": {
+					"model_run_id": "123e4567-e89b-12d3-a456-426614174001",
+					"model_type": "random_forest_classifier",
+					"rank": 1,
+					"ranking_score": 0.935
+				},
+				"metric_statistics": [
+					{
+						"metric_name": "accuracy",
+						"mean": 0.93,
+						"std": 0.02,
+						"min": 0.90,
+						"max": 0.95,
+						"best_model_id": "123e4567-e89b-12d3-a456-426614174001",
+						"worst_model_id": "123e4567-e89b-12d3-a456-426614174003"
+					}
+				],
+				"ranking_criteria": "f1_score",
+				"recommendations": [
+					"random_forest_classifier achieved the best f1_score of 0.935",
+					"Consider ensembling the top 2 models for improved performance"
+				],
+				"timestamp": "2025-12-30T10:00:00Z"
+			}
+		}
+
+
+class ModelRankingRequest(BaseModel):
+	"""Request schema for ranking models by custom criteria."""
+	
+	model_run_ids: List[UUID] = Field(..., min_length=2, max_length=20)
+	ranking_weights: Dict[str, float] = Field(
+		...,
+		description="Metric weights for composite ranking score. Must sum to 1.0"
+	)
+	higher_is_better: Optional[Dict[str, bool]] = None
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"model_run_ids": [
+					"123e4567-e89b-12d3-a456-426614174001",
+					"123e4567-e89b-12d3-a456-426614174002"
+				],
+				"ranking_weights": {
+					"f1_score": 0.5,
+					"precision": 0.3,
+					"recall": 0.2
+				},
+				"higher_is_better": {
+					"f1_score": True,
+					"precision": True,
+					"recall": True
+				}
+			}
+		}
+
+
+class RankedModel(BaseModel):
+	"""A ranked model with composite score."""
+	
+	model_run_id: str
+	model_type: str
+	rank: int
+	composite_score: float
+	individual_scores: Dict[str, float]
+	weighted_contributions: Dict[str, float]
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"model_run_id": "123e4567-e89b-12d3-a456-426614174001",
+				"model_type": "random_forest_classifier",
+				"rank": 1,
+				"composite_score": 0.935,
+				"individual_scores": {
+					"f1_score": 0.935,
+					"precision": 0.94,
+					"recall": 0.93
+				},
+				"weighted_contributions": {
+					"f1_score": 0.4675,
+					"precision": 0.282,
+					"recall": 0.186
+				}
+			}
+		}
+
+
+class ModelRankingResponse(BaseModel):
+	"""Response schema for model ranking."""
+	
+	ranking_id: str
+	ranked_models: List[RankedModel]
+	ranking_weights: Dict[str, float]
+	best_model: RankedModel
+	score_range: Dict[str, Any]
+	timestamp: str
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"ranking_id": "rank-xyz-789",
+				"ranked_models": [
+					{
+						"model_run_id": "123e4567-e89b-12d3-a456-426614174001",
+						"model_type": "random_forest_classifier",
+						"rank": 1,
+						"composite_score": 0.935,
+						"individual_scores": {"f1_score": 0.935, "precision": 0.94},
+						"weighted_contributions": {"f1_score": 0.4675, "precision": 0.282}
+					}
+				],
+				"ranking_weights": {"f1_score": 0.5, "precision": 0.3, "recall": 0.2},
+				"best_model": {
+					"model_run_id": "123e4567-e89b-12d3-a456-426614174001",
+					"rank": 1,
+					"composite_score": 0.935
+				},
+				"score_range": {
+					"min": 0.85,
+					"max": 0.935,
+					"spread": 0.085
+				},
+				"timestamp": "2025-12-30T10:00:00Z"
+			}
+		}
