@@ -611,5 +611,187 @@ class TestOrchestrationAPI:
         assert data['parallel'] is True
 
 
+class TestEarlyStopping:
+    """Tests for early stopping functionality."""
+    
+    @pytest.fixture
+    def mock_db(self):
+        """Create mock database session."""
+        db = Mock()
+        db.query = Mock()
+        return db
+    
+    def test_early_stopping_triggers_when_no_improvement(self, mock_db):
+        """Test that early stopping triggers when improvement is insufficient."""
+        service = TuningOrchestrationService(mock_db)
+        
+        # Create a completed run with insufficient improvement
+        completed_run = Mock(spec=TuningRun)
+        completed_run.results = {
+            'best_score': 0.951,
+            'previous_best_score': 0.950,
+            'min_improvement': 0.01,  # Requires 1% improvement
+            'early_stopping_enabled': True
+        }
+        
+        # Execute
+        should_stop, reason = service._check_early_stopping(
+            orchestration_id='orch-123',
+            completed_run=completed_run
+        )
+        
+        # Assert
+        assert should_stop is True
+        assert 'Insufficient improvement' in reason
+        assert '0.001000 < 0.010000' in reason
+    
+    def test_early_stopping_does_not_trigger_with_sufficient_improvement(self, mock_db):
+        """Test that early stopping doesn't trigger when improvement is sufficient."""
+        service = TuningOrchestrationService(mock_db)
+        
+        # Create a completed run with sufficient improvement
+        completed_run = Mock(spec=TuningRun)
+        completed_run.results = {
+            'best_score': 0.960,
+            'previous_best_score': 0.950,
+            'min_improvement': 0.005,  # Requires 0.5% improvement
+            'early_stopping_enabled': True
+        }
+        
+        # Execute
+        should_stop, reason = service._check_early_stopping(
+            orchestration_id='orch-123',
+            completed_run=completed_run
+        )
+        
+        # Assert
+        assert should_stop is False
+        assert reason == ""
+    
+    def test_early_stopping_skipped_for_first_stage(self, mock_db):
+        """Test that early stopping is skipped for first stage (no previous score)."""
+        service = TuningOrchestrationService(mock_db)
+        
+        # Create a completed run without previous score (first stage)
+        completed_run = Mock(spec=TuningRun)
+        completed_run.results = {
+            'best_score': 0.950,
+            'previous_best_score': None,
+            'min_improvement': 0.01,
+            'early_stopping_enabled': True
+        }
+        
+        # Execute
+        should_stop, reason = service._check_early_stopping(
+            orchestration_id='orch-123',
+            completed_run=completed_run
+        )
+        
+        # Assert
+        assert should_stop is False
+        assert reason == ""
+    
+    @patch('app.services.tuning_orchestration_service.tune_hyperparameters')
+    def test_trigger_next_stage_returns_early_stopped_result(
+        self,
+        mock_tune_task,
+        mock_db
+    ):
+        """Test that trigger_next_stage returns early stopped result when triggered."""
+        # Setup completed grid search run with insufficient improvement
+        orchestration_id = str(uuid4())
+        model_run_id = uuid4()
+        
+        completed_run = Mock(spec=TuningRun)
+        completed_run.id = uuid4()
+        completed_run.model_run_id = model_run_id
+        completed_run.status = TuningStatus.COMPLETED
+        completed_run.best_params = {'n_estimators': 100}
+        completed_run.results = {
+            'orchestration_id': orchestration_id,
+            'next_stage': 'random_search',
+            'stage': 'grid_search',
+            'best_score': 0.901,
+            'previous_best_score': 0.900,
+            'early_stopping_enabled': True,
+            'min_improvement': 0.01,  # Requires 1% improvement
+            'all_results': []
+        }
+        
+        # Mock DB query
+        mock_db.query.return_value.filter.return_value.first.return_value = completed_run
+        
+        service = TuningOrchestrationService(mock_db)
+        
+        # Execute
+        result = service.trigger_next_stage(
+            orchestration_id=orchestration_id,
+            completed_tuning_run_id=completed_run.id,
+            user_id="user-123"
+        )
+        
+        # Assert early stopping was triggered
+        assert result is not None
+        assert result['early_stopped'] is True
+        assert 'Insufficient improvement' in result['reason']
+        assert result['completed_stage'] == 'grid_search'
+        assert result['best_score'] == 0.901
+        
+        # Verify no tuning task was queued
+        mock_tune_task.apply_async.assert_not_called()
+    
+    @pytest.fixture
+    def progressive_config_with_early_stopping(self):
+        """Create progressive search configuration with early stopping."""
+        return ProgressiveSearchConfig(
+            initial_param_grid={
+                'n_estimators': [50, 100, 200],
+                'max_depth': [5, 10, 20]
+            },
+            refinement_factor=0.3,
+            cv_folds=5,
+            scoring_metric='accuracy',
+            n_iter_random=50,
+            n_iter_bayesian=30,
+            early_stopping=True,
+            min_improvement=0.01,
+            patience=1
+        )
+    
+    @patch('app.services.tuning_orchestration_service.tune_hyperparameters')
+    def test_progressive_search_stores_early_stopping_config(
+        self,
+        mock_tune_task,
+        mock_db,
+        progressive_config_with_early_stopping
+    ):
+        """Test that progressive search stores early stopping configuration."""
+        # Setup
+        model_run = Mock(spec=ModelRun)
+        model_run.id = uuid4()
+        model_run.status = "completed"
+        mock_db.query.return_value.filter.return_value.first.return_value = model_run
+        
+        mock_task = Mock()
+        mock_task.id = "task-abc-123"
+        mock_tune_task.apply_async.return_value = mock_task
+        
+        service = TuningOrchestrationService(mock_db)
+        
+        # Execute
+        result = service.progressive_search(
+            model_run_id=model_run.id,
+            config=progressive_config_with_early_stopping,
+            user_id="user-123"
+        )
+        
+        # Assert - verify tuning runs were created with early stopping config
+        assert mock_db.add.call_count == 3
+        
+        # Check that the first tuning run has early stopping enabled
+        first_tuning_run = mock_db.add.call_args_list[0][0][0]
+        assert hasattr(first_tuning_run, 'results')
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

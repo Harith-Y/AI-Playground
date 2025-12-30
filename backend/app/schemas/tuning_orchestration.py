@@ -21,6 +21,9 @@ class ProgressiveSearchRequest(BaseModel):
     scoring_metric: Optional[str] = None
     n_iter_random: int = Field(default=50, ge=10, le=500)
     n_iter_bayesian: int = Field(default=30, ge=10, le=200)
+    early_stopping: bool = Field(default=False)
+    min_improvement: float = Field(default=0.001, ge=0.0, le=1.0)
+    patience: int = Field(default=1, ge=1, le=10)
     
     class Config:
         json_schema_extra = {
@@ -35,7 +38,10 @@ class ProgressiveSearchRequest(BaseModel):
                 "cv_folds": 5,
                 "scoring_metric": "accuracy",
                 "n_iter_random": 50,
-                "n_iter_bayesian": 30
+                "n_iter_bayesian": 30,
+                "early_stopping": True,
+                "min_improvement": 0.001,
+                "patience": 1
             }
         }
 
@@ -336,6 +342,8 @@ class NextStageResponse(BaseModel):
     tuning_run_id: Optional[str] = None
     task_id: Optional[str] = None
     status: Optional[str] = None
+    early_stopped: Optional[bool] = None
+    reason: Optional[str] = None
     message: str
     
     class Config:
@@ -345,6 +353,8 @@ class NextStageResponse(BaseModel):
                 "tuning_run_id": "444-555-666",
                 "task_id": "task-def-456",
                 "status": "RUNNING",
+                "early_stopped": False,
+                "reason": None,
                 "message": "Next stage (random_search) triggered successfully"
             }
         }

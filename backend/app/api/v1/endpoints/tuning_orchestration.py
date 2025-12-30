@@ -75,6 +75,12 @@ async def start_progressive_search(
     - Automatic parameter space refinement between stages
     - No manual intervention needed between stages
     - Reduces risk of missing optimal parameters
+    - Optional early stopping to save time when improvements plateau
+    
+    **Early Stopping:**
+    When enabled, the workflow will stop if a stage doesn't improve over the
+    previous stage by at least `min_improvement`. This saves computation time
+    when the model has converged.
     
     **Use Cases:**
     - Complex models with large parameter spaces
@@ -131,7 +137,10 @@ async def start_progressive_search(
             cv_folds=request.cv_folds,
             scoring_metric=request.scoring_metric,
             n_iter_random=request.n_iter_random,
-            n_iter_bayesian=request.n_iter_bayesian
+            n_iter_bayesian=request.n_iter_bayesian,
+            early_stopping=request.early_stopping,
+            min_improvement=request.min_improvement,
+            patience=request.patience
         )
         
         # Execute progressive search

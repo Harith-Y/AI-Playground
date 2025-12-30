@@ -37,7 +37,10 @@ class ProgressiveSearchConfig:
         cv_folds: int = 5,
         scoring_metric: Optional[str] = None,
         n_iter_random: int = 50,
-        n_iter_bayesian: int = 30
+        n_iter_bayesian: int = 30,
+        early_stopping: bool = False,
+        min_improvement: float = 0.001,
+        patience: int = 1
     ):
         """
         Initialize progressive search configuration.
@@ -62,6 +65,9 @@ class ProgressiveSearchConfig:
         self.scoring_metric = scoring_metric
         self.n_iter_random = n_iter_random
         self.n_iter_bayesian = n_iter_bayesian
+        self.early_stopping = early_stopping
+        self.min_improvement = min_improvement
+        self.patience = patience
 
 
 class MultiModelConfig:
@@ -234,6 +240,9 @@ class TuningOrchestrationService:
         grid_tuning_run.results['orchestration_id'] = str(orchestration_id)
         grid_tuning_run.results['stage'] = 'grid_search'
         grid_tuning_run.results['next_stage'] = 'random_search'
+        grid_tuning_run.results['early_stopping_enabled'] = config.early_stopping
+        grid_tuning_run.results['min_improvement'] = config.min_improvement
+        grid_tuning_run.results['patience'] = config.patience
         
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(grid_tuning_run, 'results')
@@ -280,7 +289,8 @@ class TuningOrchestrationService:
         Trigger the next stage of progressive search based on completed stage.
         
         This method should be called when a stage completes to automatically
-        start the next stage with refined parameters.
+        start the next stage with refined parameters. Supports early stopping
+        if improvement threshold is not met.
         
         Args:
             orchestration_id: ID of the orchestration workflow
@@ -288,7 +298,7 @@ class TuningOrchestrationService:
             user_id: User ID for logging
         
         Returns:
-            Dict with next stage details, or None if workflow is complete
+            Dict with next stage details, or None if workflow is complete or stopped early
         """
         # Get completed tuning run
         completed_run = self.db.query(TuningRun).filter(
@@ -313,6 +323,29 @@ class TuningOrchestrationService:
         
         next_stage = completed_run.results['next_stage']
         model_run_id = completed_run.model_run_id
+        
+        # Check early stopping if enabled
+        early_stopping_enabled = completed_run.results.get('early_stopping_enabled', False)
+        if early_stopping_enabled:
+            should_stop, reason = self._check_early_stopping(
+                orchestration_id=orchestration_id,
+                completed_run=completed_run
+            )
+            if should_stop:
+                self.logger.info(
+                    f"Early stopping triggered: {reason}",
+                    extra={
+                        'event': 'early_stopping_triggered',
+                        'orchestration_id': orchestration_id,
+                        'reason': reason
+                    }
+                )
+                return {
+                    'early_stopped': True,
+                    'reason': reason,
+                    'completed_stage': completed_run.results.get('stage'),
+                    'best_score': completed_run.results.get('best_score')
+                }
         
         # Refine parameter grid based on best results
         refined_param_grid = self._refine_param_grid(
@@ -351,6 +384,10 @@ class TuningOrchestrationService:
                 next_tuning_run.results['stage'] = 'random_search'
                 next_tuning_run.results['next_stage'] = 'bayesian_optimization'
                 next_tuning_run.results['refined_from'] = str(completed_tuning_run_id)
+                next_tuning_run.results['early_stopping_enabled'] = completed_run.results.get('early_stopping_enabled', False)
+                next_tuning_run.results['min_improvement'] = completed_run.results.get('min_improvement', 0.001)
+                next_tuning_run.results['patience'] = completed_run.results.get('patience', 1)
+                next_tuning_run.results['previous_best_score'] = completed_run.results.get('best_score')
                 
                 from sqlalchemy.orm.attributes import flag_modified
                 flag_modified(next_tuning_run, 'results')
@@ -392,6 +429,10 @@ class TuningOrchestrationService:
                 next_tuning_run.results['orchestration_id'] = orchestration_id
                 next_tuning_run.results['stage'] = 'bayesian_optimization'
                 next_tuning_run.results['refined_from'] = str(completed_tuning_run_id)
+                next_tuning_run.results['early_stopping_enabled'] = completed_run.results.get('early_stopping_enabled', False)
+                next_tuning_run.results['min_improvement'] = completed_run.results.get('min_improvement', 0.001)
+                next_tuning_run.results['patience'] = completed_run.results.get('patience', 1)
+                next_tuning_run.results['previous_best_score'] = completed_run.results.get('best_score')
                 
                 from sqlalchemy.orm.attributes import flag_modified
                 flag_modified(next_tuning_run, 'results')
@@ -405,6 +446,49 @@ class TuningOrchestrationService:
                 }
         
         return None
+    
+    def _check_early_stopping(
+        self,
+        orchestration_id: str,
+        completed_run: TuningRun
+    ) -> Tuple[bool, str]:
+        """
+        Check if early stopping criteria are met.
+        
+        Compares current stage score with previous stage score to determine
+        if improvement is sufficient to continue.
+        
+        Args:
+            orchestration_id: ID of the orchestration workflow
+            completed_run: The completed tuning run to check
+        
+        Returns:
+            Tuple of (should_stop: bool, reason: str)
+        """
+        current_score = completed_run.results.get('best_score')
+        if current_score is None:
+            return False, ""
+        
+        previous_best_score = completed_run.results.get('previous_best_score')
+        if previous_best_score is None:
+            # First stage, no previous score to compare
+            return False, ""
+        
+        min_improvement = completed_run.results.get('min_improvement', 0.001)
+        patience = completed_run.results.get('patience', 1)
+        
+        # Calculate improvement
+        improvement = current_score - previous_best_score
+        
+        # Check if improvement meets threshold
+        if improvement < min_improvement:
+            reason = (
+                f"Insufficient improvement: {improvement:.6f} < {min_improvement:.6f}. "
+                f"Current score: {current_score:.4f}, Previous: {previous_best_score:.4f}"
+            )
+            return True, reason
+        
+        return False, ""
     
     def _refine_param_grid(
         self,
