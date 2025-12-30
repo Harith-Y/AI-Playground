@@ -30,7 +30,7 @@ from app.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.services.training_validation_service import get_training_validator, ValidationError
 from app.services.storage_service import get_model_serialization_service
-from app.core.logging_config import get_logger
+from app.utils.logger import get_logger
 
 router = APIRouter()
 

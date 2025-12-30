@@ -23,14 +23,29 @@ from app.models.experiment import Experiment
 from app.models.dataset import Dataset
 from app.models.preprocessing_step import PreprocessingStep
 from app.ml_engine.model_registry import ModelRegistry
-from app.ml_engine.preprocessing.serialization import deserialize_transformer
-from app.ml_engine.evaluation.metrics import (
-    calculate_classification_metrics,
-    calculate_regression_metrics,
-    calculate_clustering_metrics
-)
+from app.ml_engine.preprocessing.serializer import PipelineSerializer
+import pickle
+
+def deserialize_transformer(binary_data):
+    """
+    Deserialize a fitted transformer from binary data.
+    
+    Args:
+        binary_data: Pickled transformer object
+        
+    Returns:
+        Deserialized transformer object
+    """
+    if binary_data is None:
+        return None
+    return pickle.loads(binary_data)
+
+from app.ml_engine.evaluation.classification_metrics import calculate_classification_metrics
+# TODO: Import regression and clustering metrics when implemented
+# from app.ml_engine.evaluation.regression_metrics import calculate_regression_metrics
+# from app.ml_engine.evaluation.clustering_metrics import calculate_clustering_metrics
 from app.core.config import settings
-from app.core.logging_config import get_logger
+from app.utils.logger import get_logger
 from app.services.training_error_handler import handle_training_error
 from app.core.training_exceptions import (
     DataLoadError,

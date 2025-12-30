@@ -23,7 +23,7 @@ import joblib
 import uuid
 
 from app.core.config import settings
-from app.core.logging_config import get_logger
+from app.utils.logger import get_logger
 from app.ml_engine.models.base import BaseModelWrapper
 
 

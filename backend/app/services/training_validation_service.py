@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from app.models.dataset import Dataset
 from app.models.experiment import Experiment
 from app.ml_engine.model_registry import ModelRegistry
-from app.core.logging_config import get_logger
+from app.utils.logger import get_logger
 
 
 logger = get_logger(__name__)

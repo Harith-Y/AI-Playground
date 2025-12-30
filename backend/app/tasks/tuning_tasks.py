@@ -21,9 +21,24 @@ from app.models.tuning_run import TuningRun, TuningStatus
 from app.models.dataset import Dataset
 from app.models.preprocessing_step import PreprocessingStep
 from app.ml_engine.model_registry import ModelRegistry
-from app.ml_engine.preprocessing.serialization import deserialize_transformer
+from app.ml_engine.preprocessing.serializer import PipelineSerializer
+import pickle
+
+def deserialize_transformer(binary_data):
+    """
+    Deserialize a fitted transformer from binary data.
+    
+    Args:
+        binary_data: Pickled transformer object
+        
+    Returns:
+        Deserialized transformer object
+    """
+    if binary_data is None:
+        return None
+    return pickle.loads(binary_data)
 from app.services.storage_service import get_model_serialization_service
-from app.core.logging_config import get_logger
+from app.utils.logger import get_logger
 
 
 class TuningTask(Task):

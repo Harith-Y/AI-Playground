@@ -20,7 +20,7 @@ from app.core.training_exceptions import (
     MemoryError,
     TimeoutError
 )
-from app.core.logging_config import get_logger
+from app.utils.logger import get_logger
 from app.models.model_run import ModelRun
 
 
