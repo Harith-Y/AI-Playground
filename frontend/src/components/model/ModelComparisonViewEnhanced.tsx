@@ -27,6 +27,8 @@ import {
   Divider,
   Button,
   CircularProgress,
+  Skeleton,
+  AlertTitle,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -39,6 +41,8 @@ import {
   Refresh as RefreshIcon,
   Download as DownloadIcon,
   Lightbulb as LightbulbIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  CompareArrows as CompareArrowsIcon,
 } from '@mui/icons-material';
 import Plot from 'react-plotly.js';
 import type {
@@ -294,34 +298,135 @@ const ModelComparisonViewEnhanced: React.FC<ModelComparisonViewEnhancedProps> = 
 
   if (modelRunIds.length < 2) {
     return (
-      <Alert severity="info">
-        Please select at least 2 models to compare.
-      </Alert>
+      <Card>
+        <CardContent>
+          <Box display="flex" flexDirection="column" alignItems="center" py={6}>
+            <CompareArrowsIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              Select Models to Compare
+            </Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center" mb={2}>
+              Please select at least 2 models to see a detailed comparison
+              <br />
+              of their performance metrics and characteristics.
+            </Typography>
+            <Chip label={`${modelRunIds.length} model${modelRunIds.length === 1 ? '' : 's'} selected`} color="primary" />
+          </Box>
+        </CardContent>
+      </Card>
     );
   }
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
+      <Box>
+        {/* Best Model Banner Skeleton */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box display="flex" alignItems="center" gap={2} mb={3}>
+              <Skeleton variant="circular" width={40} height={40} />
+              <Box flex={1}>
+                <Skeleton variant="text" width="40%" height={32} />
+                <Skeleton variant="text" width="30%" height={24} />
+              </Box>
+            </Box>
+            <Box display="flex" flexWrap="wrap" gap={2}>
+              {[1, 2, 3, 4].map((i) => (
+                <Box key={i} sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '150px' }}>
+                  <Skeleton variant="text" width="60%" />
+                  <Skeleton variant="text" width="80%" height={32} />
+                </Box>
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* Statistics Cards Skeleton */}
+        <Skeleton variant="text" width="30%" height={32} sx={{ mb: 2 }} />
+        <Box display="flex" flexWrap="wrap" gap={2} mb={3}>
+          {[1, 2, 3].map((i) => (
+            <Box key={i} sx={{ flex: '1 1 calc(33.333% - 16px)', minWidth: '250px' }}>
+              <Card sx={{ height: '150px' }}>
+                <CardContent>
+                  <Skeleton variant="text" width="70%" />
+                  <Skeleton variant="rectangular" height={80} sx={{ mt: 1 }} />
+                </CardContent>
+              </Card>
+            </Box>
+          ))}
+        </Box>
+
+        {/* Chart Skeleton */}
+        <Card>
+          <CardContent>
+            <Skeleton variant="rectangular" height={450} />
+          </CardContent>
+        </Card>
       </Box>
     );
   }
 
   if (error) {
     return (
-      <Alert severity="error" action={
-        <Button color="inherit" size="small" onClick={handleRefresh}>
-          Retry
-        </Button>
-      }>
-        {error}
-      </Alert>
+      <Card>
+        <CardContent>
+          <Box display="flex" flexDirection="column" alignItems="center" py={6}>
+            <ErrorOutlineIcon color="error" sx={{ fontSize: 64, mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              Comparison Failed
+            </Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center" mb={3}>
+              {error}
+            </Typography>
+            <Box display="flex" gap={2}>
+              <Button
+                variant="contained"
+                startIcon={<RefreshIcon />}
+                onClick={handleRefresh}
+              >
+                Try Again
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => window.location.reload()}
+              >
+                Reload Page
+              </Button>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 2 }}>
+              Comparing {modelRunIds.length} models
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
     );
   }
 
   if (!comparisonData) {
-    return null;
+    return (
+      <Card>
+        <CardContent>
+          <Box display="flex" flexDirection="column" alignItems="center" py={6}>
+            <CompareArrowsIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              No Comparison Data
+            </Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center" mb={3}>
+              Unable to retrieve comparison data for the selected models.
+              <br />
+              Please try refreshing or select different models.
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+            >
+              Refresh
+            </Button>
+          </Box>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

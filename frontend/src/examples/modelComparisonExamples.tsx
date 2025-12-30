@@ -8,8 +8,8 @@ import React from 'react';
 import {
   ModelComparisonViewEnhanced,
   ModelListSelector,
-  CompareModelsRequest,
 } from '../components/model';
+import type { CompareModelsRequest } from '../components/model';
 import { modelComparisonService } from '../services/modelComparisonService';
 
 // ============================================================================

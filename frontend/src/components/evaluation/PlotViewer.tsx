@@ -16,6 +16,8 @@ import {
   ToggleButton,
   IconButton,
   Tooltip,
+  Skeleton,
+  Button,
 } from '@mui/material';
 import {
   ShowChart as ShowChartIcon,
@@ -23,10 +25,12 @@ import {
   ScatterPlot as ScatterPlotIcon,
   Download as DownloadIcon,
   Fullscreen as FullscreenIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import Plot from 'react-plotly.js';
-import { evaluationService, PlotType } from '../../services/evaluationService';
-import type { PlotDataResponse } from '../../services/evaluationService';
+import { evaluationService } from '../../services/evaluationService';
+import type { PlotType, PlotDataResponse } from '../../services/evaluationService';
 
 interface PlotViewerProps {
   modelRunId: string;
@@ -245,15 +249,33 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
 
         {/* Plot Content */}
         {loading && (
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-            <CircularProgress />
+          <Box>
+            <Skeleton variant="rectangular" height={500} sx={{ borderRadius: 1 }} />
+            <Box display="flex" justifyContent="space-between" mt={2}>
+              <Skeleton variant="text" width="30%" />
+              <Skeleton variant="text" width="30%" />
+            </Box>
           </Box>
         )}
 
         {error && !loading && (
-          <Alert severity="warning">
-            {error}
-          </Alert>
+          <Box display="flex" flexDirection="column" alignItems="center" py={6}>
+            <ErrorOutlineIcon color="warning" sx={{ fontSize: 56, mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              Plot Not Available
+            </Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center" mb={3}>
+              {error}
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={() => fetchPlotData(selectedPlot)}
+            >
+              Retry
+            </Button>
+          </Box>
         )}
 
         {plotData && !loading && !error && (

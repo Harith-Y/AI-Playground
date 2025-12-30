@@ -30,6 +30,8 @@ import {
   BubbleChart as BubbleChartIcon,
   CompareArrows as CompareArrowsIcon,
   Refresh as RefreshIcon,
+  ScienceOutlined as ScienceIcon,
+  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 import type {
   EvaluationTab,
@@ -185,7 +187,16 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
 
       {/* Error Alert */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+        <Alert 
+          severity="error" 
+          sx={{ mb: 3 }} 
+          onClose={() => setError(null)}
+          action={
+            <Button color="inherit" size="small" onClick={handleRefresh}>
+              Retry
+            </Button>
+          }
+        >
           {error}
         </Alert>
       )}
@@ -293,12 +304,24 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
             {/* Classification Tab */}
             <TabPanel value={EvaluationTabEnum.CLASSIFICATION} currentValue={currentTab}>
               {classificationRuns.length === 0 ? (
-                <Alert severity="info">
-                  <Typography variant="body2">
-                    No classification model runs found. Train a classification model to see evaluation
-                    metrics here.
+                <Box display="flex" flexDirection="column" alignItems="center" py={8}>
+                  <ScienceIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="h5" gutterBottom>
+                    No Classification Models Yet
                   </Typography>
-                </Alert>
+                  <Typography variant="body1" color="text.secondary" textAlign="center" mb={3}>
+                    Train a classification model to see evaluation metrics, confusion matrices,
+                    <br />
+                    ROC curves, and performance insights here.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<TrendingUpIcon />}
+                    onClick={() => window.location.href = '/training'}
+                  >
+                    Start Training
+                  </Button>
+                </Box>
               ) : selectedRunId ? (
                 <>
                   <EvaluationDashboard
@@ -339,12 +362,24 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
             {/* Regression Tab */}
             <TabPanel value={EvaluationTabEnum.REGRESSION} currentValue={currentTab}>
               {regressionRuns.length === 0 ? (
-                <Alert severity="info">
-                  <Typography variant="body2">
-                    No regression model runs found. Train a regression model to see evaluation metrics
-                    here.
+                <Box display="flex" flexDirection="column" alignItems="center" py={8}>
+                  <ScatterPlotIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="h5" gutterBottom>
+                    No Regression Models Yet
                   </Typography>
-                </Alert>
+                  <Typography variant="body1" color="text.secondary" textAlign="center" mb={3}>
+                    Train a regression model to see evaluation metrics, residual plots,
+                    <br />
+                    and prediction accuracy analysis here.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<TrendingUpIcon />}
+                    onClick={() => window.location.href = '/training'}
+                  >
+                    Start Training
+                  </Button>
+                </Box>
               ) : selectedRunId ? (
                 <>
                   <EvaluationDashboard
@@ -385,12 +420,24 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
             {/* Clustering Tab */}
             <TabPanel value={EvaluationTabEnum.CLUSTERING} currentValue={currentTab}>
               {clusteringRuns.length === 0 ? (
-                <Alert severity="info">
-                  <Typography variant="body2">
-                    No clustering model runs found. Train a clustering model to see evaluation metrics
-                    here.
+                <Box display="flex" flexDirection="column" alignItems="center" py={8}>
+                  <BubbleChartIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="h5" gutterBottom>
+                    No Clustering Models Yet
                   </Typography>
-                </Alert>
+                  <Typography variant="body1" color="text.secondary" textAlign="center" mb={3}>
+                    Train a clustering model to see silhouette scores, cluster distributions,
+                    <br />
+                    and pattern analysis here.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<TrendingUpIcon />}
+                    onClick={() => window.location.href = '/training'}
+                  >
+                    Start Training
+                  </Button>
+                </Box>
               ) : selectedRunId ? (
                 <>
                   <EvaluationDashboard
@@ -435,12 +482,43 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
             {/* Comparison Tab */}
             <TabPanel value={EvaluationTabEnum.COMPARISON} currentValue={currentTab}>
               {runs.length === 0 ? (
-                <Alert severity="info">
-                  <Typography variant="body2">
-                    No model runs available for comparison. Train at least two models to compare their
-                    performance.
+                <Box display="flex" flexDirection="column" alignItems="center" py={8}>
+                  <CompareArrowsIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="h5" gutterBottom>
+                    No Models to Compare
                   </Typography>
-                </Alert>
+                  <Typography variant="body1" color="text.secondary" textAlign="center" mb={3}>
+                    Train at least two models to compare their performance side-by-side,
+                    <br />
+                    analyze metrics, and identify the best model for your task.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<TrendingUpIcon />}
+                    onClick={() => window.location.href = '/training'}
+                  >
+                    Start Training
+                  </Button>
+                </Box>
+              ) : runs.length < 2 ? (
+                <Box display="flex" flexDirection="column" alignItems="center" py={8}>
+                  <CompareArrowsIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="h5" gutterBottom>
+                    Need More Models
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" textAlign="center" mb={3}>
+                    You have {runs.length} model. Train at least one more model
+                    <br />
+                    to enable model comparison features.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<TrendingUpIcon />}
+                    onClick={() => window.location.href = '/training'}
+                  >
+                    Train Another Model
+                  </Button>
+                </Box>
               ) : (
                 <Box>
                   <Typography variant="h6" gutterBottom>
@@ -449,7 +527,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                   <Alert severity="info" sx={{ mt: 2 }}>
                     <Typography variant="body2">
                       Compare multiple models side-by-side to identify the best performing model for your
-                      task.
+                      task. Select models from the dropdown above to start comparing.
                     </Typography>
                   </Alert>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>

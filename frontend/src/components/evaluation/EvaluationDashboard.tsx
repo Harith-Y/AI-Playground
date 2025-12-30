@@ -19,6 +19,8 @@ import {
   IconButton,
   Tooltip,
   Divider,
+  Skeleton,
+  AlertTitle,
 } from '@mui/material';
 import {
   Assessment as AssessmentIcon,
@@ -28,6 +30,8 @@ import {
   Refresh as RefreshIcon,
   Download as DownloadIcon,
   Info as InfoIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  HourglassEmpty as HourglassEmptyIcon,
 } from '@mui/icons-material';
 import Plot from 'react-plotly.js';
 import { evaluationService } from '../../services/evaluationService';
@@ -367,26 +371,106 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
+      <Box>
+        {/* Header Skeleton */}
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Skeleton variant="circular" width={32} height={32} />
+            <Box>
+              <Skeleton variant="text" width={200} height={32} />
+              <Skeleton variant="text" width={150} height={24} />
+            </Box>
+          </Box>
+          <Box display="flex" gap={1}>
+            <Skeleton variant="circular" width={40} height={40} />
+            <Skeleton variant="circular" width={40} height={40} />
+          </Box>
+        </Box>
+
+        {/* Metrics Cards Skeleton */}
+        <Box display="flex" flexWrap="wrap" gap={2} mb={3}>
+          {[1, 2, 3, 4].map((i) => (
+            <Box key={i} sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '200px' }}>
+              <Card sx={{ height: '120px' }}>
+                <CardContent>
+                  <Skeleton variant="text" width="60%" height={20} />
+                  <Skeleton variant="text" width="80%" height={40} sx={{ mt: 1 }} />
+                </CardContent>
+              </Card>
+            </Box>
+          ))}
+        </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        {/* Chart Skeleton */}
+        <Card>
+          <CardContent>
+            <Skeleton variant="rectangular" height={400} />
+          </CardContent>
+        </Card>
       </Box>
     );
   }
 
   if (error) {
     return (
-      <Alert severity="error" action={
-        <Button color="inherit" size="small" onClick={handleRefresh}>
-          Retry
-        </Button>
-      }>
-        {error}
-      </Alert>
+      <Card>
+        <CardContent>
+          <Box display="flex" flexDirection="column" alignItems="center" py={4}>
+            <ErrorOutlineIcon color="error" sx={{ fontSize: 64, mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              Failed to Load Evaluation Data
+            </Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center" mb={3}>
+              {error}
+            </Typography>
+            <Box display="flex" gap={2}>
+              <Button
+                variant="contained"
+                startIcon={<RefreshIcon />}
+                onClick={handleRefresh}
+              >
+                Retry
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => window.location.reload()}
+              >
+                Reload Page
+              </Button>
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
     );
   }
 
   if (!metricsData) {
-    return null;
+    return (
+      <Card>
+        <CardContent>
+          <Box display="flex" flexDirection="column" alignItems="center" py={6}>
+            <HourglassEmptyIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              No Evaluation Data Available
+            </Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center" mb={3}>
+              This model run doesn't have evaluation metrics yet.
+              <br />
+              Please wait for the training to complete or check back later.
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+            >
+              Check Again
+            </Button>
+          </Box>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
