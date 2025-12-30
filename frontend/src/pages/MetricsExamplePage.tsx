@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 import { MetricsDisplay, MetricCard } from '../components/evaluation/metrics';
+import { ClusteringCharts } from '../components/evaluation/charts';
 import type {
   ClassificationMetrics,
   RegressionMetrics,
@@ -168,6 +169,21 @@ const MetricsExamplePage: React.FC = () => {
                 showDescription={true}
                 compact={false}
               />
+
+              {/* Clustering Charts */}
+              <Box mt={4}>
+                <Typography variant="h6" gutterBottom>
+                  Clustering Visualizations
+                </Typography>
+                <ClusteringCharts
+                  metrics={clusteringMetrics}
+                  isLoading={isLoading}
+                  showSilhouette={true}
+                  showInertia={true}
+                  showDistribution={true}
+                  showProjection={false}
+                />
+              </Box>
             </Box>
           )}
 

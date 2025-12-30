@@ -34,7 +34,7 @@ import type {
 } from '../types/evaluation';
 import { EvaluationTab as EvaluationTabEnum, TaskType as TaskTypeEnum } from '../types/evaluation';
 import { MetricsDisplay } from '../components/evaluation/metrics';
-import { ClassificationCharts, RegressionCharts } from '../components/evaluation/charts';
+import { ClassificationCharts, RegressionCharts, ClusteringCharts } from '../components/evaluation/charts';
 
 // Tab panel component
 interface TabPanelProps {
@@ -331,22 +331,28 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                 </Alert>
               ) : (
                 <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Clustering Evaluation
-                  </Typography>
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    <Typography variant="body2">
-                      <strong>Available metrics:</strong> Silhouette Score, Inertia, Davies-Bouldin Index,
-                      Calinski-Harabasz Score
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      <strong>Visualizations:</strong> Cluster Distribution, Silhouette Plot, 2D Projection
-                    </Typography>
-                  </Alert>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    Found {clusteringRuns.length} clustering run(s). Detailed metrics and visualizations
-                    will be displayed here.
-                  </Typography>
+                  {/* Metrics Display */}
+                  <MetricsDisplay
+                    taskType={TaskTypeEnum.CLUSTERING}
+                    metrics={clusteringRuns[0]?.metrics || null}
+                    isLoading={isLoading}
+                    showDescription={true}
+                    compact={false}
+                  />
+
+                  {/* Clustering Charts */}
+                  {clusteringRuns[0]?.metrics && (
+                    <Box mt={4}>
+                      <ClusteringCharts
+                        metrics={clusteringRuns[0].metrics as any}
+                        isLoading={isLoading}
+                        showSilhouette={true}
+                        showInertia={true}
+                        showDistribution={true}
+                        showProjection={false}
+                      />
+                    </Box>
+                  )}
                 </Box>
               )}
             </TabPanel>
