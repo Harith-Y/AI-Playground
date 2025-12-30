@@ -1,7 +1,7 @@
 # API v1 router aggregator
 
 from fastapi import APIRouter
-from app.api.v1.endpoints import datasets, preprocessing, models, tuning, tuning_orchestration
+from app.api.v1.endpoints import datasets, preprocessing, models, tuning, tuning_orchestration, metrics
 
 api_router = APIRouter()
 
@@ -33,4 +33,10 @@ api_router.include_router(
     tuning_orchestration.router,
     prefix="/tuning-orchestration",
     tags=["tuning-orchestration"]
+)
+
+# Metrics endpoint (no prefix, no tags - for Prometheus)
+api_router.include_router(
+    metrics.router,
+    tags=["monitoring"]
 )

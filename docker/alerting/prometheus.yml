@@ -36,7 +36,7 @@ scrape_configs:
 
   # Backend API metrics
   - job_name: 'backend'
-    metrics_path: '/api/metrics'
+    metrics_path: '/api/v1/metrics'
     static_configs:
       - targets: ['backend:8000']
         labels:
@@ -44,14 +44,24 @@ scrape_configs:
           component: 'api'
     scrape_interval: 10s
 
-  # Training job metrics
-  - job_name: 'training-jobs'
-    metrics_path: '/api/training/metrics'
+  # Celery worker metrics (via backend metrics endpoint)
+  - job_name: 'celery-workers'
+    metrics_path: '/api/v1/metrics'
     static_configs:
       - targets: ['backend:8000']
         labels:
-          service: 'training'
-          component: 'jobs'
+          service: 'celery'
+          component: 'workers'
+    scrape_interval: 15s
+
+  # Evaluation & Tuning metrics
+  - job_name: 'evaluation-tuning'
+    metrics_path: '/api/v1/metrics'
+    static_configs:
+      - targets: ['backend:8000']
+        labels:
+          service: 'ml-platform'
+          component: 'evaluation-tuning'
     scrape_interval: 30s
 
   # Node Exporter (system metrics)

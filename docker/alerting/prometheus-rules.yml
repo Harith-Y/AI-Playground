@@ -1,4 +1,110 @@
 groups:
+  # ============================================================================
+  # Performance Monitoring Rules
+  # ============================================================================
+  - name: performance_monitoring
+    interval: 30s
+    rules:
+      # Slow training tasks
+      - alert: SlowTrainingTask
+        expr: histogram_quantile(0.95, rate(model_training_duration_seconds_bucket[5m])) > 3600
+        for: 5m
+        labels:
+          severity: warning
+          component: training
+        annotations:
+          summary: "Slow training task detected"
+          description: "Training task {{$labels.model_type}} is taking longer than 1 hour (p95: {{$value}}s)"
+      
+      # Slow tuning tasks
+      - alert: SlowTuningTask
+        expr: histogram_quantile(0.95, rate(hyperparameter_tuning_duration_seconds_bucket[5m])) > 7200
+        for: 10m
+        labels:
+          severity: warning
+          component: tuning
+        annotations:
+          summary: "Slow tuning task detected"
+          description: "Tuning task {{$labels.model_type}} ({{$labels.tuning_method}}) is taking longer than 2 hours (p95: {{$value}}s)"
+      
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: process_memory_usage_bytes{process_type="celery_worker"} > 8589934592
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High memory usage in Celery worker"
+          description: "Celery worker memory usage is {{$value | humanize}}B (>8GB)"
+      
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: process_cpu_usage_percent{process_type="celery_worker"} > 90
+        for: 10m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High CPU usage in Celery worker"
+          description: "Celery worker CPU usage is {{$value}}% (>90%)"
+      
+      # Task queue buildup
+      - alert: TaskQueueBuildup
+        expr: celery_queue_length > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: celery
+        annotations:
+          summary: "Task queue buildup detected"
+          description: "Queue {{$labels.queue_name}} has {{$value}} pending tasks"
+      
+      # Low cache hit rate
+      - alert: LowCacheHitRate
+        expr: rate(evaluation_cache_total{result="hit"}[5m]) / rate(evaluation_cache_total[5m]) < 0.5
+        for: 10m
+        labels:
+          severity: info
+          component: cache
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{$value | humanizePercentage}} (<50%)"
+      
+      # High task failure rate
+      - alert: HighTaskFailureRate
+        expr: rate(celery_task_total{status="failure"}[5m]) / rate(celery_task_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: celery
+        annotations:
+          summary: "High task failure rate"
+          description: "Task {{$labels.task_name}} failure rate is {{$value | humanizePercentage}} (>10%)"
+      
+      # Slow API endpoints
+      - alert: SlowAPIEndpoint
+        expr: histogram_quantile(0.95, rate(api_request_duration_seconds_bucket{endpoint=~".*evaluation.*|.*tuning.*"}[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Slow API endpoint detected"
+          description: "Endpoint {{$labels.endpoint}} p95 latency is {{$value}}s (>10s)"
+      
+      # Stalled tasks (no progress updates)
+      - alert: StalledTask
+        expr: time() - celery_task_duration_seconds > 7200 and celery_active_tasks > 0
+        for: 10m
+        labels:
+          severity: critical
+          component: celery
+        annotations:
+          summary: "Task appears to be stalled"
+          description: "Task {{$labels.task_name}} has been running for >2 hours without completion"
+
+groups:
   # Training Job Failure Alerts
   - name: training_failures
     interval: 30s

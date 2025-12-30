@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.utils.logger import get_logger, set_correlation_id
 from app.api.v1.api import api_router
+from app.monitoring.middleware import PerformanceMonitoringMiddleware
 
 
 def create_app() -> FastAPI:
@@ -18,6 +19,10 @@ def create_app() -> FastAPI:
 	)
 
 	logger = get_logger("backend")
+
+	# Add performance monitoring middleware
+	app.add_middleware(PerformanceMonitoringMiddleware)
+	logger.info("Performance monitoring middleware added")
 
 	# Request/Response logging middleware with correlation ID
 	@app.middleware("http")
@@ -59,4 +64,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
