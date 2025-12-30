@@ -10,8 +10,6 @@ import {
   Card,
   CardContent,
   Typography,
-  Alert,
-  CircularProgress,
   ToggleButtonGroup,
   ToggleButton,
   IconButton,
@@ -24,13 +22,22 @@ import {
   GridOn as GridOnIcon,
   ScatterPlot as ScatterPlotIcon,
   Download as DownloadIcon,
-  Fullscreen as FullscreenIcon,
   ErrorOutline as ErrorOutlineIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import Plot from 'react-plotly.js';
 import { evaluationService } from '../../services/evaluationService';
-import type { PlotType, PlotDataResponse } from '../../services/evaluationService';
+import type { PlotDataResponse } from '../../services/evaluationService';
+
+// Define plot types locally
+export type PlotType = 
+  | 'roc_curve' 
+  | 'confusion_matrix' 
+  | 'precision_recall_curve' 
+  | 'residuals' 
+  | 'learning_curve' 
+  | 'calibration_curve' 
+  | 'feature_importance';
 
 interface PlotViewerProps {
   modelRunId: string;
@@ -84,27 +91,42 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
 
     switch (plotType) {
       case 'roc_curve':
-        return evaluationService.generateROCCurvePlot(
+        const rocPlot = evaluationService.generateROCCurvePlot(
           Array.from({ length: 100 }, (_, i) => i / 100),
           Array.from({ length: 100 }, (_, i) => Math.pow(i / 100, 0.8)),
           0.95
         );
+        return {
+          plot_type: 'roc_curve',
+          plot_data: rocPlot.data,
+          layout: rocPlot.layout,
+        };
 
       case 'confusion_matrix':
-        return evaluationService.generateConfusionMatrixPlot(
+        const cmPlot = evaluationService.generateConfusionMatrixPlot(
           [[85, 15], [10, 90]],
           ['Class 0', 'Class 1']
         );
+        return {
+          plot_type: 'confusion_matrix',
+          plot_data: cmPlot.data,
+          layout: cmPlot.layout,
+        };
 
       case 'residuals':
         const predictions = Array.from({ length: 100 }, () => Math.random() * 100);
         const actuals = predictions.map(p => p + (Math.random() - 0.5) * 20);
-        return evaluationService.generateResidualPlot(predictions, actuals);
+        const residualPlot = evaluationService.generateResidualPlot(predictions, actuals);
+        return {
+          plot_type: 'residuals',
+          plot_data: residualPlot.data,
+          layout: residualPlot.layout,
+        };
 
       case 'precision_recall_curve':
         return {
           plot_type: 'precision_recall_curve',
-          data: [{
+          plot_data: [{
             type: 'scatter',
             x: Array.from({ length: 100 }, (_, i) => 1 - i / 100),
             y: Array.from({ length: 100 }, (_, i) => Math.pow(1 - i / 100, 1.2)),
@@ -122,7 +144,7 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
       case 'learning_curve':
         return {
           plot_type: 'learning_curve',
-          data: [
+          plot_data: [
             {
               type: 'scatter',
               x: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
@@ -281,7 +303,7 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
         {plotData && !loading && !error && (
           <Box>
             <Plot
-              data={plotData.data}
+              data={plotData.plot_data}
               layout={{
                 ...plotData.layout,
                 autosize: true,
@@ -297,10 +319,10 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
               useResizeHandler
             />
 
-            {plotData.metadata && (
+            {plotData.config && (
               <Box mt={2}>
                 <Typography variant="caption" color="text.secondary">
-                  {Object.entries(plotData.metadata).map(([key, value]) => (
+                  {Object.entries(plotData.config).map(([key, value]) => (
                     <span key={key} style={{ marginRight: '16px' }}>
                       <strong>{key}:</strong> {String(value)}
                     </span>
