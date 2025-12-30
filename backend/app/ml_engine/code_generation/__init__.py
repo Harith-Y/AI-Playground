@@ -9,7 +9,8 @@ Modules:
     training_generator: Generate model training code
     evaluation_generator: Generate model evaluation code
     prediction_generator: Generate prediction/inference code
-    generator: Main code generation logic [Coming in ML-67]
+    requirements_generator: Generate requirements.txt files
+    generator: Main code generation logic
 """
 
 from app.ml_engine.code_generation.templates import (
@@ -39,6 +40,12 @@ from app.ml_engine.code_generation.prediction_generator import (
     generate_prediction_code,
 )
 
+from app.ml_engine.code_generation.requirements_generator import (
+    RequirementsGenerator,
+    DependencyInfo,
+    generate_requirements,
+)
+
 __all__ = [
     "TEMPLATES",
     "get_template",
@@ -52,4 +59,7 @@ __all__ = [
     "generate_evaluation_code",
     "PredictionCodeGenerator",
     "generate_prediction_code",
+    "RequirementsGenerator",
+    "DependencyInfo",
+    "generate_requirements",
 ]
