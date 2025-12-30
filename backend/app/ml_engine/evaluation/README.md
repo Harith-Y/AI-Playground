@@ -10,7 +10,7 @@ The evaluation module provides tools to assess model performance across differen
 - 🚧 **Regression Metrics** - MAE, MSE, RMSE, R², MAPE (Coming Soon)
 - ✅ **Residual Analysis Utilities** - Residual stats, standardized residuals, outlier detection
 - ✅ **Actual vs Predicted Aggregation** - Scatter-ready payload with error stats and correlations
-- 🚧 **Clustering Metrics** - Silhouette score, inertia, Davies-Bouldin index (Coming Soon)
+- ✅ **Clustering Metrics** - Silhouette, Calinski-Harabasz, Davies-Bouldin, inertia
 - 🚧 **Visualizations** - ROC curves, PR curves, confusion matrices, residual plots (Coming Soon)
 
 ## 🎯 Classification Metrics (ML-46)
@@ -493,6 +493,31 @@ print(result.mae)         # 0.5
 print(result.pearson_r)   # correlation
 print(result.best_fit)    # {'slope': ..., 'intercept': ...}
 scatter = result.series   # ready for plotting
+```
+
+## 🧩 Clustering Metrics (ML-53)
+
+Features:
+
+- Silhouette score (supports sampling and configurable distance metric)
+- Calinski-Harabasz and Davies-Bouldin indices
+- Inertia (uses model.inertia\_ when available; otherwise computed manually)
+- Cluster size summary with noise point count for algorithms like DBSCAN
+
+### Quick Start
+
+```python
+from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+from app.ml_engine.evaluation import calculate_clustering_metrics
+
+X, _ = make_blobs(n_samples=50, centers=2, cluster_std=0.6, random_state=42)
+model = KMeans(n_clusters=2, random_state=42, n_init=10).fit(X)
+
+metrics = calculate_clustering_metrics(X, model.labels_, model=model)
+print(metrics.silhouette)
+print(metrics.cluster_sizes)  # {'0': 25, '1': 25}
+payload = metrics.to_dict()
 ```
 
 ## 🧪 Testing

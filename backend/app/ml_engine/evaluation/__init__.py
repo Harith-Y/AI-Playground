@@ -7,7 +7,7 @@ Provides comprehensive model evaluation metrics and visualizations for:
 - ROC curves for binary and multi-class classification
 - PR curves for binary and multi-class classification
 - Regression models (MAE, MSE, RMSE, R², etc.) [Coming Soon]
-- Clustering models (silhouette, inertia, etc.) [Coming Soon]
+- Clustering models (silhouette, inertia, etc.)
 
 Modules:
     classification_metrics: Classification evaluation metrics
@@ -56,6 +56,12 @@ from app.ml_engine.evaluation.actual_vs_predicted import (
     aggregate_actual_vs_predicted,
 )
 
+from app.ml_engine.evaluation.clustering_metrics import (
+    ClusteringMetricsCalculator,
+    ClusteringMetricsResult,
+    calculate_clustering_metrics,
+)
+
 __all__ = [
     # Classification metrics
     "ClassificationMetricsCalculator",
@@ -83,4 +89,8 @@ __all__ = [
     "ActualVsPredictedAggregator",
     "ActualVsPredictedResult",
     "aggregate_actual_vs_predicted",
+    # Clustering metrics
+    "ClusteringMetricsCalculator",
+    "ClusteringMetricsResult",
+    "calculate_clustering_metrics",
 ]
