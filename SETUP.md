@@ -3,6 +3,7 @@
 ## Prerequisites
 
 Before starting, ensure you have the following installed:
+
 - **Python 3.11+** (for backend)
 - **Node.js 18+** and **npm/yarn** (for frontend)
 - **Database** (choose one):
@@ -244,21 +245,25 @@ docker-compose exec backend alembic revision --autogenerate -m "Initial migratio
 ### Backend (Python)
 
 **Core Framework:**
+
 - `fastapi` - Web framework
 - `uvicorn[standard]` - ASGI server
 - `pydantic` - Data validation
 - `pydantic-settings` - Settings management
 
 **Database:**
+
 - `sqlalchemy` - ORM
 - `psycopg2-binary` - PostgreSQL adapter
 - `alembic` - Database migrations
 
 **Task Queue:**
+
 - `celery` - Async task queue
 - `redis` - Message broker
 
 **ML Libraries:**
+
 - `scikit-learn` - ML algorithms
 - `pandas` - Data manipulation
 - `numpy` - Numerical computing
@@ -268,15 +273,21 @@ docker-compose exec backend alembic revision --autogenerate -m "Initial migratio
 - `xgboost` - Gradient boosting
 - `lightgbm` - Gradient boosting
 - `catboost` - Gradient boosting
-- `scikit-optimize` - Bayesian optimization (optional)
+
+**Optional ML Libraries:**
+
+- `scikit-optimize` - Bayesian optimization (install with: `pip install scikit-optimize`)
+- `shap` - SHAP values for feature importance (install with: `pip install shap`)
 
 **Utilities:**
+
 - `python-multipart` - File uploads
 - `python-jose[cryptography]` - JWT tokens
 - `passlib[bcrypt]` - Password hashing
 - `python-dotenv` - Environment variables
 
 **Development:**
+
 - `pytest` - Testing
 - `black` - Code formatting
 - `flake8` - Linting
@@ -285,37 +296,45 @@ docker-compose exec backend alembic revision --autogenerate -m "Initial migratio
 ### Frontend (JavaScript/TypeScript)
 
 **Core:**
+
 - `react` - UI library
 - `react-dom` - React DOM
 - `typescript` - Type safety
 - `vite` - Build tool (or `react-scripts` for CRA)
 
 **State Management:**
+
 - `@reduxjs/toolkit` - State management
 - `react-redux` - React bindings for Redux
 
 **Routing:**
+
 - `react-router-dom` - Client-side routing
 
 **HTTP Client:**
+
 - `axios` - API requests
 
 **UI Components:**
+
 - `@mui/material` - Material-UI components
 - `@emotion/react` - CSS-in-JS
 - `@emotion/styled` - Styled components
 
 **Data Visualization:**
+
 - `plotly.js` - Interactive charts
 - `react-plotly.js` - React wrapper for Plotly
 - `recharts` - React charts library
 
 **Forms:**
+
 - `react-hook-form` - Form handling
 - `yup` - Schema validation
 - `@hookform/resolvers` - Form validators
 
 **Development:**
+
 - `@types/react` - React types
 - `@types/react-dom` - React DOM types
 - `@types/node` - Node types
@@ -541,16 +560,19 @@ After initialization:
 ### Common Issues
 
 **Backend won't start:**
+
 - Check if PostgreSQL is running
 - Verify DATABASE_URL in .env
 - Check port 8000 is not in use
 
 **Frontend won't start:**
+
 - Delete node_modules and reinstall: `rm -rf node_modules && npm install`
 - Clear npm cache: `npm cache clean --force`
 - Check port 5173/3000 is not in use
 
 **Database connection failed:**
+
 - **If using Neon:** Check connection string includes `?sslmode=require`
 - **If using Neon:** Verify your IP is not blocked (Neon allows all IPs by default)
 - **If using local PostgreSQL:** Verify PostgreSQL service is running
@@ -558,12 +580,14 @@ After initialization:
 - Ensure database exists
 
 **Celery worker not processing tasks:**
+
 - Check if Redis is running
 - Verify CELERY_BROKER_URL in .env
 - Check worker logs for errors
 - **Windows users:** Must use `--pool=solo` flag with Celery worker
 
 **Docker issues:**
+
 - Restart Docker Desktop
 - Check Docker logs: `docker-compose logs`
 - Clean Docker system: `docker system prune -a`

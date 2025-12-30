@@ -12,6 +12,10 @@ from app.ml_engine.tuning.random_search import (
     RandomSearchResult,
     run_random_search,
 )
+from app.ml_engine.tuning.bayesian import (
+    BayesianSearchResult,
+    run_bayesian_search,
+)
 from app.ml_engine.tuning.cross_validation import (
     CrossValidationResult,
     run_cross_validation,
@@ -27,6 +31,8 @@ __all__ = [
     "run_grid_search",
     "RandomSearchResult",
     "run_random_search",
+    "BayesianSearchResult",
+    "run_bayesian_search",
     "CrossValidationResult",
     "run_cross_validation",
     "run_simple_cross_validation",
