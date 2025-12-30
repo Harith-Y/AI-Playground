@@ -33,9 +33,11 @@ from app.tasks.training_tasks import train_model
 from app.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.services.training_validation_service import get_training_validator, ValidationError
+from app.utils.cache import cache_service, CacheKeys, CacheTTL, invalidate_model_cache, invalidate_comparison_cache
 from app.services.storage_service import get_model_serialization_service
 from app.services.model_comparison_service import ModelComparisonService
 from app.utils.logger import get_logger
+from app.utils.cache import cache_service, CacheKeys, CacheTTL
 
 router = APIRouter()
 
@@ -743,6 +745,10 @@ async def delete_model_run(
         db.commit()
         deletion_summary["database_record_deleted"] = True
         
+        # Invalidate related caches
+        await invalidate_model_cache(model_run_id)
+        await invalidate_comparison_cache()
+        
         logger.info(
             f"Deleted model run database record",
             extra={
@@ -779,11 +785,14 @@ async def delete_model_run(
 @router.get("/train/{model_run_id}/metrics", response_model=ModelMetricsResponse)
 async def get_model_metrics(
     model_run_id: str,
+    use_cache: bool = True,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
     """
     Get detailed metrics for a completed model run.
+    
+    Results are cached for 1 hour to improve response times.
     
     This endpoint returns comprehensive evaluation metrics including:
     - Performance metrics (accuracy, precision, recall, F1, etc.)
@@ -807,7 +816,16 @@ async def get_model_metrics(
     
     Example:
         GET /api/v1/models/train/abc-123/metrics
+        GET /api/v1/models/train/abc-123/metrics?use_cache=false
     """
+    # Try cache first
+    if use_cache:
+        cache_key = CacheKeys.model_metrics(model_run_id)
+        cached_result = cache_service.get(cache_key)
+        if cached_result:
+            logger.info(f"Returning cached metrics for model {model_run_id}")
+            return cached_result
+    
     # Fetch model run
     try:
         model_run = db.query(ModelRun).filter(
@@ -876,6 +894,12 @@ async def get_model_metrics(
             response["training_metadata"]["test_samples"] = model_run.run_metadata['test_samples']
         if 'n_features' in model_run.run_metadata:
             response["training_metadata"]["n_features"] = model_run.run_metadata['n_features']
+    
+    # Cache the response for 1 hour
+    if use_cache:
+        cache_key = CacheKeys.model_metrics(model_run_id)
+        cache_service.set(cache_key, response, CacheTTL.LONG)
+        logger.info(f"Cached metrics for model {model_run_id}")
     
     return response
 
@@ -961,6 +985,7 @@ def _get_importance_method(model_type: str) -> str:
 async def get_feature_importance(
     model_run_id: str,
     top_n: Optional[int] = None,
+    use_cache: bool = True,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
@@ -970,6 +995,8 @@ async def get_feature_importance(
     This endpoint returns feature importance scores that indicate which features
     had the most impact on the model's predictions. Feature importance is available
     for models that support it (tree-based models, linear models, etc.).
+    
+    Cached for 30 minutes to improve performance.
     
     **Supported Models:**
     - Tree-based: Random Forest, Decision Tree, Gradient Boosting, XGBoost, LightGBM, CatBoost
@@ -1008,6 +1035,14 @@ async def get_feature_importance(
             'user_id': user_id
         }
     )
+    
+    # Check cache first
+    if use_cache:
+        cache_key = CacheKeys.feature_importance(model_run_id, top_n)
+        cached_result = await cache_service.get(cache_key)
+        if cached_result:
+            logger.info(f"Cache hit for feature importance {model_run_id}")
+            return cached_result
     
     # Fetch model run
     try:
@@ -1126,7 +1161,7 @@ async def get_feature_importance(
         }
     )
     
-    return FeatureImportanceResponse(
+    response = FeatureImportanceResponse(
         model_run_id=str(model_run.id),
         model_type=model_run.model_type,
         task_type=task_type,
@@ -1138,6 +1173,13 @@ async def get_feature_importance(
         importance_method=importance_method,
         message=None
     )
+    
+    # Cache the result
+    if use_cache:
+        cache_key = CacheKeys.feature_importance(model_run_id, top_n)
+        await cache_service.set(cache_key, response, ttl=CacheTTL.MEDIUM)
+    
+    return response
 
 
 # ============================================================================
@@ -1148,6 +1190,7 @@ async def get_feature_importance(
 @router.post("/compare", response_model=ModelComparisonResponse)
 async def compare_models(
     request: CompareModelsRequest,
+    use_cache: bool = True,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
@@ -1180,6 +1223,14 @@ async def compare_models(
             "ranking_criteria": "f1_score"
         }
     """
+    # Try cache first
+    if use_cache:
+        cache_key = CacheKeys.model_comparison([str(mid) for mid in request.model_run_ids])
+        cached_result = cache_service.get(cache_key)
+        if cached_result:
+            logger.info(f"Returning cached comparison for {len(request.model_run_ids)} models")
+            return cached_result
+    
     try:
         comparison_service = ModelComparisonService(db)
         result = comparison_service.compare_models(request, user_id)
@@ -1194,6 +1245,14 @@ async def compare_models(
                 'ranking_criteria': result.ranking_criteria
             }
         )
+        
+        # Cache the comparison result for 30 minutes
+        if use_cache:
+            cache_key = CacheKeys.model_comparison([str(mid) for mid in request.model_run_ids])
+            # Convert to dict for caching
+            result_dict = result.model_dump() if hasattr(result, 'model_dump') else result.dict()
+            cache_service.set(cache_key, result_dict, CacheTTL.MEDIUM)
+            logger.info(f"Cached comparison for {len(request.model_run_ids)} models")
         
         return result
         
@@ -1369,5 +1428,164 @@ async def list_model_runs(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list model runs: {str(e)}"
+        )
+
+
+@router.get("/cache/stats", status_code=status.HTTP_200_OK)
+async def get_cache_stats(
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get cache statistics and health information.
+    
+    This endpoint provides insights into the caching system:
+    - Cache availability and connection status
+    - Memory usage and key counts
+    - Hit/miss statistics if available
+    - Cache configuration
+    
+    Args:
+        user_id: Current user ID (for authentication)
+    
+    Returns:
+        Cache statistics and health information
+    
+    Example:
+        GET /api/v1/models/cache/stats
+        
+    Response:
+        {
+            "available": true,
+            "stats": {
+                "used_memory": "1.5M",
+                "total_keys": 42,
+                "hits": 1245,
+                "misses": 156
+            },
+            "config": {
+                "ttl_short": 900,
+                "ttl_medium": 1800,
+                "ttl_long": 3600
+            }
+        }
+    """
+    logger.info(
+        f"Cache stats requested",
+        extra={'event': 'cache_stats_request', 'user_id': user_id}
+    )
+    
+    if not cache_service.is_available():
+        return {
+            "available": False,
+            "message": "Redis cache is not available",
+            "stats": None,
+            "config": None
+        }
+    
+    try:
+        stats = await cache_service.get_stats()
+        
+        return {
+            "available": True,
+            "stats": stats,
+            "config": {
+                "ttl_very_short": CacheTTL.VERY_SHORT,
+                "ttl_short": CacheTTL.SHORT,
+                "ttl_medium": CacheTTL.MEDIUM,
+                "ttl_long": CacheTTL.LONG,
+                "ttl_very_long": CacheTTL.VERY_LONG,
+                "ttl_day": CacheTTL.DAY,
+                "ttl_week": CacheTTL.WEEK
+            },
+            "message": "Cache is healthy"
+        }
+    except Exception as e:
+        logger.error(
+            f"Failed to get cache stats: {e}",
+            extra={'event': 'cache_stats_failed', 'error': str(e)},
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve cache statistics: {str(e)}"
+        )
+
+
+@router.delete("/cache/clear", status_code=status.HTTP_200_OK)
+async def clear_cache(
+    pattern: Optional[str] = None,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Clear cache entries (admin operation).
+    
+    This endpoint allows clearing specific cache patterns or all cache entries.
+    Use with caution as it will impact system performance temporarily.
+    
+    Args:
+        pattern: Optional pattern to match keys (e.g., 'model:metrics:*')
+                If not provided, clears ALL cache entries
+        user_id: Current user ID (for authentication)
+    
+    Returns:
+        Number of keys deleted
+    
+    Example:
+        DELETE /api/v1/models/cache/clear
+        DELETE /api/v1/models/cache/clear?pattern=model:metrics:*
+        
+    Response:
+        {
+            "message": "Cache cleared successfully",
+            "deleted_count": 42,
+            "pattern": "model:metrics:*"
+        }
+    """
+    logger.info(
+        f"Cache clear requested",
+        extra={
+            'event': 'cache_clear_request',
+            'user_id': user_id,
+            'pattern': pattern
+        }
+    )
+    
+    if not cache_service.is_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Redis cache is not available"
+        )
+    
+    try:
+        if pattern:
+            deleted_count = await cache_service.delete_pattern(pattern)
+            message = f"Cleared {deleted_count} cache entries matching pattern: {pattern}"
+        else:
+            deleted_count = await cache_service.clear_all()
+            message = f"Cleared all {deleted_count} cache entries"
+        
+        logger.info(
+            message,
+            extra={
+                'event': 'cache_cleared',
+                'deleted_count': deleted_count,
+                'pattern': pattern
+            }
+        )
+        
+        return {
+            "message": message,
+            "deleted_count": deleted_count,
+            "pattern": pattern or "all"
+        }
+    except Exception as e:
+        logger.error(
+            f"Failed to clear cache: {e}",
+            extra={'event': 'cache_clear_failed', 'error': str(e)},
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear cache: {str(e)}"
         )
 

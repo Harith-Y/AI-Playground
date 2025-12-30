@@ -46,6 +46,7 @@ from app.ml_engine.evaluation.classification_metrics import calculate_classifica
 # from app.ml_engine.evaluation.clustering_metrics import calculate_clustering_metrics
 from app.core.config import settings
 from app.utils.logger import get_logger
+from app.utils.cache import invalidate_model_cache, invalidate_comparison_cache
 from app.services.training_error_handler import handle_training_error
 from app.core.training_exceptions import (
     DataLoadError,
@@ -674,6 +675,19 @@ def train_model(
         db.refresh(model_run)
 
         logger.info(f"ModelRun updated with results")
+        
+        # Invalidate related caches
+        import asyncio
+        try:
+            asyncio.create_task(invalidate_model_cache(model_run_id))
+            asyncio.create_task(invalidate_comparison_cache())
+        except RuntimeError:
+            # If no event loop is running, run synchronously
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(invalidate_model_cache(model_run_id))
+            loop.run_until_complete(invalidate_comparison_cache())
+            loop.close()
 
         # 12. Update experiment status if needed
         if experiment.status == "running":

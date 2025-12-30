@@ -11,6 +11,7 @@ A comprehensive full-stack machine learning platform for automated ML workflows 
 ## 🎯 Overview
 
 AI-Playground is an end-to-end ML platform that enables:
+
 - ✅ **Dataset Management** - Upload, explore, and visualize datasets with comprehensive statistics
 - ✅ **Exploratory Data Analysis** - Statistical summaries, correlation analysis, distribution plots, heatmaps
 - ✅ **Automated Preprocessing** - Customizable pipeline with imputation, scaling, encoding, outlier detection
@@ -23,7 +24,8 @@ AI-Playground is an end-to-end ML platform that enables:
 
 ## ✨ Key Features
 
-###  📊 Data Management & EDA (✅ Implemented)
+### 📊 Data Management & EDA (✅ Implemented)
+
 - ✅ **Multi-format Upload** - Support for CSV, Excel (XLSX, XLS), JSON
 - ✅ **Dataset Preview** - Interactive data table with 10+ rows preview
 - ✅ **Comprehensive Statistics** - Row/column counts, dtypes, missing values, duplicates, memory usage
@@ -34,6 +36,7 @@ AI-Playground is an end-to-end ML platform that enables:
 - ✅ **Distribution Plots** - Auto-binning algorithms (Sturges', Freedman-Diaconis), grouped histograms, normal curve overlays
 
 ### 🔧 Preprocessing Pipeline (✅ Implemented)
+
 - ✅ **CRUD Operations** - Create, read, update, delete, reorder preprocessing steps
 - ✅ **Modular Steps** - Build custom pipelines by chaining independent steps
 - ✅ **Missing Value Imputation** - Mean, median, mode, constant strategies
@@ -46,6 +49,7 @@ AI-Playground is an end-to-end ML platform that enables:
 - ✅ **Authorization** - User ownership verification for all operations
 
 ### 🤖 Machine Learning Engine (✅ Core Modules)
+
 - ✅ **Variance Threshold Selector** - Remove low-variance features with configurable threshold
 - ✅ **Correlation Selector** - Select features based on correlation with target variable
 - ✅ **Mutual Information Selector** - Feature selection using mutual information scores
@@ -60,6 +64,7 @@ AI-Playground is an end-to-end ML platform that enables:
 - 🚧 **Hyperparameter Tuning** - Grid search, random search, Bayesian optimization (Placeholder)
 
 ### 🎨 Frontend Features (✅ Implemented)
+
 - ✅ **Redux State Management** - Complete dataset CRUD with async thunks (6 thunks, 4 sync actions)
 - ✅ **Material-UI Components** - Modern, responsive design with MUI 7.3.6
 - ✅ **Interactive Visualizations** - Plotly.js integration for dynamic charts
@@ -74,11 +79,14 @@ AI-Playground is an end-to-end ML platform that enables:
 - 🚧 **Model Training UI** - Model selection and configuration (Coming Soon)
 
 ### 🔌 Backend API (✅ Core Endpoints)
+
 - ✅ **RESTful API** - Clean, documented endpoints with OpenAPI/Swagger
 - ✅ **Dataset Endpoints** - Upload, preview, stats, delete with full CRUD
 - ✅ **Preprocessing Endpoints** - Step management (create, read, update, delete, reorder) with authorization
 - ✅ **NeonDB Optimized** - Serverless PostgreSQL with connection pooling
-- ✅ **Redis Caching** - Fast data access and session management
+- ✅ **Redis Caching** - Fast data access with 40-133x faster response times (see [CACHING_GUIDE.md](CACHING_GUIDE.md))
+- ✅ **Cache Invalidation** - Automatic cache updates on model changes
+- ✅ **Cache Monitoring** - Statistics and health check endpoints
 - ✅ **Celery Tasks** - Async processing for long-running operations
 - ✅ **Comprehensive Tests** - 80+ unit tests with pytest
 - ✅ **Input Validation** - Pydantic schemas for all API payloads
@@ -191,8 +199,9 @@ AI-Playground/
 │   │   │   └── tuning_tasks.py    # Async hyperparameter tuning
 │   │   │
 │   │   └── utils/           # Utility Functions
+│   │       ├── cache.py         # Redis caching service
 │   │       ├── file_handler.py  # File operations
-    │           └── logger.py        # Logging configuration
+│   │       └── logger.py        # Logging configuration
 │   │
 │   └── tests/               # Backend Tests
 │
@@ -304,6 +313,7 @@ AI-Playground/
 ## 🛠️ Technology Stack
 
 ### Backend
+
 - **Framework**: FastAPI 0.126.0
 - **ORM**: SQLAlchemy 2.0.45
 - **Database**: PostgreSQL (via Neon or self-hosted)
@@ -313,12 +323,14 @@ AI-Playground/
 - **Authentication**: python-jose, passlib, bcrypt
 
 ### Machine Learning
+
 - **Core**: scikit-learn 1.8.0, pandas 2.3.3, numpy 2.4.0
 - **Boosting**: XGBoost 3.1.2, LightGBM 4.6.0, CatBoost 1.2.8
 - **Visualization**: matplotlib 3.10.8, seaborn 0.13.2, plotly 6.5.0
 - **Stats**: scipy 1.16.3
 
 ### Frontend
+
 - **Framework**: React 19.2.0 with TypeScript 5.9.3
 - **Build Tool**: Vite 7.2.4
 - **UI Library**: Material-UI (@mui/material) 7.3.6
@@ -330,6 +342,7 @@ AI-Playground/
 - **Testing**: Vitest 4.0.16, Testing Library
 
 ### Development Tools
+
 - **Code Quality**: Black, Flake8, mypy (Python) | ESLint (TypeScript)
 - **Testing**: pytest, pytest-cov, pytest-asyncio
 - **API Testing**: httpx
@@ -338,6 +351,7 @@ AI-Playground/
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - **Python 3.11+**
 - **Node.js 18+** and npm
 - **PostgreSQL** (or [Neon](https://neon.tech) account - recommended)
@@ -347,6 +361,7 @@ AI-Playground/
 ### Option 1: Local Development
 
 #### Backend Setup
+
 ```powershell
 # Navigate to backend
 cd backend
@@ -373,6 +388,7 @@ celery -A app.celery_app worker --loglevel=info
 ```
 
 #### Frontend Setup
+
 ```powershell
 # Navigate to frontend
 cd frontend
@@ -385,6 +401,7 @@ npm run dev
 ```
 
 ### Option 2: Docker Setup
+
 ```powershell
 # Build and start all services
 docker-compose build
@@ -395,6 +412,7 @@ docker-compose logs -f
 ```
 
 Access the application:
+
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
@@ -422,6 +440,7 @@ This project is optimized for **[Neon](https://neon.tech)** - serverless Postgre
 ## 🧪 Testing
 
 ### Backend Tests
+
 ```powershell
 cd backend
 pytest
@@ -429,6 +448,7 @@ pytest --cov=app tests/  # With coverage
 ```
 
 ### Frontend Tests
+
 ```powershell
 cd frontend
 npm test
@@ -438,6 +458,7 @@ npm run test:coverage
 ## 📝 API Endpoints
 
 ### Core Endpoints
+
 - `POST /api/v1/datasets/upload` - Upload dataset
 - `GET /api/v1/datasets/{id}` - Get dataset details
 - `POST /api/v1/preprocessing/apply` - Apply preprocessing
@@ -454,6 +475,7 @@ Full API documentation available at `/docs` (Swagger UI) and `/redoc` (ReDoc)
 ### Environment Variables
 
 **Backend (.env)**
+
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/ai_playground
 REDIS_URL=redis://localhost:6379/0
@@ -464,6 +486,7 @@ UPLOAD_DIR=./uploads
 ```
 
 **Frontend (.env)**
+
 ```env
 VITE_API_URL=http://localhost:8000
 VITE_WS_URL=ws://localhost:8000/ws

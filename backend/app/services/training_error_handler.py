@@ -142,6 +142,9 @@ class TrainingErrorHandler:
         """Update model run with error information."""
         try:
             from uuid import UUID
+            from app.utils.cache import invalidate_model_cache, invalidate_comparison_cache
+            import asyncio
+            
             model_run = self.db.query(ModelRun).filter(
                 ModelRun.id == UUID(self.model_run_id)
             ).first()
@@ -169,6 +172,18 @@ class TrainingErrorHandler:
                 flag_modified(model_run, 'run_metadata')
                 
                 self.db.commit()
+                
+                # Invalidate related caches
+                try:
+                    asyncio.create_task(invalidate_model_cache(self.model_run_id))
+                    asyncio.create_task(invalidate_comparison_cache())
+                except RuntimeError:
+                    # If no event loop is running, run synchronously
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(invalidate_model_cache(self.model_run_id))
+                    loop.run_until_complete(invalidate_comparison_cache())
+                    loop.close()
                 
                 self.logger.info(
                     f"Updated model run with error details",
