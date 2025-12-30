@@ -1,0 +1,51 @@
+# Alerting Directory .gitignore
+# This file ensures sensitive configuration is not committed to Git
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+
+# Data directories (will be created by Docker)
+data/
+prometheus-data/
+alertmanager-data/
+grafana-data/
+pushgateway-data/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup
+
+# SSL certificates (if any)
+*.pem
+*.key
+*.crt
+*.cert
+
+# Local overrides
+local-*.yml
+local-*.yaml
+override-*.yml
+override-*.yaml
+
+# Test files
+test-*.yml
+test-*.yaml
