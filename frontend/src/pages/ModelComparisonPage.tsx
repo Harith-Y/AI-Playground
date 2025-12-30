@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Container,
@@ -16,11 +16,20 @@ import {
   Select,
   MenuItem,
   Paper,
+  Chip,
+  IconButton,
+  Tooltip,
+  Collapse,
+  InputAdornment,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   Home as HomeIcon,
   Compare as CompareIcon,
+  FilterList as FilterListIcon,
+  Clear as ClearIcon,
+  Search as SearchIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import ModelListSelector from '../components/model/ModelListSelector';
 import ModelComparisonViewEnhanced from '../components/model/ModelComparisonViewEnhanced';
@@ -39,6 +48,11 @@ const ModelComparisonPage: React.FC = () => {
   // Comparison options
   const [comparisonMetrics, setComparisonMetrics] = useState<string>('');
   const [rankingCriteria, setRankingCriteria] = useState<string>('');
+  
+  // Filter states
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [modelTypeFilter, setModelTypeFilter] = useState<string>('all');
 
   // Fetch models on component mount
   useEffect(() => {
@@ -98,6 +112,38 @@ const ModelComparisonPage: React.FC = () => {
   const handleSelectionChange = (selectedIds: string[]) => {
     setSelectedModels(selectedIds);
   };
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setModelTypeFilter('all');
+  };
+
+  // Filter models
+  const filteredModels = useMemo(() => {
+    let filtered = [...models];
+
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (model) =>
+          model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          model.type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          model.id.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Model type filter
+    if (modelTypeFilter !== 'all') {
+      filtered = filtered.filter((model) => model.type === modelTypeFilter);
+    }
+
+    return filtered;
+  }, [models, searchQuery, modelTypeFilter]);
+
+  // Get unique model types
+  const uniqueModelTypes = useMemo(() => {
+    return Array.from(new Set(models.map((m) => m.type).filter(Boolean)));
+  }, [models]);
 
   const handleBack = () => {
     navigate('/modeling');
@@ -172,14 +218,118 @@ const ModelComparisonPage: React.FC = () => {
               </Typography>
             </Box>
           </Box>
-          <Button
-            variant="outlined"
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBack}
-          >
-            Back to Modeling
-          </Button>
+          <Box display="flex" gap={1}>
+            <Tooltip title={showFilters ? 'Hide Filters' : 'Show Filters'}>
+              <IconButton
+                onClick={() => setShowFilters(!showFilters)}
+                color={showFilters ? 'primary' : 'default'}
+              >
+                <FilterListIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Refresh Models">
+              <IconButton onClick={fetchModels}>
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+            <Button
+              variant="outlined"
+              startIcon={<ArrowBackIcon />}
+              onClick={handleBack}
+            >
+              Back
+            </Button>
+          </Box>
         </Box>
+
+        {/* Filters Panel */}
+        <Collapse in={showFilters}>
+          <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+              <Typography variant="h6" display="flex" alignItems="center" gap={1}>
+                <FilterListIcon />
+                Filters
+              </Typography>
+              <Button
+                size="small"
+                startIcon={<ClearIcon />}
+                onClick={handleClearFilters}
+              >
+                Clear All
+              </Button>
+            </Box>
+
+            <Box display="flex" flexWrap="wrap" gap={2}>
+              {/* Search */}
+              <Box sx={{ flex: '1 1 300px', minWidth: '250px' }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Search models by name or type..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchQuery && (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setSearchQuery('')}>
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
+
+              {/* Model Type Filter */}
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel>Model Type</InputLabel>
+                <Select
+                  value={modelTypeFilter}
+                  onChange={(e) => setModelTypeFilter(e.target.value)}
+                  label="Model Type"
+                >
+                  <MenuItem value="all">All Types</MenuItem>
+                  {uniqueModelTypes.map((type) => (
+                    <MenuItem key={type} value={type}>
+                      {type}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
+            {/* Active Filters Summary */}
+            {(searchQuery || modelTypeFilter !== 'all') && (
+              <Box mt={2} display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                <Typography variant="caption" color="text.secondary">
+                  Active filters:
+                </Typography>
+                {searchQuery && (
+                  <Chip
+                    size="small"
+                    label={`Search: "${searchQuery}"`}
+                    onDelete={() => setSearchQuery('')}
+                  />
+                )}
+                {modelTypeFilter !== 'all' && (
+                  <Chip
+                    size="small"
+                    label={`Type: ${modelTypeFilter}`}
+                    onDelete={() => setModelTypeFilter('all')}
+                  />
+                )}
+                <Typography variant="caption" color="primary" fontWeight="bold">
+                  ({filteredModels.length} of {models.length} models)
+                </Typography>
+              </Box>
+            )}
+          </Paper>
+        </Collapse>
 
         {/* Error Alert */}
         {error && (
@@ -231,8 +381,20 @@ const ModelComparisonPage: React.FC = () => {
 
         {/* Model Selection */}
         <Box mb={4}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">
+              Select Models to Compare
+            </Typography>
+            {selectedModels.length > 0 && (
+              <Chip
+                label={`${selectedModels.length} selected`}
+                color="primary"
+                size="small"
+              />
+            )}
+          </Box>
           <ModelListSelector
-            models={models}
+            models={filteredModels}
             selectedModels={selectedModels}
             onSelectionChange={handleSelectionChange}
             maxSelection={10}
