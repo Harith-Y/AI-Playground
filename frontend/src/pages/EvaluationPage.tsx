@@ -17,6 +17,11 @@ import {
   Stack,
   Button,
   CircularProgress,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  SelectChangeEvent,
 } from '@mui/material';
 import {
   Assessment as AssessmentIcon,
@@ -35,6 +40,9 @@ import type {
 import { EvaluationTab as EvaluationTabEnum, TaskType as TaskTypeEnum } from '../types/evaluation';
 import { MetricsDisplay } from '../components/evaluation/metrics';
 import { ClassificationCharts, RegressionCharts, ClusteringCharts } from '../components/evaluation/charts';
+import EvaluationDashboard from '../components/evaluation/EvaluationDashboard';
+import PlotViewer from '../components/evaluation/PlotViewer';
+import { modelService } from '../services/modelService';
 
 // Tab panel component
 interface TabPanelProps {
@@ -95,21 +103,29 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
     setError(null);
 
     try {
-      // TODO: Replace with actual API call
-      // const response = await api.get('/models/runs');
-      // setRuns(response.data);
+      // Fetch from API
+      const response = await modelService.listModels();
+      const apiRuns: ModelRun[] = response.items.map((model: any) => ({
+        id: model.id,
+        name: model.name || `Model ${model.id}`,
+        taskType: (model.task_type || 'classification') as TaskType,
+        modelType: model.model_type || 'unknown',
+        createdAt: model.created_at,
+        status: model.status,
+        metrics: model.metrics || {},
+      }));
+      setRuns(apiRuns);
 
-      // For now, load from sessionStorage or use mock data
-      const savedRuns = sessionStorage.getItem('modelRuns');
-      if (savedRuns) {
-        setRuns(JSON.parse(savedRuns));
-      } else {
-        // Mock data for development
-        setRuns(getMockRuns());
+      // If runId was provided and not in selectedRunId, set it
+      if (runId && !selectedRunId) {
+        setSelectedRunId(runId);
       }
     } catch (err) {
       setError('Failed to load model runs. Please try again.');
       console.error('Error loading runs:', err);
+      
+      // Fallback to mock data
+      setRuns(getMockRuns());
     } finally {
       setIsLoading(false);
     }
@@ -254,6 +270,26 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
 
           {/* Tab Panels */}
           <Box sx={{ p: 3 }}>
+            {/* Model Run Selector */}
+            {selectedRunId && (
+              <Box mb={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Select Model Run</InputLabel>
+                  <Select
+                    value={selectedRunId}
+                    onChange={(e: SelectChangeEvent<string>) => setSelectedRunId(e.target.value)}
+                    label="Select Model Run"
+                  >
+                    {runs.map((run) => (
+                      <MenuItem key={run.id} value={run.id}>
+                        {run.name} - {run.modelType} ({run.taskType})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            )}
+
             {/* Classification Tab */}
             <TabPanel value={EvaluationTabEnum.CLASSIFICATION} currentValue={currentTab}>
               {classificationRuns.length === 0 ? (
@@ -263,6 +299,19 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                     metrics here.
                   </Typography>
                 </Alert>
+              ) : selectedRunId ? (
+                <>
+                  <EvaluationDashboard
+                    modelRunId={selectedRunId}
+                    onRefresh={handleRefresh}
+                  />
+                  <Box mt={4}>
+                    <PlotViewer
+                      modelRunId={selectedRunId}
+                      availablePlots={['roc_curve', 'confusion_matrix', 'precision_recall_curve', 'learning_curve']}
+                    />
+                  </Box>
+                </>
               ) : (
                 <Box>
                   {/* Metrics Display */}
@@ -296,6 +345,19 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                     here.
                   </Typography>
                 </Alert>
+              ) : selectedRunId ? (
+                <>
+                  <EvaluationDashboard
+                    modelRunId={selectedRunId}
+                    onRefresh={handleRefresh}
+                  />
+                  <Box mt={4}>
+                    <PlotViewer
+                      modelRunId={selectedRunId}
+                      availablePlots={['residuals', 'learning_curve']}
+                    />
+                  </Box>
+                </>
               ) : (
                 <Box>
                   {/* Metrics Display */}
@@ -329,6 +391,19 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                     here.
                   </Typography>
                 </Alert>
+              ) : selectedRunId ? (
+                <>
+                  <EvaluationDashboard
+                    modelRunId={selectedRunId}
+                    onRefresh={handleRefresh}
+                  />
+                  <Box mt={4}>
+                    <PlotViewer
+                      modelRunId={selectedRunId}
+                      availablePlots={['feature_importance', 'learning_curve']}
+                    />
+                  </Box>
+                </>
               ) : (
                 <Box>
                   {/* Metrics Display */}

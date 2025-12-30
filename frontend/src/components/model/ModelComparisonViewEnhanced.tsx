@@ -24,7 +24,6 @@ import {
   Tooltip,
   Alert,
   Paper,
-  Grid,
   Divider,
   Button,
   CircularProgress,
@@ -348,24 +347,24 @@ const ModelComparisonViewEnhanced: React.FC<ModelComparisonViewEnhancedProps> = 
             </Box>
           </Box>
           
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={3}>
+          <Box display="flex" flexWrap="wrap" gap={2}>
+            <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '150px' }}>
               <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>
                 Model Type
               </Typography>
               <Typography variant="h6">
                 {comparisonData.best_model.model_type}
               </Typography>
-            </Grid>
-            <Grid item xs={12} md={3}>
+            </Box>
+            <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '150px' }}>
               <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>
                 Ranking Score
               </Typography>
               <Typography variant="h6">
                 {formatMetricValue(comparisonData.best_model.ranking_score)}
               </Typography>
-            </Grid>
-            <Grid item xs={12} md={3}>
+            </Box>
+            <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '150px' }}>
               <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>
                 Training Time
               </Typography>
@@ -374,16 +373,16 @@ const ModelComparisonViewEnhanced: React.FC<ModelComparisonViewEnhancedProps> = 
                   ? `${Math.round(comparisonData.best_model.training_time)}s`
                   : 'N/A'}
               </Typography>
-            </Grid>
-            <Grid item xs={12} md={3}>
+            </Box>
+            <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '150px' }}>
               <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>
                 Rank
               </Typography>
               <Typography variant="h6">
                 #{comparisonData.best_model.rank} of {comparisonData.total_models}
               </Typography>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         </CardContent>
       </Card>
 
@@ -412,53 +411,53 @@ const ModelComparisonViewEnhanced: React.FC<ModelComparisonViewEnhancedProps> = 
       <Typography variant="h6" gutterBottom>
         Metric Statistics
       </Typography>
-      <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Box display="flex" flexWrap="wrap" gap={2} sx={{ mb: 3 }}>
         {comparisonData.metric_statistics.map((stat) => (
-          <Grid item xs={12} sm={6} md={4} key={stat.metric_name}>
-            <Card>
+          <Box key={stat.metric_name} sx={{ flex: '1 1 calc(33.333% - 16px)', minWidth: '250px' }}>
+            <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Typography variant="subtitle2" color="primary" gutterBottom>
                   {stat.metric_name.replace(/_/g, ' ').toUpperCase()}
                 </Typography>
-                <Grid container spacing={1}>
-                  <Grid item xs={6}>
+                <Box display="flex" flexWrap="wrap" gap={1}>
+                  <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: '80px' }}>
                     <Typography variant="caption" color="text.secondary">
                       Mean
                     </Typography>
                     <Typography variant="body2" fontWeight="bold">
                       {formatMetricValue(stat.mean)}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
+                  </Box>
+                  <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: '80px' }}>
                     <Typography variant="caption" color="text.secondary">
                       Std Dev
                     </Typography>
                     <Typography variant="body2" fontWeight="bold">
                       {formatMetricValue(stat.std)}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
+                  </Box>
+                  <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: '80px' }}>
                     <Typography variant="caption" color="text.secondary">
                       Min
                     </Typography>
                     <Typography variant="body2">
                       {formatMetricValue(stat.min)}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
+                  </Box>
+                  <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: '80px' }}>
                     <Typography variant="caption" color="text.secondary">
                       Max
                     </Typography>
                     <Typography variant="body2">
                       {formatMetricValue(stat.max)}
                     </Typography>
-                  </Grid>
-                </Grid>
+                  </Box>
+                </Box>
               </CardContent>
             </Card>
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
 
       {/* Comparison Tabs */}
       <Card>
