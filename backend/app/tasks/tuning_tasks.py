@@ -22,6 +22,7 @@ from app.models.dataset import Dataset
 from app.models.preprocessing_step import PreprocessingStep
 from app.ml_engine.model_registry import ModelRegistry
 from app.ml_engine.preprocessing.serializer import PipelineSerializer
+from app.ml_engine.tuning import get_default_search_space
 import pickle
 
 def deserialize_transformer(binary_data):
@@ -80,7 +81,7 @@ def tune_hyperparameters(
     tuning_run_id: str,
     model_run_id: str,
     tuning_method: str,
-    param_grid: Dict[str, List[Any]],
+    param_grid: Optional[Dict[str, List[Any]]],
     cv_folds: int = 5,
     scoring_metric: Optional[str] = None,
     n_iter: Optional[int] = 10,
@@ -251,7 +252,14 @@ def tune_hyperparameters(
         
         logger.info(f"Using scoring metric: {scoring_metric}")
         
-        # 7. Perform hyperparameter tuning
+        # 7. Prepare param grid (fallback to default search space when missing)
+        if not param_grid:
+            param_grid = get_default_search_space(model_run.model_type)
+            if not param_grid:
+                raise ValueError("param_grid is required and no default search space is defined for this model")
+            logger.info("Using default search space for model %s", model_run.model_type)
+
+        # 8. Perform hyperparameter tuning
         self.update_state(
             state='PROGRESS',
             meta={
@@ -334,7 +342,7 @@ def tune_hyperparameters(
         tuning_duration = time.time() - tuning_start
         logger.info(f"Tuning completed in {tuning_duration:.2f} seconds")
         
-        # 8. Extract results
+        # 9. Extract results
         self.update_state(
             state='PROGRESS',
             meta={
@@ -369,7 +377,7 @@ def tune_hyperparameters(
             }
             top_results.append(result_item)
         
-        # 9. Update TuningRun with results
+        # 10. Update TuningRun with results
         tuning_run.best_params = best_params
         tuning_run.results = {
             'best_score': float(best_score),
