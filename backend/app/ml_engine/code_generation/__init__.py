@@ -46,6 +46,14 @@ from app.ml_engine.code_generation.requirements_generator import (
     generate_requirements,
 )
 
+from app.ml_engine.code_generation.template_engine import (
+    TemplateEngine,
+    TemplateRegistry,
+    TemplateConfig,
+    get_template_engine,
+    get_template_registry,
+)
+
 __all__ = [
     "TEMPLATES",
     "get_template",
@@ -62,4 +70,9 @@ __all__ = [
     "RequirementsGenerator",
     "DependencyInfo",
     "generate_requirements",
+    "TemplateEngine",
+    "TemplateRegistry",
+    "TemplateConfig",
+    "get_template_engine",
+    "get_template_registry",
 ]
