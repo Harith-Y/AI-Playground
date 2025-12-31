@@ -23,8 +23,6 @@ import {
   Chip,
   IconButton,
   Tooltip,
-  Card,
-  CardContent,
   Stack,
 } from '@mui/material';
 import {
@@ -38,21 +36,9 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import TuningConfiguration from '../components/tuning/TuningConfiguration';
 import TuningProgress from '../components/tuning/TuningProgress';
+import TuningResults from '../components/tuning/TuningResults';
 
 // Placeholder components (to be implemented in subsequent tasks)
-
-const TuningResults = () => (
-  <Card>
-    <CardContent>
-      <Typography variant="h6" gutterBottom>
-        Tuning Results
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        Best parameters, trial history, and performance metrics
-      </Typography>
-    </CardContent>
-  </Card>
-);
 
 const TuningPage: React.FC = () => {
   const navigate = useNavigate();
