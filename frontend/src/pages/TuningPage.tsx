@@ -7,7 +7,7 @@
  * - Results display
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -24,6 +24,8 @@ import {
   IconButton,
   Tooltip,
   Stack,
+  Button,
+  Snackbar,
 } from '@mui/material';
 import {
   NavigateNext as NavigateNextIcon,
@@ -37,18 +39,48 @@ import { useNavigate, useParams } from 'react-router-dom';
 import TuningConfiguration from '../components/tuning/TuningConfiguration';
 import TuningProgress from '../components/tuning/TuningProgress';
 import TuningResults from '../components/tuning/TuningResults';
+import { useTuning } from '../hooks/useTuning';
+import type { TuningConfig } from '../services/tuningService';
 
 // Placeholder components (to be implemented in subsequent tasks)
 
 const TuningPage: React.FC = () => {
   const navigate = useNavigate();
-  const { modelRunId: _modelRunId } = useParams<{ modelRunId?: string }>();
+  const { modelRunId } = useParams<{ modelRunId?: string }>();
   
   // State
   const [activeStep, setActiveStep] = useState(0);
-  const [tuningStatus, _setTuningStatus] = useState<'idle' | 'configuring' | 'running' | 'completed' | 'failed'>('idle');
-  const [selectedModel, _setSelectedModel] = useState<string | null>('random_forest_classifier');
-  const [tuningConfig, setTuningConfig] = useState<any>(null);
+  const [selectedModel] = useState<string>('random_forest_classifier');
+  const [tuningConfig, setTuningConfig] = useState<TuningConfig | null>(null);
+  const [snackbarMessage, setSnackbarMessage] = useState<string>('');
+  const [showSnackbar, setShowSnackbar] = useState(false);
+
+  // Tuning hook
+  const {
+    tuningId,
+    progress,
+    results,
+    isLoading,
+    error,
+    start,
+    applyConfig,
+    exportResults,
+    refresh,
+    clearError,
+  } = useTuning({
+    onComplete: (results) => {
+      setSnackbarMessage(`Tuning completed! Best score: ${results.best_score.toFixed(4)}`);
+      setShowSnackbar(true);
+      setActiveStep(2);
+    },
+    onError: (error) => {
+      setSnackbarMessage(`Error: ${error.message}`);
+      setShowSnackbar(true);
+    },
+  });
+
+  // Derive tuning status from progress
+  const tuningStatus = progress?.status || (results ? 'completed' : 'idle');
   
   // Steps for the tuning workflow
   const steps = [
@@ -68,6 +100,57 @@ const TuningPage: React.FC = () => {
       setActiveStep(step);
     }
   };
+
+  // Handle start tuning
+  const handleStartTuning = useCallback(async () => {
+    if (!tuningConfig || !modelRunId) {
+      setSnackbarMessage('Please configure tuning parameters first');
+      setShowSnackbar(true);
+      return;
+    }
+
+    try {
+      await start({
+        model_run_id: modelRunId,
+        model_type: selectedModel,
+        tuning_config: tuningConfig,
+      });
+      setActiveStep(1);
+      setSnackbarMessage('Tuning started successfully');
+      setShowSnackbar(true);
+    } catch (err) {
+      // Error handled by hook
+    }
+  }, [tuningConfig, modelRunId, selectedModel, start]);
+
+  // Handle apply configuration
+  const handleApplyConfig = useCallback(async (parameters: Record<string, any>) => {
+    try {
+      await applyConfig(parameters, true);
+      setSnackbarMessage('Configuration applied successfully');
+      setShowSnackbar(true);
+    } catch (err) {
+      // Error handled by hook
+    }
+  }, [applyConfig]);
+
+  // Handle export
+  const handleExport = useCallback(async () => {
+    try {
+      await exportResults();
+      setSnackbarMessage('Results exported successfully');
+      setShowSnackbar(true);
+    } catch (err) {
+      // Error handled by hook
+    }
+  }, [exportResults]);
+
+  // Handle status change from progress component
+  const handleStatusChange = useCallback((status: string) => {
+    if (status === 'completed') {
+      setActiveStep(2);
+    }
+  }, []);
   
   // Status color mapping
   const getStatusColor = (status: typeof tuningStatus) => {
@@ -78,8 +161,8 @@ const TuningPage: React.FC = () => {
         return 'success';
       case 'failed':
         return 'error';
-      case 'configuring':
-        return 'info';
+      case 'paused':
+        return 'warning';
       default:
         return 'default';
     }
@@ -94,8 +177,8 @@ const TuningPage: React.FC = () => {
         return 'Tuning Completed';
       case 'failed':
         return 'Tuning Failed';
-      case 'configuring':
-        return 'Configuring';
+      case 'paused':
+        return 'Paused';
       default:
         return 'Ready to Start';
     }
@@ -159,7 +242,7 @@ const TuningPage: React.FC = () => {
                 icon={<TuneIcon />}
               />
               <Tooltip title="Refresh">
-                <IconButton size="small" color="primary">
+                <IconButton size="small" color="primary" onClick={refresh} disabled={isLoading}>
                   <RefreshIcon />
                 </IconButton>
               </Tooltip>
@@ -273,18 +356,25 @@ const TuningPage: React.FC = () => {
                   Progress
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
-                <TuningProgress />
+                <TuningProgress 
+                  tuningId={tuningId || undefined}
+                  onStatusChange={handleStatusChange}
+                />
               </Box>
             )}
             
             {/* Results Section */}
-            {(activeStep === 2 || tuningStatus === 'completed') && (
+            {(activeStep === 2 || tuningStatus === 'completed') && results && (
               <Box>
                 <Typography variant="h6" gutterBottom>
                   Results
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
-                <TuningResults />
+                <TuningResults 
+                  resultsData={results}
+                  onApplyConfig={handleApplyConfig}
+                  onExport={handleExport}
+                />
               </Box>
             )}
             
@@ -308,19 +398,16 @@ const TuningPage: React.FC = () => {
                   the hyperparameter optimization process.
                 </Typography>
                 <Box display="flex" gap={2} justifyContent="center">
-                  <Tooltip title="Start tuning process">
-                    <IconButton
-                      color="primary"
-                      size="large"
-                      sx={{
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                        '&:hover': { bgcolor: 'primary.dark' },
-                      }}
-                    >
-                      <PlayArrowIcon />
-                    </IconButton>
-                  </Tooltip>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={handleStartTuning}
+                    disabled={!tuningConfig || isLoading}
+                  >
+                    Start Tuning
+                  </Button>
                 </Box>
               </Paper>
             )}
@@ -362,6 +449,28 @@ const TuningPage: React.FC = () => {
             </Box>
           </Stack>
         </Paper>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" sx={{ mt: 3 }} onClose={clearError}>
+            {error.message}
+          </Alert>
+        )}
+
+        {/* Loading Indicator */}
+        {isLoading && (
+          <Alert severity="info" sx={{ mt: 3 }}>
+            Processing...
+          </Alert>
+        )}
+
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={showSnackbar}
+          autoHideDuration={6000}
+          onClose={() => setShowSnackbar(false)}
+          message={snackbarMessage}
+        />
       </Container>
     </Box>
   );
