@@ -52,8 +52,10 @@ services:
       - key: JWT_SECRET
         generateValue: true
       
-      # Feature Flags
+      # Feature Flags for Free Tier
       - key: ENABLE_HEAVY_MODELS
-        value: false  # Disable XGBoost, RandomForest on free tier
+        value: false  # Disable XGBoost, CatBoost, LightGBM (not installed)
       - key: ENABLE_HYPERPARAMETER_TUNING
         value: false  # Too CPU intensive for free tier
+      - key: AVAILABLE_MODELS
+        value: logistic_regression,linear_regression,ridge,lasso,decision_tree,random_forest,svm,knn
