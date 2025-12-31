@@ -1,0 +1,59 @@
+# Render Blueprint for AI-Playground Backend
+# This file configures automatic deployment on Render
+
+services:
+  # Main Backend API + ML Worker
+  - type: web
+    name: aiplayground-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      # Database (NeonDB)
+      - key: DATABASE_URL
+        sync: false  # Set manually in Render dashboard
+      
+      # Redis (Upstash)
+      - key: REDIS_URL
+        sync: false  # Set manually in Render dashboard
+      
+      # Cloudflare R2
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: aiplayground-storage
+      - key: R2_PUBLIC_URL
+        sync: false
+      
+      # App Configuration
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_ORIGINS
+        value: https://ai-playground-lime.vercel.app,http://localhost:5173
+      - key: MAX_UPLOAD_SIZE_MB
+        value: 10
+      - key: MAX_DATASET_ROWS
+        value: 10000
+      - key: MAX_TRAINING_TIME_SECONDS
+        value: 60
+      
+      # Security
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      
+      # Feature Flags
+      - key: ENABLE_HEAVY_MODELS
+        value: false  # Disable XGBoost, RandomForest on free tier
+      - key: ENABLE_HYPERPARAMETER_TUNING
+        value: false  # Too CPU intensive for free tier
