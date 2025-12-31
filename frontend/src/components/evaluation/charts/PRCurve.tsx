@@ -82,6 +82,23 @@ const PRCurve: React.FC<PRCurveProps> = ({
     return 0.5;
   }, []);
 
+  // Calculate optimal point (highest F1 score)
+  const optimalIndex = useMemo(() => {
+    let maxF1 = -Infinity;
+    let optimalIdx = 0;
+
+    precision.forEach((p, idx) => {
+      const r = recall[idx];
+      const f1 = p + r > 0 ? (2 * p * r) / (p + r) : 0;
+      if (f1 > maxF1) {
+        maxF1 = f1;
+        optimalIdx = idx;
+      }
+    });
+
+    return optimalIdx;
+  }, [precision, recall]);
+
   // Prepare plot data
   const plotData: Data[] = useMemo(() => {
     const data: Data[] = [];
@@ -164,23 +181,7 @@ const PRCurve: React.FC<PRCurveProps> = ({
       }
     });
 
-    // Optimal point (highest F1 score)
-    const optimalIndex = useMemo(() => {
-      let maxF1 = -Infinity;
-      let optimalIdx = 0;
-
-      precision.forEach((p, idx) => {
-        const r = recall[idx];
-        const f1 = p + r > 0 ? (2 * p * r) / (p + r) : 0;
-        if (f1 > maxF1) {
-          maxF1 = f1;
-          optimalIdx = idx;
-        }
-      });
-
-      return optimalIdx;
-    }, [precision, recall]);
-
+    // Optimal point
     const optimalF1 =
       precision[optimalIndex] + recall[optimalIndex] > 0
         ? (2 * precision[optimalIndex] * recall[optimalIndex]) /
@@ -215,7 +216,7 @@ const PRCurve: React.FC<PRCurveProps> = ({
     data.push(optimalPoint);
 
     return data;
-  }, [precision, recall, thresholds, calculatedAP, baseline, showBaseline, showThresholds]);
+  }, [precision, recall, thresholds, calculatedAP, baseline, showBaseline, showThresholds, optimalIndex]);
 
   // Plot layout
   const layout: Partial<Layout> = useMemo(

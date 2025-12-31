@@ -69,6 +69,24 @@ const ROCCurve: React.FC<ROCCurveProps> = ({
     return Math.max(0, Math.min(1, sum));
   }, [fpr, tpr, auc]);
 
+  // Calculate optimal point (closest to top-left corner)
+  const optimalIndex = useMemo(() => {
+    let minDist = Infinity;
+    let optimalIdx = 0;
+
+    fpr.forEach((fprVal, idx) => {
+      const tprVal = tpr[idx];
+      // Distance to (0, 1) - perfect classifier
+      const dist = Math.sqrt(Math.pow(fprVal, 2) + Math.pow(1 - tprVal, 2));
+      if (dist < minDist) {
+        minDist = dist;
+        optimalIdx = idx;
+      }
+    });
+
+    return optimalIdx;
+  }, [fpr, tpr]);
+
   // Prepare plot data
   const plotData: Data[] = useMemo(() => {
     const data: Data[] = [];
@@ -116,24 +134,7 @@ const ROCCurve: React.FC<ROCCurveProps> = ({
       data.push(diagonalTrace);
     }
 
-    // Optimal point (closest to top-left corner)
-    const optimalIndex = useMemo(() => {
-      let minDist = Infinity;
-      let optimalIdx = 0;
-
-      fpr.forEach((fprVal, idx) => {
-        const tprVal = tpr[idx];
-        // Distance to (0, 1) - perfect classifier
-        const dist = Math.sqrt(Math.pow(fprVal, 2) + Math.pow(1 - tprVal, 2));
-        if (dist < minDist) {
-          minDist = dist;
-          optimalIdx = idx;
-        }
-      });
-
-      return optimalIdx;
-    }, [fpr, tpr]);
-
+    // Optimal point
     const optimalPoint: Data = {
       x: [fpr[optimalIndex]],
       y: [tpr[optimalIndex]],
@@ -161,7 +162,7 @@ const ROCCurve: React.FC<ROCCurveProps> = ({
     data.push(optimalPoint);
 
     return data;
-  }, [fpr, tpr, thresholds, calculatedAUC, showDiagonal, showThresholds]);
+  }, [fpr, tpr, thresholds, calculatedAUC, showDiagonal, showThresholds, optimalIndex]);
 
   // Plot layout
   const layout: Partial<Layout> = useMemo(
