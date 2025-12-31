@@ -451,6 +451,115 @@ async def generate_jupyter_notebook(
         )
 
 
+@router.post("/fastapi", response_model=CodeGenerationResponse)
+async def generate_fastapi_service(
+    request: CodeGenerationRequest = Body(...),
+    include_dockerfile: bool = Query(
+        default=True,
+        description="Include Dockerfile for containerization"
+    ),
+    include_docker_compose: bool = Query(
+        default=False,
+        description="Include docker-compose.yml"
+    )
+) -> CodeGenerationResponse:
+    """
+    Generate FastAPI microservice for model deployment.
+    
+    This endpoint generates a complete FastAPI application including:
+    - API endpoints for predictions
+    - Model loading and caching
+    - Request/response validation
+    - Error handling
+    - Health checks
+    - API documentation
+    - Dockerfile (optional)
+    - docker-compose.yml (optional)
+    
+    The generated service is production-ready and can be deployed immediately.
+    
+    Args:
+        request: Code generation configuration
+        include_dockerfile: Whether to include Dockerfile
+        include_docker_compose: Whether to include docker-compose.yml
+    
+    Returns:
+        Generated FastAPI service code
+    
+    Raises:
+        HTTPException: If service generation fails
+    """
+    try:
+        logger.info(
+            f"Generating FastAPI service for {request.model_type}",
+            extra={
+                'event': 'fastapi_generation_start',
+                'model_type': request.model_type,
+                'include_dockerfile': include_dockerfile,
+                'include_docker_compose': include_docker_compose
+            }
+        )
+        
+        # Prepare configuration
+        config = _prepare_config(request)
+        
+        # Generate FastAPI service
+        service_code = _generate_fastapi_service(config, request)
+        
+        # Add Dockerfile if requested
+        if include_dockerfile:
+            dockerfile = _generate_dockerfile(config)
+            service_code += f"\n\n# {'=' * 78}\n# DOCKERFILE\n# {'=' * 78}\n\n"
+            service_code += f'"""\nSave as: Dockerfile\n\n{dockerfile}\n"""\n'
+        
+        # Add docker-compose if requested
+        if include_docker_compose:
+            docker_compose = _generate_docker_compose(config)
+            service_code += f"\n\n# {'=' * 78}\n# DOCKER-COMPOSE.YML\n# {'=' * 78}\n\n"
+            service_code += f'"""\nSave as: docker-compose.yml\n\n{docker_compose}\n"""\n'
+        
+        # Calculate metadata
+        metadata = {
+            'generated_at': datetime.utcnow().isoformat(),
+            'model_type': request.model_type,
+            'task_type': request.task_type,
+            'service_type': 'fastapi_microservice',
+            'lines_of_code': len(service_code.split('\n')),
+            'includes_dockerfile': include_dockerfile,
+            'includes_docker_compose': include_docker_compose,
+            'experiment_name': request.experiment_name,
+        }
+        
+        logger.info(
+            f"FastAPI service generation completed: {metadata['lines_of_code']} lines",
+            extra={
+                'event': 'fastapi_generation_complete',
+                **metadata
+            }
+        )
+        
+        return CodeGenerationResponse(
+            code=service_code,
+            code_type="fastapi_microservice",
+            output_format="api",
+            metadata=metadata
+        )
+        
+    except Exception as e:
+        logger.error(
+            f"FastAPI service generation failed: {e}",
+            extra={
+                'event': 'fastapi_generation_failed',
+                'error': str(e)
+            },
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"FastAPI service generation failed: {str(e)}"
+        )
+
+
 @router.post("/requirements", response_model=Dict[str, str])
 async def generate_requirements_txt(
     request: RequirementsGenerationRequest = Body(...),
@@ -1184,3 +1293,565 @@ def _generate_notebook(
     }
     
     return json.dumps(notebook, indent=2)
+
+
+def _generate_fastapi_service(
+    config: Dict[str, Any],
+    request: CodeGenerationRequest
+) -> str:
+    """
+    Generate FastAPI microservice code.
+    
+    Args:
+        config: Configuration dictionary
+        request: Code generation request
+    
+    Returns:
+        FastAPI service code
+    """
+    model_type = config['model_type']
+    task_type = config['task_type']
+    experiment_name = config['experiment_name']
+    
+    # Determine input/output schemas based on task type
+    if task_type == 'classification':
+        prediction_type = 'str'
+        prediction_example = '"class_0"'
+    elif task_type == 'regression':
+        prediction_type = 'float'
+        prediction_example = '123.45'
+    else:  # clustering
+        prediction_type = 'int'
+        prediction_example = '0'
+    
+    code = f'''"""
+{experiment_name} - FastAPI Microservice
+
+Auto-generated by AI-Playground
+Generated: {datetime.utcnow().isoformat()}
+
+Model: {model_type}
+Task: {task_type}
+
+This microservice provides REST API endpoints for model predictions.
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+```
+
+## Running the Service
+
+```bash
+# Development
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Production
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+## API Documentation
+
+Once running, visit:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+## Docker Deployment
+
+```bash
+docker build -t {experiment_name.lower().replace(" ", "-")}-api .
+docker run -p 8000:8000 {experiment_name.lower().replace(" ", "-")}-api
+```
+"""
+
+from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, validator
+from typing import List, Dict, Any, Optional
+import joblib
+import numpy as np
+import pandas as pd
+from pathlib import Path
+import logging
+from datetime import datetime
+import uvicorn
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# ============================================================================
+# Configuration
+# ============================================================================
+
+MODEL_PATH = Path("{config.get('model_path', 'model.pkl')}")
+MODEL_VERSION = "1.0.0"
+SERVICE_NAME = "{experiment_name}"
+
+# ============================================================================
+# Pydantic Models
+# ============================================================================
+
+class HealthResponse(BaseModel):
+    """Health check response."""
+    status: str = Field(..., description="Service status")
+    model_loaded: bool = Field(..., description="Whether model is loaded")
+    model_version: str = Field(..., description="Model version")
+    timestamp: str = Field(..., description="Current timestamp")
+
+
+class PredictionRequest(BaseModel):
+    """Prediction request model."""
+    features: List[float] = Field(
+        ...,
+        description="Input features for prediction",
+        example=[1.0, 2.0, 3.0, 4.0]
+    )
+    
+    @validator('features')
+    def validate_features(cls, v):
+        """Validate features."""
+        if not v:
+            raise ValueError("Features cannot be empty")
+        if any(not isinstance(x, (int, float)) for x in v):
+            raise ValueError("All features must be numeric")
+        return v
+
+
+class BatchPredictionRequest(BaseModel):
+    """Batch prediction request model."""
+    instances: List[List[float]] = Field(
+        ...,
+        description="List of feature vectors",
+        example=[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+    )
+    
+    @validator('instances')
+    def validate_instances(cls, v):
+        """Validate instances."""
+        if not v:
+            raise ValueError("Instances cannot be empty")
+        if not all(isinstance(inst, list) for inst in v):
+            raise ValueError("Each instance must be a list")
+        return v
+
+
+class PredictionResponse(BaseModel):
+    """Prediction response model."""
+    prediction: {prediction_type} = Field(
+        ...,
+        description="Model prediction",
+        example={prediction_example}
+    )
+    confidence: Optional[float] = Field(
+        None,
+        description="Prediction confidence (if available)",
+        example=0.95
+    )
+    model_version: str = Field(..., description="Model version used")
+    timestamp: str = Field(..., description="Prediction timestamp")
+
+
+class BatchPredictionResponse(BaseModel):
+    """Batch prediction response model."""
+    predictions: List[{prediction_type}] = Field(
+        ...,
+        description="List of predictions"
+    )
+    confidences: Optional[List[float]] = Field(
+        None,
+        description="List of confidences (if available)"
+    )
+    count: int = Field(..., description="Number of predictions")
+    model_version: str = Field(..., description="Model version used")
+    timestamp: str = Field(..., description="Prediction timestamp")
+
+
+class ModelInfo(BaseModel):
+    """Model information."""
+    name: str = Field(..., description="Model name")
+    version: str = Field(..., description="Model version")
+    type: str = Field(..., description="Model type")
+    task: str = Field(..., description="Task type")
+    loaded: bool = Field(..., description="Whether model is loaded")
+    path: str = Field(..., description="Model file path")
+
+
+# ============================================================================
+# Model Management
+# ============================================================================
+
+class ModelManager:
+    """Manages model loading and caching."""
+    
+    def __init__(self, model_path: Path):
+        """Initialize model manager."""
+        self.model_path = model_path
+        self.model = None
+        self._load_model()
+    
+    def _load_model(self):
+        """Load model from disk."""
+        try:
+            if not self.model_path.exists():
+                logger.error(f"Model file not found: {{self.model_path}}")
+                raise FileNotFoundError(f"Model file not found: {{self.model_path}}")
+            
+            logger.info(f"Loading model from {{self.model_path}}")
+            self.model = joblib.load(self.model_path)
+            logger.info("Model loaded successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to load model: {{e}}")
+            raise
+    
+    def predict(self, features: np.ndarray) -> np.ndarray:
+        """Make prediction."""
+        if self.model is None:
+            raise RuntimeError("Model not loaded")
+        
+        try:
+            prediction = self.model.predict(features)
+            return prediction
+        except Exception as e:
+            logger.error(f"Prediction failed: {{e}}")
+            raise
+    
+    def predict_proba(self, features: np.ndarray) -> Optional[np.ndarray]:
+        """Get prediction probabilities (if available)."""
+        if self.model is None:
+            raise RuntimeError("Model not loaded")
+        
+        try:
+            if hasattr(self.model, 'predict_proba'):
+                return self.model.predict_proba(features)
+            return None
+        except Exception as e:
+            logger.error(f"Probability prediction failed: {{e}}")
+            return None
+    
+    def is_loaded(self) -> bool:
+        """Check if model is loaded."""
+        return self.model is not None
+
+
+# ============================================================================
+# FastAPI Application
+# ============================================================================
+
+# Initialize FastAPI app
+app = FastAPI(
+    title=SERVICE_NAME,
+    description="ML Model Prediction API",
+    version=MODEL_VERSION,
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure appropriately for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize model manager
+try:
+    model_manager = ModelManager(MODEL_PATH)
+except Exception as e:
+    logger.error(f"Failed to initialize model manager: {{e}}")
+    model_manager = None
+
+
+# ============================================================================
+# API Endpoints
+# ============================================================================
+
+@app.get("/", tags=["Root"])
+async def root():
+    """Root endpoint."""
+    return {{
+        "service": SERVICE_NAME,
+        "version": MODEL_VERSION,
+        "status": "running",
+        "docs": "/docs",
+        "health": "/health"
+    }}
+
+
+@app.get("/health", response_model=HealthResponse, tags=["Health"])
+async def health_check():
+    """
+    Health check endpoint.
+    
+    Returns service health status and model information.
+    """
+    return HealthResponse(
+        status="healthy" if model_manager and model_manager.is_loaded() else "unhealthy",
+        model_loaded=model_manager.is_loaded() if model_manager else False,
+        model_version=MODEL_VERSION,
+        timestamp=datetime.utcnow().isoformat()
+    )
+
+
+@app.get("/model/info", response_model=ModelInfo, tags=["Model"])
+async def get_model_info():
+    """
+    Get model information.
+    
+    Returns details about the loaded model.
+    """
+    if not model_manager or not model_manager.is_loaded():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Model not loaded"
+        )
+    
+    return ModelInfo(
+        name=SERVICE_NAME,
+        version=MODEL_VERSION,
+        type="{model_type}",
+        task="{task_type}",
+        loaded=True,
+        path=str(MODEL_PATH)
+    )
+
+
+@app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
+async def predict(request: PredictionRequest):
+    """
+    Make a single prediction.
+    
+    Args:
+        request: Prediction request with features
+    
+    Returns:
+        Prediction response with result and metadata
+    
+    Raises:
+        HTTPException: If prediction fails
+    """
+    if not model_manager or not model_manager.is_loaded():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Model not loaded"
+        )
+    
+    try:
+        # Convert features to numpy array
+        features = np.array([request.features])
+        
+        # Make prediction
+        prediction = model_manager.predict(features)[0]
+        
+        # Get confidence if available
+        confidence = None
+        probabilities = model_manager.predict_proba(features)
+        if probabilities is not None:
+            confidence = float(np.max(probabilities[0]))
+        
+        # Convert prediction to appropriate type
+        if "{task_type}" == "classification":
+            prediction = str(prediction)
+        elif "{task_type}" == "regression":
+            prediction = float(prediction)
+        else:  # clustering
+            prediction = int(prediction)
+        
+        logger.info(f"Prediction made: {{prediction}}")
+        
+        return PredictionResponse(
+            prediction=prediction,
+            confidence=confidence,
+            model_version=MODEL_VERSION,
+            timestamp=datetime.utcnow().isoformat()
+        )
+        
+    except Exception as e:
+        logger.error(f"Prediction failed: {{e}}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Prediction failed: {{str(e)}}"
+        )
+
+
+@app.post("/predict/batch", response_model=BatchPredictionResponse, tags=["Prediction"])
+async def predict_batch(request: BatchPredictionRequest):
+    """
+    Make batch predictions.
+    
+    Args:
+        request: Batch prediction request with multiple instances
+    
+    Returns:
+        Batch prediction response with results
+    
+    Raises:
+        HTTPException: If prediction fails
+    """
+    if not model_manager or not model_manager.is_loaded():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Model not loaded"
+        )
+    
+    try:
+        # Convert instances to numpy array
+        features = np.array(request.instances)
+        
+        # Make predictions
+        predictions = model_manager.predict(features)
+        
+        # Get confidences if available
+        confidences = None
+        probabilities = model_manager.predict_proba(features)
+        if probabilities is not None:
+            confidences = [float(np.max(prob)) for prob in probabilities]
+        
+        # Convert predictions to appropriate type
+        if "{task_type}" == "classification":
+            predictions = [str(p) for p in predictions]
+        elif "{task_type}" == "regression":
+            predictions = [float(p) for p in predictions]
+        else:  # clustering
+            predictions = [int(p) for p in predictions]
+        
+        logger.info(f"Batch prediction made: {{len(predictions)}} predictions")
+        
+        return BatchPredictionResponse(
+            predictions=predictions,
+            confidences=confidences,
+            count=len(predictions),
+            model_version=MODEL_VERSION,
+            timestamp=datetime.utcnow().isoformat()
+        )
+        
+    except Exception as e:
+        logger.error(f"Batch prediction failed: {{e}}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Batch prediction failed: {{str(e)}}"
+        )
+
+
+# ============================================================================
+# Main Entry Point
+# ============================================================================
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False,
+        log_level="info"
+    )
+'''
+    
+    return code
+
+
+def _generate_dockerfile(config: Dict[str, Any]) -> str:
+    """
+    Generate Dockerfile for FastAPI service.
+    
+    Args:
+        config: Configuration dictionary
+    
+    Returns:
+        Dockerfile content
+    """
+    experiment_name = config['experiment_name'].lower().replace(' ', '-')
+    
+    dockerfile = f'''# FastAPI Microservice Dockerfile
+# Auto-generated by AI-Playground
+
+FROM python:3.9-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \\
+    gcc \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY main.py .
+COPY model.pkl .
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && \\
+    chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
+    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+
+# Run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+'''
+    
+    return dockerfile
+
+
+def _generate_docker_compose(config: Dict[str, Any]) -> str:
+    """
+    Generate docker-compose.yml for FastAPI service.
+    
+    Args:
+        config: Configuration dictionary
+    
+    Returns:
+        docker-compose.yml content
+    """
+    experiment_name = config['experiment_name'].lower().replace(' ', '-')
+    
+    docker_compose = f'''# Docker Compose Configuration
+# Auto-generated by AI-Playground
+
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: {experiment_name}-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=/app/model.pkl
+      - LOG_LEVEL=info
+    volumes:
+      - ./model.pkl:/app/model.pkl:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ml-network
+
+networks:
+  ml-network:
+    driver: bridge
+'''
+    
+    return docker_compose
