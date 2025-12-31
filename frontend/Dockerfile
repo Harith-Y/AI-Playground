@@ -1,7 +1,7 @@
-# Multi-stage build for React frontend
+# Multi-stage build for optimized production image
 
 # Stage 1: Build stage
-FROM node:20-alpine as build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --silent
+RUN npm ci && npm cache clean --force
 
 # Copy source code
 COPY . .
@@ -25,19 +25,20 @@ ENV VITE_WS_URL=$VITE_WS_URL
 # Build the application
 RUN npm run build
 
-# Stage 2: Production stage with Nginx
-FROM nginx:alpine as production
+# Stage 2: Production
+FROM nginx:alpine AS production
 
-# Remove default nginx static assets
-RUN rm -rf /usr/share/nginx/html/*
-
-# Copy built files from build stage
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Copy nginx config
+# Copy custom nginx config from existing location
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 80
+# Copy built assets from build stage
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:80/health || exit 1
+
+# Expose port
 EXPOSE 80
 
 # Start nginx
