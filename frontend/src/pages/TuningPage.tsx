@@ -36,20 +36,9 @@ import {
   Info as InfoIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
+import TuningConfiguration from '../components/tuning/TuningConfiguration';
 
 // Placeholder components (to be implemented in subsequent tasks)
-const TuningConfiguration = () => (
-  <Card>
-    <CardContent>
-      <Typography variant="h6" gutterBottom>
-        Tuning Configuration
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        Configure tuning method, search space, and parameters
-      </Typography>
-    </CardContent>
-  </Card>
-);
 
 const TuningProgress = () => (
   <Card>
@@ -84,7 +73,8 @@ const TuningPage: React.FC = () => {
   // State
   const [activeStep, setActiveStep] = useState(0);
   const [tuningStatus, _setTuningStatus] = useState<'idle' | 'configuring' | 'running' | 'completed' | 'failed'>('idle');
-  const [selectedModel, _setSelectedModel] = useState<string | null>(null);
+  const [selectedModel, _setSelectedModel] = useState<string | null>('random_forest_classifier');
+  const [tuningConfig, setTuningConfig] = useState<any>(null);
   
   // Steps for the tuning workflow
   const steps = [
@@ -243,7 +233,11 @@ const TuningPage: React.FC = () => {
               <Divider sx={{ mb: 2 }} />
               
               {/* Configuration Component */}
-              <TuningConfiguration />
+              <TuningConfiguration 
+                modelType={selectedModel || 'random_forest_classifier'}
+                onConfigChange={setTuningConfig}
+                disabled={tuningStatus === 'running'}
+              />
               
               {/* Quick Stats */}
               <Paper sx={{ p: 2, mt: 2 }}>
@@ -264,7 +258,7 @@ const TuningPage: React.FC = () => {
                       Method:
                     </Typography>
                     <Typography variant="body2" fontWeight="medium">
-                      Random Search
+                      {tuningConfig?.method?.replace(/_/g, ' ') || 'Random Search'}
                     </Typography>
                   </Box>
                   <Box display="flex" justifyContent="space-between">
@@ -272,7 +266,7 @@ const TuningPage: React.FC = () => {
                       Iterations:
                     </Typography>
                     <Typography variant="body2" fontWeight="medium">
-                      50
+                      {tuningConfig?.n_iter || 50}
                     </Typography>
                   </Box>
                   <Box display="flex" justifyContent="space-between">
@@ -280,7 +274,15 @@ const TuningPage: React.FC = () => {
                       CV Folds:
                     </Typography>
                     <Typography variant="body2" fontWeight="medium">
-                      5
+                      {tuningConfig?.cv_folds || 5}
+                    </Typography>
+                  </Box>
+                  <Box display="flex" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">
+                      Parameters:
+                    </Typography>
+                    <Typography variant="body2" fontWeight="medium">
+                      {tuningConfig?.parameters?.length || 0}
                     </Typography>
                   </Box>
                 </Box>
