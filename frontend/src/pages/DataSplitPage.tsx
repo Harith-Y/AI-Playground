@@ -13,7 +13,7 @@ import {
   Stack,
   Card,
   CardContent,
-  Alert,
+  Alert as _Alert,
   Divider,
   Paper,
 } from '@mui/material';

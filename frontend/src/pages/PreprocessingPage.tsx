@@ -70,7 +70,7 @@ const PreprocessingPage: React.FC = () => {
     severity: 'success',
   });
 
-  const pollingIntervalRef = useRef<number | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (currentDataset?.id) {

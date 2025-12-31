@@ -10,7 +10,7 @@ import {
   CardContent,
   Typography,
   Box,
-  Chip,
+  Chip as _Chip,
   Tooltip,
   LinearProgress,
 } from '@mui/material';

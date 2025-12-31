@@ -11,7 +11,7 @@ import {
   Speed as SpeedIcon,
   CompareArrows as CompareArrowsIcon,
   Analytics as AnalyticsIcon,
-  Groups as GroupsIcon,
+  Groups as _GroupsIcon,
 } from '@mui/icons-material';
 import MetricCard, { MetricVariant } from './MetricCard';
 import type { ClusteringMetrics as ClusteringMetricsType } from '../../../types/evaluation';

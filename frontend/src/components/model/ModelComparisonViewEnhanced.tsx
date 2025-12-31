@@ -22,13 +22,13 @@ import {
   Tab,
   IconButton,
   Tooltip,
-  Alert,
-  Paper,
+  Alert as _Alert,
+  Paper as _Paper,
   Divider,
   Button,
-  CircularProgress,
+  CircularProgress as _CircularProgress,
   Skeleton,
-  AlertTitle,
+  AlertTitle as _AlertTitle,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -39,7 +39,7 @@ import {
   Radar as RadarIcon,
   ScatterPlot as ScatterPlotIcon,
   Refresh as RefreshIcon,
-  Download as DownloadIcon,
+  Download as _DownloadIcon,
   Lightbulb as LightbulbIcon,
   ErrorOutline as ErrorOutlineIcon,
   CompareArrows as CompareArrowsIcon,
@@ -135,7 +135,7 @@ const ModelComparisonViewEnhanced: React.FC<ModelComparisonViewEnhancedProps> = 
     return value.toFixed(decimals);
   };
 
-  const getModelTypeColor = (type: string): any => {
+  const _getModelTypeColor = (type: string): any => {
     const colors: Record<string, any> = {
       random_forest: 'primary',
       logistic_regression: 'secondary',
@@ -271,7 +271,7 @@ const ModelComparisonViewEnhanced: React.FC<ModelComparisonViewEnhancedProps> = 
   };
 
   // Create statistical box plot
-  const createStatisticsChart = () => {
+  const _createStatisticsChart = () => {
     if (!comparisonData) return null;
 
     const traces = comparisonData.metric_statistics.map(stat => ({

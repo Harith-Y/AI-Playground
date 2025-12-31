@@ -120,7 +120,7 @@ const FeatureRankingTable: React.FC<FeatureRankingTableProps> = ({
     return Math.max(...features.map((f) => f.importance));
   }, [features]);
 
-  const maxPermutation = useMemo(() => {
+  const _maxPermutation = useMemo(() => {
     if (!showPermutation) return 0;
     const vals = features
       .map((f) => f.permutationImportance)

@@ -45,7 +45,7 @@ import {
 } from '../../types/featureSelection';
 
 const TargetColumnSelector: React.FC<TargetColumnSelectorProps> = ({
-  datasetId,
+  // datasetId, // Unused
   columns,
   selectedTarget,
   taskType,

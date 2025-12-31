@@ -59,7 +59,7 @@ const ModelingPage: React.FC = () => {
 
   const [activeStep, setActiveStep] = useState(0);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
-  const [hyperparameters, setHyperparameters] = useState<Record<string, any>>({});
+  const [_hyperparameters, _setHyperparameters] = useState<Record<string, any>>({});
 
   useEffect(() => {
     dispatch(fetchModels());
@@ -158,7 +158,7 @@ const ModelingPage: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Left Column: Configuration Sections */}
-        <Grid item xs={12} lg={8}>
+        <Grid size={{ xs: 12, lg: 8 }}>
           <Stack spacing={3}>
             {/* Section 1: Data Selection */}
             <Card
@@ -319,7 +319,7 @@ const ModelingPage: React.FC = () => {
         </Grid>
 
         {/* Right Column: Run Status & Progress */}
-        <Grid item xs={12} lg={4}>
+        <Grid size={{ xs: 12, lg: 4 }}>
           <Card sx={{ border: '1px solid #e2e8f0', position: 'sticky', top: 24 }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -364,7 +364,7 @@ const ModelingPage: React.FC = () => {
                       Model:
                     </Typography>
                     <Typography variant="caption" fontWeight={500}>
-                      {selectedModel?.name || 'Not selected'}
+                      {typeof selectedModel === 'string' ? selectedModel : (selectedModel as any)?.name || 'Not selected'}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>

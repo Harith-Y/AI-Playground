@@ -44,8 +44,8 @@ import {
   Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
-  LineChart,
-  Line,
+  LineChart as _LineChart,
+  Line as _Line,
   PieChart,
   Pie,
   Cell,
@@ -299,7 +299,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
 
       {/* Shape Comparison */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={6}>
+        <Grid size={{ xs: 6 }}>
           <Card variant="outlined">
             <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
               <Typography variant="caption" color="text.secondary" gutterBottom>
@@ -314,7 +314,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={6}>
+        <Grid size={{ xs: 6 }}>
           <Card variant="outlined">
             <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
               <Typography variant="caption" color="text.secondary" gutterBottom>
@@ -495,7 +495,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                 {/* Statistics Cards for Numeric Columns */}
                 {isNumericColumn(selectedColumn) && beforeStats && afterStats && (
                   <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={6} md={2}>
+                    <Grid size={{ xs: 6, md: 2 }}>
                       <Card variant="outlined">
                         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <Typography variant="caption" color="text.secondary">
@@ -513,7 +513,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                         </CardContent>
                       </Card>
                     </Grid>
-                    <Grid item xs={6} md={2}>
+                    <Grid size={{ xs: 6, md: 2 }}>
                       <Card variant="outlined">
                         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <Typography variant="caption" color="text.secondary">
@@ -531,7 +531,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                         </CardContent>
                       </Card>
                     </Grid>
-                    <Grid item xs={6} md={2}>
+                    <Grid size={{ xs: 6, md: 2 }}>
                       <Card variant="outlined">
                         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <Typography variant="caption" color="text.secondary">
@@ -546,7 +546,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                         </CardContent>
                       </Card>
                     </Grid>
-                    <Grid item xs={6} md={2}>
+                    <Grid size={{ xs: 6, md: 2 }}>
                       <Card variant="outlined">
                         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <Typography variant="caption" color="text.secondary">
@@ -561,7 +561,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                         </CardContent>
                       </Card>
                     </Grid>
-                    <Grid item xs={6} md={2}>
+                    <Grid size={{ xs: 6, md: 2 }}>
                       <Card variant="outlined">
                         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <Typography variant="caption" color="text.secondary">
@@ -576,7 +576,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                         </CardContent>
                       </Card>
                     </Grid>
-                    <Grid item xs={6} md={2}>
+                    <Grid size={{ xs: 6, md: 2 }}>
                       <Card variant="outlined">
                         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <Typography variant="caption" color="text.secondary">
@@ -597,7 +597,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                 {/* Charts */}
                 <Grid container spacing={2}>
                   {/* Before Chart */}
-                  <Grid item xs={12} md={6}>
+                  <Grid size={{ xs: 12, md: 6 }}>
                     <Paper variant="outlined" sx={{ p: 2 }}>
                       <Typography variant="subtitle2" gutterBottom fontWeight={600} color="text.secondary">
                         Before: {selectedColumn}
@@ -636,7 +636,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                   </Grid>
 
                   {/* After Chart */}
-                  <Grid item xs={12} md={6}>
+                  <Grid size={{ xs: 12, md: 6 }}>
                     <Paper variant="outlined" sx={{ p: 2 }}>
                       <Typography variant="subtitle2" gutterBottom fontWeight={600} color="primary.main">
                         After: {selectedColumn}

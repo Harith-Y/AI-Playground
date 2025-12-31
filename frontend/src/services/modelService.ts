@@ -10,6 +10,13 @@ class ModelService {
   }
 
   /**
+   * List all models (alias for getModels)
+   */
+  async listModels(): Promise<Model[]> {
+    return this.getModels();
+  }
+
+  /**
    * Get model by ID
    */
   async getModel(id: string): Promise<Model> {

@@ -242,7 +242,7 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
         <Grid container spacing={3}>
           {/* General Error Alert */}
           {generalError && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Alert severity="error" icon={<ErrorIcon />}>
                 <AlertTitle>Configuration Error</AlertTitle>
                 {generalError}
@@ -252,7 +252,7 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
 
           {/* Empty Dataset Warning */}
           {columns.length === 0 && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Alert severity="warning" icon={<Warning />}>
                 <AlertTitle>No Columns Available</AlertTitle>
                 The selected dataset has no columns. Please upload a valid dataset before creating preprocessing steps.
@@ -261,7 +261,7 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
           )}
 
           {/* Step Type Selection */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Typography variant="subtitle2" gutterBottom fontWeight={600}>
               Step Type *
             </Typography>
@@ -271,7 +271,7 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
                 const isSelected = stepType === type;
 
                 return (
-                  <Grid item xs={12} sm={6} key={type}>
+                  <Grid size={{ xs: 12, sm: 6 }} key={type}>
                     <Box
                       onClick={() => handleStepTypeChange(type)}
                       sx={{
@@ -308,7 +308,7 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
 
           {/* Column Selection */}
           {selectedConfig?.requiresColumn && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <FormControl fullWidth error={!!errors.column}>
                 <InputLabel>Target Column *</InputLabel>
                 <Select
@@ -348,13 +348,13 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
 
           {/* Parameters */}
           {selectedConfig && selectedConfig.parameterSchema.length > 0 && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Typography variant="subtitle2" gutterBottom fontWeight={600}>
                 Parameters
               </Typography>
               <Grid container spacing={2}>
                 {selectedConfig.parameterSchema.map((field) => (
-                  <Grid item xs={12} sm={6} key={field.name}>
+                  <Grid size={{ xs: 12, sm: 6 }} key={field.name}>
                     {renderParameterField(field)}
                   </Grid>
                 ))}
@@ -364,7 +364,7 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
 
           {/* Info Alert */}
           {selectedConfig && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Alert severity="info" icon={<Info />}>
                 <Typography variant="body2">
                   <strong>{selectedConfig.label}:</strong> {selectedConfig.description}

@@ -103,7 +103,7 @@ const TuningProgress: React.FC<TuningProgressProps> = ({
   });
   
   const [isPolling, setIsPolling] = useState(true);
-  const intervalRef = useRef<number | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Generate mock trial data
   useEffect(() => {

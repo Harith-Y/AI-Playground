@@ -30,7 +30,7 @@ const MissingValuesHeatmap: React.FC<MissingValuesHeatmapProps> = ({
   // Calculate dimensions
   const columnWidth = Math.max(120, Math.min(200, width / Math.max(data.length, 5)));
   const actualWidth = columnWidth * data.length;
-  const barHeight = 40;
+  const _barHeight = 40;
   const labelHeight = 100;
   const chartHeight = Math.min(maxHeight - labelHeight - 150, 400);
 
@@ -277,7 +277,7 @@ const MissingValuesHeatmap: React.FC<MissingValuesHeatmapProps> = ({
                       {column.columnName}
                     </Typography>
                     <Chip
-                      icon={severity.icon}
+                      icon={severity.icon as React.ReactElement}
                       label={severity.label}
                       size="small"
                       sx={{

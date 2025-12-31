@@ -125,7 +125,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
     try {
       // Fetch from API
       const response = await modelService.listModels();
-      const apiRuns: ModelRun[] = response.items.map((model: any) => ({
+      const apiRuns: ModelRun[] = (Array.isArray(response) ? response : (response as any).items || []).map((model: any) => ({
         id: model.id,
         name: model.name || `Model ${model.id}`,
         taskType: (model.task_type || 'classification') as TaskType,

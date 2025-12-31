@@ -38,14 +38,14 @@ const EvaluationMetrics: React.FC<EvaluationMetricsProps> = ({
 
       <Grid container spacing={2}>
         {Object.entries(metrics).map(([key, value]) => (
-          <Grid item xs={12} sm={6} md={4} key={key}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={key}>
             <Card sx={{ border: '1px solid #e2e8f0', background: '#f8fafc' }}>
               <CardContent>
                 <Typography variant="caption" color="text.secondary">
                   {key.replace(/_/g, ' ').toUpperCase()}
                 </Typography>
                 <Typography variant="h5" fontWeight={600} sx={{ mt: 1 }}>
-                  {typeof value === 'number' ? value.toFixed(4) : value}
+                  {typeof value === 'number' ? value.toFixed(4) : String(value)}
                 </Typography>
               </CardContent>
             </Card>

@@ -8,7 +8,7 @@ import {
   Chip,
   Paper,
 } from '@mui/material';
-import { Timeline, CheckCircle, Error as ErrorIcon } from '@mui/icons-material';
+import { Timeline, CheckCircle, Error as _ErrorIcon } from '@mui/icons-material';
 import type { TrainingMetrics } from '../../types/model';
 
 interface TrainingProgressProps {

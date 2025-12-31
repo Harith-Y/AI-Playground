@@ -18,7 +18,7 @@ const ModelingPageWithInlineEvaluation: React.FC = () => {
     data: latestResults,
     loading: resultsLoading,
     error: resultsError,
-    refresh: refreshResults,
+    refresh: _refreshResults,
   } = useLatestTrainingResults({
     autoRefresh: true, // Auto-refresh every 10 seconds
     refreshInterval: 10000,
@@ -57,7 +57,7 @@ const ModelingPageWithInlineEvaluation: React.FC = () => {
         />
 
         {/* You can also manually refresh */}
-        {/* <Button onClick={refreshResults}>Refresh Results</Button> */}
+        {/* <Button onClick={_refreshResults}>Refresh Results</Button> */}
       </Box>
     </Container>
   );

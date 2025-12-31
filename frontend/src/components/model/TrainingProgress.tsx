@@ -26,7 +26,7 @@ import {
   Refresh as RefreshIcon,
   Timeline as TimelineIcon,
 } from '@mui/icons-material';
-import { TrainingRun, TrainingLog } from '../../types/training';
+import type { TrainingRun, TrainingLog } from '../../types/training';
 import Plot from 'react-plotly.js';
 
 interface TrainingProgressProps {
@@ -285,7 +285,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
 
           {/* Time Info */}
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <Typography variant="body2" color="text.secondary">
                 Started
               </Typography>
@@ -294,7 +294,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
               </Typography>
             </Grid>
             {trainingRun.endTime && (
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ xs: 12, sm: 4 }}>
                 <Typography variant="body2" color="text.secondary">
                   Ended
                 </Typography>
@@ -303,7 +303,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
                 </Typography>
               </Grid>
             )}
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <Typography variant="body2" color="text.secondary">
                 Duration
               </Typography>
@@ -334,7 +334,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
           <Grid container spacing={2}>
             {/* Training Metrics */}
             {trainingRun.metrics.trainScore !== undefined && (
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <Paper elevation={0} sx={{ p: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
                   <Typography variant="body2">Train Score</Typography>
                   <Typography variant="h4">
@@ -346,7 +346,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
 
             {/* Validation Metrics */}
             {trainingRun.metrics.valScore !== undefined && (
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <Paper elevation={0} sx={{ p: 2, bgcolor: 'secondary.light', color: 'secondary.contrastText' }}>
                   <Typography variant="body2">Validation Score</Typography>
                   <Typography variant="h4">
@@ -358,7 +358,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
 
             {/* Test Metrics */}
             {trainingRun.metrics.testScore !== undefined && (
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <Paper elevation={0} sx={{ p: 2, bgcolor: 'success.light', color: 'success.contrastText' }}>
                   <Typography variant="body2">Test Score</Typography>
                   <Typography variant="h4">
@@ -370,7 +370,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
 
             {/* Additional Metrics */}
             {trainingRun.metrics.precision !== undefined && (
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
                   <Typography variant="body2" color="text.secondary">Precision</Typography>
                   <Typography variant="h5">
@@ -381,7 +381,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
             )}
 
             {trainingRun.metrics.recall !== undefined && (
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
                   <Typography variant="body2" color="text.secondary">Recall</Typography>
                   <Typography variant="h5">
@@ -392,7 +392,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
             )}
 
             {trainingRun.metrics.f1Score !== undefined && (
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
                   <Typography variant="body2" color="text.secondary">F1 Score</Typography>
                   <Typography variant="h5">
@@ -403,7 +403,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
             )}
 
             {trainingRun.metrics.rmse !== undefined && (
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
                   <Typography variant="body2" color="text.secondary">RMSE</Typography>
                   <Typography variant="h5">
@@ -414,7 +414,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
             )}
 
             {trainingRun.metrics.mae !== undefined && (
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
                   <Typography variant="body2" color="text.secondary">MAE</Typography>
                   <Typography variant="h5">
@@ -425,7 +425,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
             )}
 
             {trainingRun.metrics.r2Score !== undefined && (
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
                   <Typography variant="body2" color="text.secondary">R² Score</Typography>
                   <Typography variant="h5">

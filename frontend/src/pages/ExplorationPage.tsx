@@ -9,7 +9,7 @@ import EvaluationMetrics from '../components/evaluation/EvaluationMetrics';
 import ConfusionMatrix from '../components/evaluation/ConfusionMatrix';
 
 const ExplorationPage: React.FC = () => {
-  const dispatch = useAppDispatch();
+  const _dispatch = useAppDispatch();
   const { metrics, confusionMatrix, isEvaluating, error } = useAppSelector(
     (state) => state.evaluation
   );
@@ -61,7 +61,7 @@ const ExplorationPage: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Evaluation Metrics */}
-        <Grid item xs={12}>
+        <Grid size={{ xs: 12 }}>
           <Card sx={{ border: '1px solid #e2e8f0' }}>
             <CardContent>
               <EvaluationMetrics metrics={metrics} />
@@ -71,7 +71,7 @@ const ExplorationPage: React.FC = () => {
 
         {/* Confusion Matrix */}
         {confusionMatrix && (
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Card sx={{ border: '1px solid #e2e8f0' }}>
               <CardContent>
                 <ConfusionMatrix matrix={confusionMatrix} />

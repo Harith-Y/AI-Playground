@@ -10,11 +10,15 @@ export interface Dataset {
   createdAt: string;
   updatedAt: string;
   status: DatasetStatus;
+  rows?: number; // Alias for rowCount
+  columns?: number; // Alias for columnCount
+  shape?: [number, number]; // [rows, columns]
 }
 
 export interface ColumnInfo {
   name: string;
   dataType: string;
+  dtype: string; // Required alias for dataType (not optional)
   nullCount: number;
   uniqueCount: number;
   sampleValues: any[];

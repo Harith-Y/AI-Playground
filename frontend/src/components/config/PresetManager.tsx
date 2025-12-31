@@ -36,7 +36,7 @@ import {
   Save as SaveIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
-import type { PresetManagerProps, DataSplitPreset } from '../../types/dataSplit';
+import type { PresetManagerProps, DataSplitPreset as _DataSplitPreset } from '../../types/dataSplit';
 
 const PresetManager: React.FC<PresetManagerProps> = ({
   presets,

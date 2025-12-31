@@ -23,7 +23,7 @@ import {
 import {
   CloudUpload,
   CheckCircle,
-  Error as ErrorIcon,
+  Error as _ErrorIcon,
   Info as InfoIcon,
   ExpandMore,
   ExpandLess,

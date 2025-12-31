@@ -48,7 +48,7 @@ export const validatePreprocessingStep = (
   }
 
   // Validate parameters
-  if (config && step.parameters) {
+  if (config && step.parameters && step.step_type) {
     const paramErrors = validateParameters(step.parameters, config.parameterSchema, step.step_type);
     Object.assign(errors, paramErrors.errors);
     errorList.push(...paramErrors.errorList);

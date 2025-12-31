@@ -45,7 +45,7 @@ import {
 } from '../../types/featureSelection';
 
 const FeatureSelector: React.FC<FeatureSelectorProps> = ({
-  datasetId,
+  // datasetId, // Unused
   columns,
   selectedFeatures,
   excludedColumns = [],

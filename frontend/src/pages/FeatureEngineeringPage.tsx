@@ -40,7 +40,7 @@ const FeatureEngineeringPage: React.FC = () => {
     }
   };
 
-  const handleRefreshImportance = () => {
+  const _handleRefreshImportance = () => {
     if (currentDataset?.id) {
       dispatch(fetchFeatureImportance(currentDataset.id));
     }
@@ -97,7 +97,7 @@ const FeatureEngineeringPage: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Correlation Matrix */}
-        <Grid item xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Card sx={{ border: '1px solid #e2e8f0' }}>
             <CardContent>
               <CorrelationMatrix
@@ -110,7 +110,7 @@ const FeatureEngineeringPage: React.FC = () => {
         </Grid>
 
         {/* Feature Importance */}
-        <Grid item xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Card sx={{ border: '1px solid #e2e8f0' }}>
             <CardContent>
               <FeatureImportance

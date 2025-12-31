@@ -48,6 +48,7 @@ export interface ModelRun {
   name: string;
   modelId: string;
   modelName: string;
+  modelType?: string; // Type of model (e.g., 'RandomForest', 'XGBoost')
   taskType: TaskType;
   datasetId: string;
   datasetName: string;
