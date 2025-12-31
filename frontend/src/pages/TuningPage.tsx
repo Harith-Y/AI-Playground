@@ -37,21 +37,9 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import TuningConfiguration from '../components/tuning/TuningConfiguration';
+import TuningProgress from '../components/tuning/TuningProgress';
 
 // Placeholder components (to be implemented in subsequent tasks)
-
-const TuningProgress = () => (
-  <Card>
-    <CardContent>
-      <Typography variant="h6" gutterBottom>
-        Tuning Progress
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        Real-time progress tracking and current trial information
-      </Typography>
-    </CardContent>
-  </Card>
-);
 
 const TuningResults = () => (
   <Card>
