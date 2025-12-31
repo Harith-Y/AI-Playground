@@ -17,10 +17,6 @@ import {
   Link,
   Card,
   CardContent,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Button,
   Chip,
   Divider,
@@ -37,11 +33,16 @@ import {
   Code as CodeIcon,
   Description as DescriptionIcon,
   Api as ApiIcon,
-  Download as DownloadIcon,
-  ContentCopy as ContentCopyIcon,
-  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import CodePreview from '../components/codegen/CodePreview';
+import DownloadOptions from '../components/codegen/DownloadOptions';
+import type { ZipOptions } from '../components/codegen/DownloadOptions';
+import {
+  generatePythonScript,
+  generateJupyterNotebook,
+  generateFastAPIService,
+} from '../utils/codeGenerators';
 
 // Types
 interface Dataset {
@@ -72,6 +73,7 @@ const CodeGenerationPage: React.FC = () => {
   const [includePreprocessing, setIncludePreprocessing] = useState(true);
   const [includeEvaluation, setIncludeEvaluation] = useState(true);
   const [includeVisualization, setIncludeVisualization] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState<Array<{ filename: string; content: string; language: string }>>([]);
 
   // Mock data
   const mockDatasets: Dataset[] = [
@@ -98,16 +100,72 @@ const CodeGenerationPage: React.FC = () => {
   };
 
   const handleGenerate = () => {
-    console.log('Generating code with:', {
-      dataset: selectedDataset,
-      experiment: selectedExperiment,
-      format: codeFormat,
-      options: {
-        includePreprocessing,
-        includeEvaluation,
-        includeVisualization,
-      },
-    });
+    if (!selectedDataset || !selectedExperiment) return;
+
+    const options = {
+      datasetName: selectedDataset.name,
+      modelName: selectedExperiment.name,
+      modelType: selectedExperiment.model_type,
+      includePreprocessing,
+      includeEvaluation,
+      includeVisualization,
+    };
+
+    let code: string;
+    let filename: string;
+    let language: string;
+
+    switch (codeFormat) {
+      case 'python':
+        code = generatePythonScript(options);
+        filename = 'model.py';
+        language = 'python';
+        break;
+      case 'notebook':
+        code = generateJupyterNotebook(options);
+        filename = 'model.ipynb';
+        language = 'json';
+        break;
+      case 'fastapi':
+        code = generateFastAPIService(options);
+        filename = 'main.py';
+        language = 'python';
+        break;
+      default:
+        return;
+    }
+
+    setGeneratedCode([{ filename, content: code, language }]);
+  };
+
+  const handleDownloadFile = (_filename: string) => {
+    if (generatedCode.length === 0) return;
+
+    const file = generatedCode[0];
+    const blob = new Blob([file.content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadZip = (options: ZipOptions) => {
+    if (!selectedDataset || !selectedExperiment || generatedCode.length === 0) return;
+
+    // In a real implementation, you would use JSZip or similar
+    console.log('Downloading ZIP with options:', options);
+    
+    // Mock ZIP download
+    alert(`ZIP package "${options.projectName}.zip" would be downloaded with:\n` +
+          `- Main code file\n` +
+          (options.includeRequirements ? '- requirements.txt\n' : '') +
+          (options.includeReadme ? '- README.md\n' : '') +
+          (options.includeDockerfile ? '- Dockerfile\n' : '') +
+          (options.includeTests ? '- test_model.py\n' : ''));
   };
 
   const canGenerate = selectedDataset && selectedExperiment;
@@ -407,120 +465,51 @@ const CodeGenerationPage: React.FC = () => {
                   <Chip icon={<ApiIcon />} label="FastAPI Services" />
                 </Box>
               </Paper>
-            ) : (
+            ) : generatedCode.length > 0 ? (
               <Card>
                 <CardContent>
                   <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                     <Typography variant="h6">
-                      Code Preview
+                      Generated Code
                     </Typography>
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        size="small"
-                        startIcon={<ContentCopyIcon />}
-                        variant="outlined"
-                      >
-                        Copy
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<DownloadIcon />}
-                        variant="outlined"
-                      >
-                        Download
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<RefreshIcon />}
-                        variant="outlined"
-                      >
-                        Regenerate
-                      </Button>
-                    </Stack>
+                    <DownloadOptions
+                      onDownloadFile={handleDownloadFile}
+                      onDownloadZip={handleDownloadZip}
+                      disabled={generatedCode.length === 0}
+                    />
                   </Box>
                   <Divider sx={{ mb: 2 }} />
 
-                  {/* Code Preview Placeholder */}
-                  <Paper
-                    sx={{
-                      p: 2,
-                      bgcolor: 'grey.900',
-                      color: 'grey.100',
-                      fontFamily: 'monospace',
-                      fontSize: '0.875rem',
-                      minHeight: 400,
-                      maxHeight: 600,
-                      overflow: 'auto',
-                    }}
-                  >
-                    <pre style={{ margin: 0 }}>
-{`# Generated Code Preview
-# Dataset: ${selectedDataset?.name}
-# Model: ${selectedExperiment?.name}
-# Format: ${codeFormat}
+                  <CodePreview files={generatedCode} />
 
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
-${includePreprocessing ? 'from sklearn.preprocessing import StandardScaler' : ''}
-${includeEvaluation ? 'from sklearn.metrics import accuracy_score, classification_report' : ''}
-${includeVisualization ? 'import matplotlib.pyplot as plt\nimport seaborn as sns' : ''}
-
-# Load and prepare data
-def load_data():
-    """Load the dataset"""
-    df = pd.read_csv('${selectedDataset?.name.toLowerCase().replace(/\\s+/g, '_')}.csv')
-    return df
-
-${includePreprocessing ? `
-# Preprocessing pipeline
-def preprocess_data(df):
-    """Apply preprocessing transformations"""
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(df)
-    return X_scaled, scaler
-` : ''}
-
-# Model training
-def train_model(X_train, y_train):
-    """Train the ${selectedExperiment?.name} model"""
-    # Model implementation here
-    pass
-
-${includeEvaluation ? `
-# Model evaluation
-def evaluate_model(model, X_test, y_test):
-    """Evaluate model performance"""
-    predictions = model.predict(X_test)
-    accuracy = accuracy_score(y_test, predictions)
-    print(f"Accuracy: {accuracy:.4f}")
-    return accuracy
-` : ''}
-
-${includeVisualization ? `
-# Visualization
-def plot_results(y_true, y_pred):
-    """Visualize model results"""
-    plt.figure(figsize=(10, 6))
-    # Visualization code here
-    plt.show()
-` : ''}
-
-if __name__ == "__main__":
-    # Main execution
-    data = load_data()
-    # Training and evaluation pipeline
-    print("Code generation complete!")
-`}
-                    </pre>
-                  </Paper>
-
-                  {/* Code Info */}
                   <Alert severity="success" sx={{ mt: 2 }}>
-                    Code generated successfully! Click "Download" to save the file or "Copy" to copy to clipboard.
+                    Code generated successfully! Use the download button above to save your files.
                   </Alert>
                 </CardContent>
               </Card>
+            ) : (
+              <Paper
+                sx={{
+                  p: 6,
+                  textAlign: 'center',
+                  bgcolor: 'background.default',
+                  border: '2px dashed',
+                  borderColor: 'divider',
+                  minHeight: 400,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                }}
+              >
+                <CodeIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2, mx: 'auto' }} />
+                <Typography variant="h6" gutterBottom>
+                  Click "Generate Code" to Start
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  Your generated code will appear here. You can then download it as a single file
+                  or as a complete project package.
+                </Typography>
+              </Paper>
             )}
           </Box>
         </Box>
