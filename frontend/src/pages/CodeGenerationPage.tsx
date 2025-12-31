@@ -33,10 +33,14 @@ import {
   Code as CodeIcon,
   Description as DescriptionIcon,
   Api as ApiIcon,
+  Share as ShareIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import CodePreview from '../components/codegen/CodePreview';
 import DownloadOptions from '../components/codegen/DownloadOptions';
+import ExperimentSummary from '../components/codegen/ExperimentSummary';
+import GenerationHistory from '../components/codegen/GenerationHistory';
+import ShareExperiment from '../components/codegen/ShareExperiment';
 import type { ZipOptions } from '../components/codegen/DownloadOptions';
 import {
   generatePythonScript,
@@ -74,6 +78,14 @@ const CodeGenerationPage: React.FC = () => {
   const [includeEvaluation, setIncludeEvaluation] = useState(true);
   const [includeVisualization, setIncludeVisualization] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<Array<{ filename: string; content: string; language: string }>>([]);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [generationHistory, setGenerationHistory] = useState<Array<{
+    id: string;
+    experimentName: string;
+    datasetName: string;
+    format: CodeFormat;
+    timestamp: string;
+  }>>([]);
 
   // Mock data
   const mockDatasets: Dataset[] = [
@@ -136,6 +148,16 @@ const CodeGenerationPage: React.FC = () => {
     }
 
     setGeneratedCode([{ filename, content: code, language }]);
+
+    // Add to history
+    const historyItem = {
+      id: Date.now().toString(),
+      experimentName: selectedExperiment.name,
+      datasetName: selectedDataset.name,
+      format: codeFormat,
+      timestamp: new Date().toISOString(),
+    };
+    setGenerationHistory(prev => [historyItem, ...prev].slice(0, 10)); // Keep last 10
   };
 
   const handleDownloadFile = (_filename: string) => {
@@ -166,6 +188,28 @@ const CodeGenerationPage: React.FC = () => {
           (options.includeReadme ? '- README.md\n' : '') +
           (options.includeDockerfile ? '- Dockerfile\n' : '') +
           (options.includeTests ? '- test_model.py\n' : ''));
+  };
+
+  const handleHistorySelect = (item: typeof generationHistory[0]) => {
+    // Find and select the dataset and experiment
+    const dataset = mockDatasets.find(d => d.name === item.datasetName);
+    const experiment = mockExperiments.find(e => e.name === item.experimentName);
+    
+    if (dataset && experiment) {
+      setSelectedDataset(dataset);
+      setSelectedExperiment(experiment);
+      setCodeFormat(item.format);
+      // Regenerate code
+      setTimeout(() => handleGenerate(), 100);
+    }
+  };
+
+  const handleHistoryDelete = (id: string) => {
+    setGenerationHistory(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleHistoryClear = () => {
+    setGenerationHistory([]);
   };
 
   const canGenerate = selectedDataset && selectedExperiment;
@@ -396,42 +440,39 @@ const CodeGenerationPage: React.FC = () => {
 
             {/* Selection Summary */}
             {canGenerate && (
-              <Card sx={{ mt: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Selection Summary
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Stack spacing={1}>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Dataset:
-                      </Typography>
-                      <Typography variant="body2" fontWeight="medium">
-                        {selectedDataset?.name}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Experiment:
-                      </Typography>
-                      <Typography variant="body2" fontWeight="medium">
-                        {selectedExperiment?.name}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Format:
-                      </Typography>
-                      <Typography variant="body2" fontWeight="medium">
-                        {codeFormat === 'python' && 'Python Script (.py)'}
-                        {codeFormat === 'notebook' && 'Jupyter Notebook (.ipynb)'}
-                        {codeFormat === 'fastapi' && 'FastAPI Service'}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
+              <>
+                <ExperimentSummary
+                  experimentName={selectedExperiment.name}
+                  datasetName={selectedDataset.name}
+                  modelType={selectedExperiment.model_type}
+                  score={selectedExperiment.score}
+                  createdAt={selectedExperiment.created_at}
+                />
+
+                <Box mt={2}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ShareIcon />}
+                    onClick={() => setShareDialogOpen(true)}
+                    fullWidth
+                  >
+                    Share Experiment
+                  </Button>
+                </Box>
+              </>
+            )}
+
+            {/* Generation History */}
+            {generationHistory.length > 0 && (
+              <Box mt={2}>
+                <GenerationHistory
+                  history={generationHistory}
+                  onSelect={handleHistorySelect}
+                  onDownload={(item) => console.log('Download:', item)}
+                  onDelete={handleHistoryDelete}
+                  onClear={handleHistoryClear}
+                />
+              </Box>
             )}
           </Box>
 
@@ -549,6 +590,16 @@ const CodeGenerationPage: React.FC = () => {
             </Box>
           </Stack>
         </Paper>
+
+        {/* Share Dialog */}
+        {selectedExperiment && (
+          <ShareExperiment
+            open={shareDialogOpen}
+            onClose={() => setShareDialogOpen(false)}
+            experimentName={selectedExperiment.name}
+            experimentId={selectedExperiment.id}
+          />
+        )}
       </Container>
     </Box>
   );
