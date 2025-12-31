@@ -39,6 +39,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import TuningConfiguration from '../components/tuning/TuningConfiguration';
 import TuningProgress from '../components/tuning/TuningProgress';
 import TuningResults from '../components/tuning/TuningResults';
+import TuningErrorBoundary from '../components/tuning/TuningErrorBoundary';
+import TuningLoadingOverlay from '../components/tuning/TuningLoadingOverlay';
+import TuningStatusMessage from '../components/tuning/TuningStatusMessage';
+import TuningCancelDialog from '../components/tuning/TuningCancelDialog';
+import TuningTimeoutWarning from '../components/tuning/TuningTimeoutWarning';
 import { useTuning } from '../hooks/useTuning';
 import type { TuningConfig } from '../services/tuningService';
 
@@ -54,6 +59,8 @@ const TuningPage: React.FC = () => {
   const [tuningConfig, setTuningConfig] = useState<TuningConfig | null>(null);
   const [snackbarMessage, setSnackbarMessage] = useState<string>('');
   const [showSnackbar, setShowSnackbar] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
 
   // Tuning hook
   const {
@@ -63,6 +70,7 @@ const TuningPage: React.FC = () => {
     isLoading,
     error,
     start,
+    stop,
     applyConfig,
     exportResults,
     refresh,
@@ -145,6 +153,42 @@ const TuningPage: React.FC = () => {
     }
   }, [exportResults]);
 
+  // Handle cancel tuning
+  const handleCancelClick = useCallback(() => {
+    setShowCancelDialog(true);
+  }, []);
+
+  const handleCancelConfirm = useCallback(async (saveResults: boolean) => {
+    setShowLoadingOverlay(true);
+    try {
+      await stop();
+      setSnackbarMessage(saveResults ? 'Tuning cancelled. Results saved.' : 'Tuning cancelled.');
+      setShowSnackbar(true);
+      if (saveResults && results) {
+        setActiveStep(2);
+      } else {
+        setActiveStep(0);
+      }
+    } catch (err) {
+      // Error handled by hook
+    } finally {
+      setShowLoadingOverlay(false);
+    }
+  }, [stop, results]);
+
+  // Handle retry after failure
+  const handleRetry = useCallback(() => {
+    clearError();
+    setActiveStep(0);
+  }, [clearError]);
+
+  // Handle reset from error boundary
+  const handleErrorReset = useCallback(() => {
+    clearError();
+    setActiveStep(0);
+    navigate('/tuning');
+  }, [clearError, navigate]);
+
   // Handle status change from progress component
   const handleStatusChange = useCallback((status: string) => {
     if (status === 'completed') {
@@ -185,9 +229,45 @@ const TuningPage: React.FC = () => {
   };
   
   return (
-    <Box sx={{ flexGrow: 1, bgcolor: 'background.default', minHeight: '100vh', py: 3 }}>
-      <Container maxWidth="xl">
-        {/* Header Section */}
+    <TuningErrorBoundary onReset={handleErrorReset}>
+      {/* Loading Overlay */}
+      {showLoadingOverlay && (
+        <TuningLoadingOverlay
+          message="Cancelling tuning..."
+          onCancel={() => setShowLoadingOverlay(false)}
+        />
+      )}
+
+      {/* Cancel Dialog */}
+      <TuningCancelDialog
+        open={showCancelDialog}
+        onClose={() => setShowCancelDialog(false)}
+        onConfirm={handleCancelConfirm}
+        currentTrial={progress?.current_trial}
+        totalTrials={progress?.total_trials}
+      />
+
+      <Box sx={{ flexGrow: 1, bgcolor: 'background.default', minHeight: '100vh', py: 3 }}>
+        <Container maxWidth="xl">
+          {/* Status Message */}
+          {tuningStatus !== 'idle' && (
+            <TuningStatusMessage
+              status={tuningStatus as any}
+              onRetry={handleRetry}
+              showProgress={tuningStatus === 'running'}
+            />
+          )}
+
+          {/* Timeout Warning */}
+          {progress && tuningStatus === 'running' && (
+            <TuningTimeoutWarning
+              elapsedTime={progress.elapsed_time}
+              estimatedTime={progress.estimated_time_remaining + progress.elapsed_time}
+              onCancel={handleCancelClick}
+            />
+          )}
+
+          {/* Header Section */}
         <Box sx={{ mb: 3 }}>
           {/* Breadcrumbs */}
           <Breadcrumbs
@@ -473,6 +553,7 @@ const TuningPage: React.FC = () => {
         />
       </Container>
     </Box>
+    </TuningErrorBoundary>
   );
 };
 
