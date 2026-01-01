@@ -1,0 +1,100 @@
+# ====================================
+# AI Playground - Backup Service
+# ====================================
+#
+# This Docker Compose file adds an automated backup service
+# that runs on a schedule using cron
+#
+# Usage:
+#   # Start with backup service
+#   docker-compose -f docker-compose.yml -f docker-compose.backup.yml up -d
+#
+#   # Manual backup
+#   docker-compose -f docker-compose.backup.yml run --rm backup
+#
+# ====================================
+
+services:
+  # Automated Backup Service
+  backup:
+    image: alpine:3.18
+    container_name: aiplayground-backup
+    restart: unless-stopped
+    volumes:
+      # Mount backup scripts
+      - ./scripts/backup:/backup-scripts:ro
+
+      # Mount backup destination
+      - ./backups:/backups
+
+      # Mount Docker socket for volume backup
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # Mount environment files
+      - ./.env.docker:/app/.env.docker:ro
+      - ./.env.docker.production:/app/.env.docker.production:ro
+
+    environment:
+      # Backup configuration
+      BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-0 2 * * *}  # Daily at 2 AM
+      BACKUP_ENVIRONMENT: ${BACKUP_ENVIRONMENT:-production}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_COMPRESS: ${BACKUP_COMPRESS:-true}
+
+      # Database connection (from main env)
+      DATABASE_URL: ${DATABASE_URL}
+
+      # Cloud backup settings (optional)
+      ENABLE_CLOUD_BACKUP: ${ENABLE_CLOUD_BACKUP:-false}
+      CLOUD_PROVIDER: ${CLOUD_PROVIDER:-s3}
+      CLOUD_BUCKET: ${CLOUD_BUCKET}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+
+      # R2 settings (if using Cloudflare R2)
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+
+      # Notification settings
+      ENABLE_EMAIL_NOTIFICATIONS: ${ENABLE_EMAIL_NOTIFICATIONS:-false}
+      EMAIL_TO: ${EMAIL_TO}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+
+    command: >
+      sh -c "
+        apk add --no-cache bash postgresql-client docker-cli aws-cli dcron &&
+        echo 'Installing cron job...' &&
+        echo '$${BACKUP_SCHEDULE} cd /backup-scripts && ./backup-cron.sh' > /etc/crontabs/root &&
+        echo 'Starting cron daemon...' &&
+        crond -f -l 2
+      "
+
+    networks:
+      - aiplayground-network
+
+    depends_on:
+      - backend
+
+  # Backup Verification Service (optional)
+  backup-verify:
+    image: alpine:3.18
+    container_name: aiplayground-backup-verify
+    profiles:
+      - verify
+    volumes:
+      - ./backups:/backups:ro
+      - ./scripts/backup:/scripts:ro
+    command: >
+      sh -c "
+        apk add --no-cache bash postgresql-client &&
+        echo 'Running backup verification...' &&
+        /scripts/verify-backup.sh /backups/latest
+      "
+    networks:
+      - aiplayground-network
+
+networks:
+  aiplayground-network:
+    external: true

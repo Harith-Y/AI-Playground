@@ -52,6 +52,14 @@ Thumbs.db
 logs/
 *.log.*
 
+# Backups
+backups/
+*.sql
+*.sql.gz
+*.tar.gz.enc
+*_backup_*
+.aiplayground-backup-key
+
 # Uploads and data
 uploads/
 test_uploads/
