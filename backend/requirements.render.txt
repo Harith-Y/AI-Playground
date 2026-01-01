@@ -40,6 +40,7 @@ passlib==1.7.4
 bcrypt==5.0.0
 python-jose==3.5.0
 python-multipart==0.0.21
+email-validator==2.1.0
 
 # Utilities
 python-dotenv==1.2.1
