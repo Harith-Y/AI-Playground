@@ -1,14 +1,16 @@
 # Dataset upload, preview, stats endpoints
 
 import os
-import uuid
+import uuid as uuid_lib
 import pandas as pd
 from pathlib import Path
 from typing import List
+from uuid import UUID
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.security import get_current_user_id, verify_resource_ownership
 from app.db.session import get_db
 from app.models.dataset import Dataset
 from app.schemas.dataset import (
@@ -19,11 +21,6 @@ from app.schemas.dataset import (
 )
 
 router = APIRouter()
-
-# Mock authentication - replace with actual auth later
-def get_current_user_id() -> str:
-    """Mock function to get current user ID. Replace with actual auth."""
-    return "00000000-0000-0000-0000-000000000001"
 
 
 @router.post(
@@ -84,7 +81,7 @@ def get_current_user_id() -> str:
 async def upload_dataset(
     file: UploadFile = File(..., description="Dataset file to upload (CSV, XLSX, XLS, or JSON format)"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: UUID = Depends(get_current_user_id)
 ):
     """
     Upload a dataset file and extract metadata.
@@ -220,7 +217,7 @@ async def upload_dataset(
 )
 async def list_datasets(
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id),
+    user_id: UUID = Depends(get_current_user_id),
     skip: int = 0,
     limit: int = 100
 ):
@@ -279,7 +276,7 @@ async def list_datasets(
 async def get_dataset(
     dataset_id: str,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: UUID = Depends(get_current_user_id)
 ):
     """
     Get detailed information about a specific dataset.
@@ -289,18 +286,19 @@ async def get_dataset(
 
     **Returns:**
     - Complete dataset metadata including file path, dimensions, data types, and missing values
-    - Returns 404 if dataset not found or doesn't belong to the authenticated user
+    - Returns 404 if dataset not found
+    - Returns 403 if user doesn't own the dataset (unless admin)
     """
-    dataset = db.query(Dataset).filter(
-        Dataset.id == dataset_id,
-        Dataset.user_id == user_id
-    ).first()
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
 
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset {dataset_id} not found"
         )
+
+    # Verify ownership (allows admins to access any dataset)
+    verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
     return dataset
 
@@ -327,7 +325,7 @@ async def get_dataset(
 async def delete_dataset(
     dataset_id: str,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: UUID = Depends(get_current_user_id)
 ):
     """
     Delete a dataset and remove its file from storage.
@@ -342,18 +340,19 @@ async def delete_dataset(
 
     **Returns:**
     - 204 No Content on successful deletion
-    - 404 if dataset not found or doesn't belong to the authenticated user
+    - 404 if dataset not found
+    - 403 if user doesn't own the dataset (unless admin)
     """
-    dataset = db.query(Dataset).filter(
-        Dataset.id == dataset_id,
-        Dataset.user_id == user_id
-    ).first()
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
 
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset {dataset_id} not found"
         )
+
+    # Verify ownership (allows admins to delete any dataset)
+    verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
     # Delete file from storage
     try:
@@ -435,7 +434,7 @@ async def delete_dataset(
 async def get_dataset_preview(
     dataset_id: str,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id),
+    user_id: UUID = Depends(get_current_user_id),
     rows: int = 10
 ):
     """
@@ -462,16 +461,16 @@ async def get_dataset_preview(
     - **displayedRows**: Number of rows in preview (may be less than requested if dataset is smaller)
     """
     # Get dataset from database
-    dataset = db.query(Dataset).filter(
-        Dataset.id == dataset_id,
-        Dataset.user_id == user_id
-    ).first()
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
 
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset {dataset_id} not found"
         )
+
+    # Verify ownership (allows admins to access any dataset)
+    verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
     # Load file
     file_path = Path(dataset.file_path)
@@ -590,7 +589,7 @@ async def get_dataset_preview(
 async def get_dataset_stats(
     dataset_id: str,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: UUID = Depends(get_current_user_id)
 ):
     """
     Get comprehensive statistical summary of the dataset.
@@ -622,16 +621,16 @@ async def get_dataset_stats(
     - Dataset understanding before preprocessing
     """
     # Get dataset from database
-    dataset = db.query(Dataset).filter(
-        Dataset.id == dataset_id,
-        Dataset.user_id == user_id
-    ).first()
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
 
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset {dataset_id} not found"
         )
+
+    # Verify ownership (allows admins to access any dataset)
+    verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
     # Load file
     file_path = Path(dataset.file_path)

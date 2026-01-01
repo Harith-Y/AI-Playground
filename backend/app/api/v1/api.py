@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
+    auth,
     datasets,
     preprocessing,
     models,
@@ -13,6 +14,13 @@ from app.api.v1.endpoints import (
 )
 
 api_router = APIRouter()
+
+# Authentication endpoints (no auth required for these)
+api_router.include_router(
+    auth.router,
+    prefix="/auth",
+    tags=["authentication"]
+)
 
 api_router.include_router(
     datasets.router,
