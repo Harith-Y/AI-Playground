@@ -12,18 +12,38 @@ ml_engine/
 │   ├── encoder.py             # OneHot, Label, Ordinal encoders (449 lines)
 │   ├── imputer.py             # Mean, Median, Mode imputers (300 lines)
 │   ├── scaler.py              # Standard, MinMax, Robust scalers (464 lines)
-│   └── pipeline.py            # Pipeline orchestration (Placeholder)
+│   └── pipeline.py            # Pipeline orchestration (1044 lines) ✅
 ├── feature_selection/          # Feature engineering modules ✅
 │   ├── variance_threshold.py  # Variance-based selection (319 lines)
 │   ├── correlation_selector.py # Correlation-based selection (386 lines)
 │   └── mutual_information_selector.py  # MI selection (390 lines)
 ├── eda_statistics.py           # EDA analysis module ✅ (514 lines)
 ├── correlation_analysis.py     # Correlation matrices ✅ (535 lines)
-├── models/                     # ML models (Placeholder)
-├── training/                   # Training utilities (Placeholder)
-├── tuning/                     # Hyperparameter optimization (Placeholder)
-├── evaluation/                 # Model evaluation (Placeholder)
-└── code_generation/            # Code export (Placeholder)
+├── utils/                      # Utility modules ✅
+│   ├── column_type_detector.py # Column type detection (175 lines)
+│   └── serialization.py       # Model/pipeline serialization (281 lines) ✅
+├── models/                     # ML models ✅
+│   ├── base.py                # Base model wrappers (157 lines)
+│   ├── classification.py      # Classification models (109 lines)
+│   ├── regression.py          # Regression models (130 lines)
+│   ├── clustering.py          # Clustering models (55 lines)
+│   └── registry.py            # Model factory (24 lines)
+├── training/                   # Training utilities ✅
+│   └── trainer.py             # Generic training functions (149 lines)
+├── tuning/                     # Hyperparameter optimization ✅
+│   ├── grid_search.py         # Grid search (42 lines)
+│   ├── random_search.py       # Random search (42 lines)
+│   └── bayesian.py            # Bayesian optimization (62 lines)
+├── evaluation/                 # Model evaluation ✅
+│   ├── classification_metrics.py # Classification metrics (136 lines)
+│   ├── regression_metrics.py  # Regression metrics (174 lines)
+│   ├── clustering_metrics.py  # Clustering metrics (114 lines)
+│   └── feature_importance.py  # Feature importance (119 lines)
+└── code_generation/            # Code export ✅
+    ├── preprocessing_generator.py # Preprocessing code (120 lines)
+    ├── training_generator.py  # Training code (83 lines)
+    ├── prediction_generator.py # Prediction code (140 lines)
+    └── evaluation_generator.py # Evaluation code (157 lines)
 ```
 
 ## ✅ Implemented Modules
@@ -512,19 +532,101 @@ All modules are compatible with:
 | eda_statistics.py | 514 | 10+ analysis methods |
 | correlation_analysis.py | 535 | 7 methods + 5 convenience functions |
 
+### Utility Modules
+
+| Module | Lines | Features |
+|--------|-------|----------|
+| serialization.py | 281 | Model/pipeline/workflow serialization ✅ |
+| column_type_detector.py | 175 | Automatic column type detection |
+
+---
+
+## 5. Model & Pipeline Serialization ✅
+
+### **ModelSerializer / PipelineSerializer / WorkflowSerializer** (serialization.py)
+
+Complete serialization utilities for saving and loading ML artifacts.
+
+```python
+from app.ml_engine.utils.serialization import (
+    save_model, load_model,
+    save_pipeline, load_pipeline,
+    save_workflow, load_workflow
+)
+
+# Save a trained model
+save_model(trained_model, 'models/my_model.pkl', compression=True)
+
+# Load the model
+model = load_model('models/my_model.pkl')
+predictions = model.predict(X_test)
+
+# Save a preprocessing pipeline
+save_pipeline(fitted_pipeline, 'pipelines/preprocessing.pkl')
+
+# Load the pipeline
+pipeline = load_pipeline('pipelines/preprocessing.pkl')
+X_transformed = pipeline.transform(X_test)
+
+# Save complete workflow (preprocessing + model)
+save_workflow(
+    pipeline=preprocessing_pipeline,
+    model=trained_model,
+    path='workflows/production.pkl',
+    workflow_name='CustomerChurn_v1'
+)
+
+# Load workflow
+pipeline, model = load_workflow('workflows/production.pkl')
+
+# Get info without loading
+from app.ml_engine.utils.serialization import get_model_info
+info = get_model_info('models/my_model.pkl')
+print(f"Model: {info['model_type']}, Features: {info['n_features']}")
+```
+
+**Features:**
+- Save/load models with all metadata
+- Save/load preprocessing pipelines
+- Save/load complete workflows (pipeline + model)
+- Compression support (gzip)
+- Version tracking and compatibility checks
+- Metadata preservation (training info, feature names, configs)
+- Overwrite protection
+- File integrity checking
+
+**Methods:**
+- `save_model(model, path, compression, metadata, overwrite)` - Save model
+- `load_model(path, verify_version)` - Load model
+- `save_pipeline(pipeline, path, ...)` - Save pipeline
+- `load_pipeline(path, ...)` - Load pipeline
+- `save_workflow(pipeline, model, path, ...)` - Save workflow
+- `load_workflow(path, ...)` - Load workflow
+- `get_model_info(path)` - Get model metadata
+- `get_pipeline_info(path)` - Get pipeline metadata
+- `get_workflow_info(path)` - Get workflow metadata
+
+**Documentation:**
+- **[Serialization Guide](utils/SERIALIZATION_GUIDE.md)** - Complete user guide with examples
+- **[Implementation Summary](utils/SERIALIZATION_README.md)** - Technical details
+
+---
+
 ## 🚧 Coming Soon
 
-- **Models** - Regression, classification, clustering
-- **Training** - Cross-validation, train/test split
-- **Tuning** - Grid search, random search, Bayesian optimization
-- **Evaluation** - Metrics, confusion matrix, ROC curves
-- **Code Generation** - Export pipelines as Python code
+- ~~**Models** - Regression, classification, clustering~~ ✅ DONE
+- ~~**Training** - Cross-validation, train/test split~~ ✅ DONE
+- ~~**Tuning** - Grid search, random search, Bayesian optimization~~ ✅ DONE
+- ~~**Evaluation** - Metrics, confusion matrix, ROC curves~~ ✅ DONE
+- ~~**Code Generation** - Export pipelines as Python code~~ ✅ DONE
+- ~~**Serialization** - Save/load models and pipelines~~ ✅ DONE
 
 ## 📖 Documentation
 
 - **[Main README](../../../../README.md)** - Project overview
 - **[Backend README](../../../README.md)** - Backend API docs
 - **[Correlation Analysis Guide](../../docs/CORRELATION_ANALYSIS_GUIDE.md)** - Detailed correlation docs
+- **[Serialization Guide](utils/SERIALIZATION_GUIDE.md)** - Model/pipeline serialization guide
 
 ## 📄 License
 
