@@ -5,18 +5,31 @@ from uuid import uuid4
 
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
+from app.core.api_docs import get_openapi_config, get_custom_openapi_schema, API_TAGS
 from app.utils.logger import get_logger, set_correlation_id
 from app.api.v1.api import api_router
 from app.monitoring.middleware import PerformanceMonitoringMiddleware
 
 
 def create_app() -> FastAPI:
+	# Get OpenAPI configuration
+	openapi_config = get_openapi_config()
+	
 	app = FastAPI(
-		title=settings.PROJECT_NAME,
-		version=settings.VERSION,
+		title=openapi_config["title"],
+		version=openapi_config["version"],
+		description=openapi_config["description"],
+		openapi_tags=openapi_config["openapi_tags"],
+		contact=openapi_config["contact"],
+		license_info=openapi_config["license_info"],
+		terms_of_service=openapi_config["terms_of_service"],
 		docs_url="/docs" if settings.DEBUG else None,
 		redoc_url="/redoc" if settings.DEBUG else None,
+		openapi_url="/openapi.json" if settings.DEBUG else None,
 	)
+	
+	# Set custom OpenAPI schema
+	app.openapi = lambda: get_custom_openapi_schema(app)
 
 	logger = get_logger("backend")
 
@@ -56,8 +69,35 @@ def create_app() -> FastAPI:
 	app.include_router(api_router, prefix="/api/v1")
 
 	# Basic health endpoint
-	@app.get("/health")
+	@app.get(
+		"/health",
+		tags=["health"],
+		summary="Health Check",
+		description="Check if the API is running and healthy",
+		responses={
+			200: {
+				"description": "API is healthy",
+				"content": {
+					"application/json": {
+						"example": {
+							"status": "ok",
+							"version": "1.0.0"
+						}
+					}
+				}
+			}
+		}
+	)
 	async def health():
+		"""
+		Health check endpoint.
+		
+		Returns the current status and version of the API.
+		Use this endpoint for:
+		- Monitoring and alerting
+		- Load balancer health checks
+		- Deployment verification
+		"""
 		return {"status": "ok", "version": settings.VERSION}
 
 	return app

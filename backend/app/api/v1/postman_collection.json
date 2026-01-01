@@ -1,0 +1,338 @@
+{
+  "info": {
+    "name": "AI-Playground API",
+    "description": "Complete API collection for AI-Playground machine learning platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dataset_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "run_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Datasets",
+      "item": [
+        {
+          "name": "Upload Dataset",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/datasets/upload",
+              "host": ["{{base_url}}"],
+              "path": ["datasets", "upload"]
+            },
+            "description": "Upload a dataset file (CSV, Excel, or JSON)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Dataset Preview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/datasets/{{dataset_id}}/preview?rows=10",
+              "host": ["{{base_url}}"],
+              "path": ["datasets", "{{dataset_id}}", "preview"],
+              "query": [
+                {
+                  "key": "rows",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Dataset Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/datasets/{{dataset_id}}/stats",
+              "host": ["{{base_url}}"],
+              "path": ["datasets", "{{dataset_id}}", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Dataset",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/datasets/{{dataset_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["datasets", "{{dataset_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Preprocessing",
+      "item": [
+        {
+          "name": "Create Preprocessing Step",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataset_id\": \"{{dataset_id}}\",\n  \"step_type\": \"imputation\",\n  \"parameters\": {\n    \"strategy\": \"mean\"\n  },\n  \"column_name\": \"age\",\n  \"order\": 0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/preprocessing/steps",
+              "host": ["{{base_url}}"],
+              "path": ["preprocessing", "steps"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Preprocessing Steps",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/preprocessing/steps?dataset_id={{dataset_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["preprocessing", "steps"],
+              "query": [
+                {
+                  "key": "dataset_id",
+                  "value": "{{dataset_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Apply Preprocessing",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataset_id\": \"{{dataset_id}}\",\n  \"save_result\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/preprocessing/apply",
+              "host": ["{{base_url}}"],
+              "path": ["preprocessing", "apply"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Models",
+      "item": [
+        {
+          "name": "Train Model",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataset_id\": \"{{dataset_id}}\",\n  \"model_type\": \"random_forest\",\n  \"hyperparameters\": {\n    \"n_estimators\": 100,\n    \"max_depth\": 10,\n    \"random_state\": 42\n  },\n  \"train_split\": 0.8,\n  \"validation_split\": 0.1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/models/train",
+              "host": ["{{base_url}}"],
+              "path": ["models", "train"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Training Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/models/runs/{{run_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["models", "runs", "{{run_id}}", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Training Results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/models/runs/{{run_id}}/results",
+              "host": ["{{base_url}}"],
+              "path": ["models", "runs", "{{run_id}}", "results"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Code Generation",
+      "item": [
+        {
+          "name": "Generate Python Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"experiment_id\": \"{{dataset_id}}\",\n  \"include_preprocessing\": true,\n  \"include_training\": true,\n  \"include_evaluation\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/code-generation/python",
+              "host": ["{{base_url}}"],
+              "path": ["code-generation", "python"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Jupyter Notebook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"experiment_id\": \"{{dataset_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/code-generation/notebook",
+              "host": ["{{base_url}}"],
+              "path": ["code-generation", "notebook"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Experiments",
+      "item": [
+        {
+          "name": "Get Experiment Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/experiments/{{dataset_id}}/config?include_results=true",
+              "host": ["{{base_url}}"],
+              "path": ["experiments", "{{dataset_id}}", "config"],
+              "query": [
+                {
+                  "key": "include_results",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Export Experiment Package",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/experiments/{{dataset_id}}/export",
+              "host": ["{{base_url}}"],
+              "path": ["experiments", "{{dataset_id}}", "export"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/health",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["health"]
+        }
+      },
+      "response": []
+    }
+  ]
+}
