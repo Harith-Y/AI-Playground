@@ -1,0 +1,186 @@
+# ====================================
+# AI Playground - Logging Stack
+# ====================================
+#
+# This Docker Compose file adds comprehensive logging infrastructure:
+# - Fluentd for log aggregation
+# - Elasticsearch for log storage
+# - Kibana for log visualization
+# - Grafana Loki (alternative)
+# - Promtail (Loki agent)
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.logging.yml up -d
+#
+# Access:
+#   Kibana: http://localhost:5601
+#   Grafana: http://localhost:3000
+# ====================================
+
+services:
+  # Fluentd - Log aggregation
+  fluentd:
+    image: fluent/fluentd:v1.16-1
+    container_name: aiplayground-fluentd
+    restart: unless-stopped
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./docker/logging/fluent.conf:/fluentd/etc/fluent.conf:ro
+      - ./logs:/var/log/aiplayground
+      - fluentd_buffer:/var/log/fluentd/buffer
+    environment:
+      ELASTICSEARCH_HOST: ${ELASTICSEARCH_HOST:-elasticsearch}
+      ELASTICSEARCH_PORT: ${ELASTICSEARCH_PORT:-9200}
+      LOKI_URL: ${LOKI_URL:-http://loki:3100}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_LOG_BUCKET: ${S3_LOG_BUCKET}
+    networks:
+      - aiplayground-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Elasticsearch - Log storage
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: aiplayground-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - aiplayground-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Kibana - Log visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: aiplayground-kibana
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - aiplayground-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Grafana Loki - Alternative log storage
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: aiplayground-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./docker/logging/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - aiplayground-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Promtail - Loki log collector
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: aiplayground-promtail
+    restart: unless-stopped
+    volumes:
+      - ./docker/logging/promtail-config.yml:/etc/promtail/config.yml:ro
+      - ./logs:/var/log/aiplayground:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - aiplayground-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Grafana - Visualization & dashboards
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: aiplayground-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/logging/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./docker/logging/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+    depends_on:
+      - loki
+      - elasticsearch
+    networks:
+      - aiplayground-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Volumes
+volumes:
+  elasticsearch_data:
+    driver: local
+  loki_data:
+    driver: local
+  grafana_data:
+    driver: local
+  fluentd_buffer:
+    driver: local
+
+# Networks
+networks:
+  aiplayground-network:
+    external: true

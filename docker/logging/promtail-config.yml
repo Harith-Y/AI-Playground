@@ -1,0 +1,100 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Application logs
+  - job_name: application
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: aiplayground
+          app: backend
+          __path__: /var/log/aiplayground/application.log
+
+  # Error logs
+  - job_name: error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: aiplayground
+          app: backend
+          level: error
+          __path__: /var/log/aiplayground/error.log
+
+  # Access logs
+  - job_name: access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: aiplayground
+          app: backend
+          type: access
+          __path__: /var/log/aiplayground/access.log
+
+  # Security logs
+  - job_name: security
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: aiplayground
+          app: backend
+          type: security
+          __path__: /var/log/aiplayground/security.log
+
+  # Performance logs
+  - job_name: performance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: aiplayground
+          app: backend
+          type: performance
+          __path__: /var/log/aiplayground/performance.log
+
+  # Celery logs
+  - job_name: celery
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: aiplayground
+          app: celery
+          __path__: /var/log/aiplayground/celery.log
+
+  # Preprocessing logs
+  - job_name: preprocessing
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: aiplayground
+          app: preprocessing
+          __path__: /var/log/aiplayground/preprocessing.log
+
+  # Docker container logs
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'project'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
