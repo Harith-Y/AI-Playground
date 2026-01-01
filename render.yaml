@@ -46,6 +46,12 @@ services:
       - key: MAX_TRAINING_TIME_SECONDS
         value: 60
       
+      # Task Processing (No Celery on free tier)
+      - key: USE_CELERY
+        value: false
+      - key: USE_BACKGROUND_TASKS
+        value: true
+      
       # Security
       - key: SECRET_KEY
         generateValue: true
