@@ -1,7 +1,11 @@
-# Multi-stage build for Python backend - Optimized for Render Free Tier
+# Multi-stage build for Python backend - Optimized for production
+# Build argument to select requirements file
+ARG REQUIREMENTS_FILE=requirements.render.txt
 
 # Stage 1: Base image with dependencies
 FROM python:3.11-slim as base
+
+ARG REQUIREMENTS_FILE
 
 # Set environment variables for memory optimization
 ENV PYTHONUNBUFFERED=1 \
@@ -16,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     curl \
+    libpq-dev \
     libpq5 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -23,8 +28,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements file (use optimized version for Render)
-COPY requirements.render.txt requirements.txt
+# Copy requirements file (allows switching between full/render requirements)
+COPY ${REQUIREMENTS_FILE} requirements.txt
 
 # Install Python dependencies with memory optimization
 RUN pip install --upgrade pip && \

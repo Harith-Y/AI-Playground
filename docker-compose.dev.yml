@@ -1,0 +1,218 @@
+# Development Docker Compose Configuration
+# Includes PostgreSQL database and all services with hot reload
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: aiplayground-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aiplayground
+      POSTGRES_PASSWORD: aiplayground_dev_password
+      POSTGRES_DB: aiplayground
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiplayground"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aiplayground-network
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: aiplayground-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aiplayground-network
+
+  # FastAPI Backend (Development)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: aiplayground-backend-dev
+    restart: unless-stopped
+    environment:
+      # Database
+      DATABASE_URL: postgresql://aiplayground:aiplayground_dev_password@postgres:5432/aiplayground
+
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+
+      # Celery
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+
+      # API Settings
+      API_V1_PREFIX: /api/v1
+      PROJECT_NAME: AI-Playground
+      VERSION: 1.0.0
+
+      # Security
+      SECRET_KEY: dev-secret-key-change-in-production
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+
+      # File Storage
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE: 104857600
+
+      # Environment
+      ENVIRONMENT: development
+      DEBUG: "True"
+
+      # Logging
+      LOG_LEVEL: DEBUG
+      LOG_DIR: /app/logs
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount source code for hot reload
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini
+      # Persistent volumes for data
+      - backend_uploads_dev:/app/uploads
+      - backend_logs_dev:/app/logs
+      - backend_data_dev:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - aiplayground-network
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        sleep 5 &&
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting FastAPI server with hot reload...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+      "
+
+  # Celery Worker (Development)
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: aiplayground-celery-worker-dev
+    restart: unless-stopped
+    environment:
+      # Database
+      DATABASE_URL: postgresql://aiplayground:aiplayground_dev_password@postgres:5432/aiplayground
+
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+
+      # Celery
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+
+      # API Settings
+      PROJECT_NAME: AI-Playground
+      VERSION: 1.0.0
+
+      # Environment
+      ENVIRONMENT: development
+      DEBUG: "True"
+
+      # Logging
+      LOG_LEVEL: DEBUG
+      LOG_DIR: /app/logs
+    volumes:
+      - ./backend/app:/app/app
+      - backend_uploads_dev:/app/uploads
+      - backend_logs_dev:/app/logs
+      - backend_data_dev:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - aiplayground-network
+    command: celery -A celery_worker.celery_app worker --loglevel=debug --concurrency=2
+
+  # Flower - Celery monitoring (Development)
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: aiplayground-flower-dev
+    restart: unless-stopped
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery-worker
+    networks:
+      - aiplayground-network
+    command: celery -A celery_worker.celery_app flower --port=5555
+
+  # pgAdmin - Database Management Tool (Optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: aiplayground-pgadmin-dev
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@aiplayground.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data_dev:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - aiplayground-network
+
+# Named Volumes for Development
+volumes:
+  postgres_data_dev:
+    driver: local
+  redis_data_dev:
+    driver: local
+  backend_uploads_dev:
+    driver: local
+  backend_logs_dev:
+    driver: local
+  backend_data_dev:
+    driver: local
+  pgadmin_data_dev:
+    driver: local
+
+# Networks
+networks:
+  aiplayground-network:
+    driver: bridge
