@@ -17,12 +17,13 @@ build/
 # Environment files with secrets
 .env
 .env.local
+.env.production
 *.env.local
 
 # But allow template files
 !.env.example
+!.env.production.example
 !.env.development
-!.env.production
 !.env.test
 !.env.docker
 !.env.docker.production
@@ -71,3 +72,29 @@ frontend/build/
 *.tmp
 *.temp
 .cache/
+
+# Auto-generated code examples (from code generation examples)
+backend/generated_code/
+backend/generated_*.py
+backend/*_preprocessing.py
+backend/*_training.py
+backend/*_evaluation.py
+backend/*_prediction.py
+backend/*_microservice.py
+backend/preprocess_*.py
+backend/train_*.py
+backend/evaluate_*.py
+backend/predict_*.py
+backend/preprocessing_*.py
+backend/training_*.py
+backend/regression_*.py
+backend/clustering_*.py
+backend/titanic_*.py
+backend/churn_*.py
+backend/inference_*.py
+backend/prediction_*.py
+backend/ml_pipeline_modules/
+
+docs/
+frontend/docs/
+backend/docs/
