@@ -3,7 +3,8 @@ API endpoints for preprocessing pipeline management.
 
 Provides CRUD operations and workflow management for preprocessing pipelines.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Optional
@@ -11,6 +12,10 @@ from uuid import UUID
 import pandas as pd
 import time
 from pathlib import Path
+import zipfile
+import tempfile
+import os
+from datetime import datetime
 
 from app.db.session import get_db
 from app.models.preprocessing_pipeline import PreprocessingPipeline
@@ -49,6 +54,53 @@ from app.utils.logger import get_logger
 
 logger = get_logger("pipeline_api")
 router = APIRouter()
+
+
+# Helper functions for file cleanup
+
+def cleanup_old_export_files(export_dir: Path, max_age_hours: int = 24):
+    """
+    Clean up old export files to prevent disk space issues.
+
+    Args:
+        export_dir: Directory containing export files
+        max_age_hours: Maximum age of files in hours before deletion
+    """
+    try:
+        if not export_dir.exists():
+            return
+
+        current_time = time.time()
+        max_age_seconds = max_age_hours * 3600
+
+        for file_path in export_dir.glob("*.zip"):
+            file_age = current_time - file_path.stat().st_mtime
+            if file_age > max_age_seconds:
+                try:
+                    file_path.unlink()
+                    logger.info(f"Cleaned up old export file: {file_path.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete old export file {file_path.name}: {str(e)}")
+
+    except Exception as e:
+        logger.error(f"Error during export file cleanup: {str(e)}")
+
+
+def delete_file_after_delay(file_path: Path, delay_seconds: int = 300):
+    """
+    Delete a file after a specified delay (background task).
+
+    Args:
+        file_path: Path to file to delete
+        delay_seconds: Delay before deletion in seconds (default: 5 minutes)
+    """
+    try:
+        time.sleep(delay_seconds)
+        if file_path.exists():
+            file_path.unlink()
+            logger.info(f"Deleted export file after download: {file_path.name}")
+    except Exception as e:
+        logger.warning(f"Failed to delete file {file_path}: {str(e)}")
 
 
 # Dependency to get current user (placeholder - implement based on your auth)
@@ -565,6 +617,281 @@ def export_pipeline_code(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to export pipeline: {str(e)}",
+        )
+
+
+@router.post("/{pipeline_id}/export-code-zip")
+def export_pipeline_code_as_zip(
+    pipeline_id: UUID,
+    request: PipelineExportCodeRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Export pipeline as executable Python code in a ZIP file.
+
+    Creates a ZIP archive containing:
+    - pipeline.py: The main pipeline code
+    - requirements.txt: Python dependencies
+    - README.md: Usage instructions
+    - config.json: Pipeline configuration (optional)
+    """
+    db_pipeline = db.query(PreprocessingPipeline).filter(
+        PreprocessingPipeline.id == pipeline_id,
+        PreprocessingPipeline.user_id == current_user.id,
+    ).first()
+
+    if not db_pipeline:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pipeline {pipeline_id} not found",
+        )
+
+    try:
+        pipeline = _pipeline_from_db(db_pipeline, db)
+
+        # Generate code based on format
+        if request.format == "sklearn":
+            code = export_pipeline_to_sklearn_code(
+                pipeline,
+                include_imports=request.include_imports,
+                include_comments=request.include_comments,
+            )
+        elif request.format == "standalone":
+            code = export_pipeline_to_standalone_code(
+                pipeline,
+                include_imports=request.include_imports,
+                include_comments=request.include_comments,
+            )
+        else:
+            raise ValueError(f"Unknown export format: {request.format}")
+
+        # Create export directory
+        export_dir = Path("data/exports/code")
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate ZIP filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_name = db_pipeline.name.replace(" ", "_").replace("/", "_")
+        zip_filename = f"{safe_name}_{pipeline_id}_{timestamp}.zip"
+        zip_path = export_dir / zip_filename
+
+        # Create ZIP file
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Add main pipeline code
+            zipf.writestr("pipeline.py", code)
+
+            # Add requirements.txt
+            if request.format == "sklearn":
+                requirements = [
+                    "pandas>=1.3.0",
+                    "numpy>=1.21.0",
+                    "scikit-learn>=1.0.0",
+                ]
+            else:
+                requirements = [
+                    "pandas>=1.3.0",
+                    "numpy>=1.21.0",
+                ]
+            zipf.writestr("requirements.txt", "\n".join(requirements))
+
+            # Add README.md
+            readme_content = f"""# {db_pipeline.name}
+
+## Description
+{db_pipeline.description or 'Exported preprocessing pipeline'}
+
+## Pipeline Information
+- **Format**: {request.format}
+- **Number of Steps**: {len(pipeline.steps)}
+- **Fitted**: {'Yes' if pipeline.fitted else 'No'}
+- **Export Date**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+## Steps
+{chr(10).join(f"{i+1}. {step.name} ({step.__class__.__name__})" for i, step in enumerate(pipeline.steps))}
+
+## Installation
+
+Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+```python
+from pipeline import pipeline
+
+# Fit the pipeline (if not already fitted)
+pipeline.fit(X_train, y_train)
+
+# Transform data
+X_transformed = pipeline.transform(X_test)
+
+# Or fit and transform in one step
+X_train_transformed = pipeline.fit_transform(X_train, y_train)
+```
+
+## Notes
+- This pipeline was exported from AI-Playground
+- Generated on {datetime.now().strftime("%Y-%m-%d at %H:%M:%S")}
+"""
+            zipf.writestr("README.md", readme_content)
+
+            # Add config.json (pipeline configuration)
+            import json
+            config = pipeline.to_dict()
+            zipf.writestr("config.json", json.dumps(config, indent=2, default=str))
+
+        logger.info(f"Exported pipeline {pipeline_id} as ZIP to {zip_path}")
+
+        # Clean up old export files in the background
+        background_tasks.add_task(cleanup_old_export_files, export_dir, max_age_hours=24)
+
+        return {
+            "success": True,
+            "message": "Pipeline code exported as ZIP successfully",
+            "filename": zip_filename,
+            "download_url": f"/api/v1/preprocessing/{pipeline_id}/download-code-zip/{zip_filename}",
+            "file_size": zip_path.stat().st_size,
+        }
+
+    except Exception as e:
+        logger.error(f"Error exporting pipeline code as ZIP: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export pipeline as ZIP: {str(e)}",
+        )
+
+
+@router.get("/{pipeline_id}/download-code-zip/{filename}")
+def download_pipeline_code_zip(
+    pipeline_id: UUID,
+    filename: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Download a previously exported pipeline code ZIP file.
+
+    The ZIP file is automatically cleaned up 5 minutes after download.
+    """
+    # Verify pipeline ownership
+    db_pipeline = db.query(PreprocessingPipeline).filter(
+        PreprocessingPipeline.id == pipeline_id,
+        PreprocessingPipeline.user_id == current_user.id,
+    ).first()
+
+    if not db_pipeline:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pipeline {pipeline_id} not found",
+        )
+
+    # Construct file path
+    export_dir = Path("data/exports/code")
+    file_path = export_dir / filename
+
+    # Verify file exists and belongs to this pipeline
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Export file not found: {filename}",
+        )
+
+    # Verify filename contains pipeline_id for security
+    if str(pipeline_id) not in filename:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized access to export file",
+        )
+
+    try:
+        # Schedule file cleanup after 5 minutes (enough time for download to complete)
+        background_tasks.add_task(delete_file_after_delay, file_path, delay_seconds=300)
+
+        # Return file for download
+        return FileResponse(
+            path=str(file_path),
+            filename=filename,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error downloading ZIP file: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to download ZIP file: {str(e)}",
+        )
+
+
+@router.get("/{pipeline_id}/export-files")
+def list_pipeline_export_files(
+    pipeline_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    List all available export files for a pipeline.
+
+    Useful for debugging or when user needs to re-download a file.
+    """
+    # Verify pipeline ownership
+    db_pipeline = db.query(PreprocessingPipeline).filter(
+        PreprocessingPipeline.id == pipeline_id,
+        PreprocessingPipeline.user_id == current_user.id,
+    ).first()
+
+    if not db_pipeline:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pipeline {pipeline_id} not found",
+        )
+
+    try:
+        export_dir = Path("data/exports/code")
+        if not export_dir.exists():
+            return {
+                "success": True,
+                "files": [],
+                "message": "No export files found"
+            }
+
+        # Find all files for this pipeline
+        pattern = f"*{pipeline_id}*.zip"
+        export_files = []
+
+        for file_path in export_dir.glob(pattern):
+            file_stat = file_path.stat()
+            export_files.append({
+                "filename": file_path.name,
+                "size": file_stat.st_size,
+                "created_at": datetime.fromtimestamp(file_stat.st_ctime).isoformat(),
+                "modified_at": datetime.fromtimestamp(file_stat.st_mtime).isoformat(),
+                "download_url": f"/api/v1/preprocessing/{pipeline_id}/download-code-zip/{file_path.name}"
+            })
+
+        # Sort by modification time (newest first)
+        export_files.sort(key=lambda x: x["modified_at"], reverse=True)
+
+        return {
+            "success": True,
+            "pipeline_id": str(pipeline_id),
+            "pipeline_name": db_pipeline.name,
+            "files": export_files,
+            "total_files": len(export_files)
+        }
+
+    except Exception as e:
+        logger.error(f"Error listing export files: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list export files: {str(e)}",
         )
 
 
