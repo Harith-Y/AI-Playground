@@ -1,0 +1,162 @@
+name: ML Pipeline Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/app/ml_engine/**'
+      - 'backend/app/api/v1/endpoints/**'
+      - 'backend/tests/integration/**'
+      - '.github/workflows/integration-tests.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/app/ml_engine/**'
+      - 'backend/app/api/v1/endpoints/**'
+      - 'backend/tests/integration/**'
+
+jobs:
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio pytest-timeout
+      
+      - name: Run fast integration tests
+        run: |
+          cd backend
+          pytest -v -m "integration and not slow" tests/integration/ \
+            --cov=app.ml_engine \
+            --cov=app.api.v1.endpoints \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --junit-xml=test-results-fast.xml
+      
+      - name: Upload fast test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-fast-py${{ matrix.python-version }}
+          path: backend/test-results-fast.xml
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./backend/coverage.xml
+          flags: integration-fast
+          name: integration-fast-py${{ matrix.python-version }}
+  
+  full-integration-tests:
+    name: Full Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio pytest-timeout
+      
+      - name: Run all integration tests
+        run: |
+          cd backend
+          pytest -v -m integration tests/integration/ \
+            --cov=app.ml_engine \
+            --cov=app.api.v1.endpoints \
+            --cov-report=xml \
+            --cov-report=html \
+            --junit-xml=test-results-full.xml \
+            --timeout=300
+      
+      - name: Upload full test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-full
+          path: backend/test-results-full.xml
+      
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: coverage-report
+          path: backend/htmlcov/
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./backend/coverage.xml
+          flags: integration-full
+          name: integration-full
+      
+      - name: Comment coverage on PR
+        uses: py-cov-action/python-coverage-comment-action@v3
+        if: github.event_name == 'pull_request'
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          MINIMUM_GREEN: 80
+          MINIMUM_ORANGE: 60
+
+  test-report:
+    name: Generate Test Report
+    runs-on: ubuntu-latest
+    needs: [integration-tests, full-integration-tests]
+    if: always()
+    
+    steps:
+      - name: Download test results
+        uses: actions/download-artifact@v3
+        with:
+          path: test-results
+      
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: test-results/**/*.xml
+          check_name: Integration Test Results
+          comment_title: ML Pipeline Integration Tests
