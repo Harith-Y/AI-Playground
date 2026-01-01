@@ -582,10 +582,16 @@ alembic downgrade -1
 
 ## 📚 Additional Resources
 
+### Deployment & Operations
+- **[Deployment Guide](../docker/DEPLOYMENT_GUIDE.md)** - Complete deployment guide (all platforms)
+- **[Quick Start Deployment](../docker/DEPLOYMENT_QUICK_START.md)** - 5-minute deployment guide
+- **[Docker Setup](DOCKER.md)** - Docker and Docker Compose guide
+- **[Render Deployment](docs/RENDER_DEPLOYMENT.md)** - Render-specific deployment
+
+### Development
 - **[Main README](../README.md)** - Project overview
 - **[SETUP.md](../SETUP.md)** - Detailed setup guide
 - **[ML Engine Docs](app/ml_engine/README.md)** - ML modules documentation
-- **[Store README](../frontend/src/store/README.md)** - Redux state management
 - **[API Documentation](http://localhost:8000/docs)** - Interactive Swagger UI
 
 ## 🤝 Contributing
