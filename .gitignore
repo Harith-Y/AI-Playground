@@ -9,7 +9,10 @@ __pycache__/
 *.egg
 *.egg-info/
 dist/
-build/
+# Python build directories only
+**/backend/build/
+**/build/lib/
+**/build/bdist*/
 *.db
 *.sqlite
 *.sqlite3
@@ -78,6 +81,10 @@ htmlcov/
 # Build outputs
 frontend/dist/
 frontend/build/
+backend/build/
+
+# Docker build directory is tracked - contains build scripts and configs
+!docker/build/
 
 # Temporary files
 *.tmp
@@ -106,6 +113,10 @@ backend/inference_*.py
 backend/prediction_*.py
 backend/ml_pipeline_modules/
 
+# Docs
+**/node_modules/docs/
+**/coverage/docs/
+**/.cache/docs/
 docs/
-frontend/docs/
-backend/docs/
+frontend/docs
+backend/docs

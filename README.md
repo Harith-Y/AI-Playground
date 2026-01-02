@@ -511,6 +511,25 @@ VITE_WS_URL=ws://localhost:8000/ws
 
 See [SETUP.md](SETUP.md) for complete configuration details.
 
+## 📚 Documentation
+
+### Core Documentation
+- **[INFRASTRUCTURE.md](INFRASTRUCTURE.md)** - Complete infrastructure architecture, deployment, operations, and maintenance
+- **[SETUP.md](SETUP.md)** - Development environment setup and configuration
+- **[Docker README](docker/README.md)** - Comprehensive Docker setup, build system, and operations guide
+
+### Technical Guides
+- **[ML-PIPELINE.md](ML-PIPELINE.md)** - Machine learning pipeline architecture
+- **[MODELS.md](MODELS.md)** - Available ML models and usage
+- **[AUTHENTICATION.md](AUTHENTICATION.md)** - Authentication and authorization system
+- **[LOGGING.md](LOGGING.md)** - Logging configuration and best practices
+
+### Operational Documentation
+- **[Deployment Guide](docker/DEPLOYMENT_GUIDE.md)** - Production deployment procedures
+- **[Monitoring Guide](docker/MONITORING_QUICK_START.md)** - Monitoring and alerting setup
+- **[Performance Guide](docker/PERFORMANCE_MONITORING_GUIDE.md)** - Performance optimization
+- **[Backup Strategy](BACKUP.md)** - Backup and recovery procedures
+
 ## 🤝 Contributing
 
 1. Fork the repository
