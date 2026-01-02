@@ -594,6 +594,11 @@ alembic downgrade -1
 - **[ML Engine Docs](app/ml_engine/README.md)** - ML modules documentation
 - **[API Documentation](http://localhost:8000/docs)** - Interactive Swagger UI
 
+### Database & Testing
+- **[Database Setup](docs/DATABASE_SETUP.md)** - Database configuration
+- **[Testing Guide](docs/TESTING.md)** - Running tests
+- **[E2E Tests](docs/E2E_TEST_GUIDE.md)** - End-to-end testing guide
+
 ## 🤝 Contributing
 
 1. Write tests for new features

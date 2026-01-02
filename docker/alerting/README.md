@@ -435,6 +435,110 @@ For issues or questions:
 3. Check Prometheus/AlertManager docs
 4. Contact ops team
 
+---
+
+## Windows Compatibility Notes
+
+### Working Services ✅
+
+The following services work perfectly on Windows:
+
+- **Prometheus** (http://localhost:9090) - Metrics collection and alerting
+- **AlertManager** (http://localhost:9093) - Alert routing and notifications  
+- **Pushgateway** (http://localhost:9091) - Batch job metrics
+- **Node Exporter** (http://localhost:9100) - System metrics
+
+### Known Issues on Windows ⚠️
+
+#### Grafana - Exec Format Error
+
+**Issue**: Grafana container fails with `exec /run.sh: exec format error`
+
+**Workaround Options**:
+1. **Use Grafana Cloud** (recommended): Free tier available at https://grafana.com/products/cloud/
+2. **Install Grafana locally**: Download from https://grafana.com/grafana/download?platform=windows
+3. **Use WSL2**: Run the full stack in WSL2 for better Linux compatibility
+
+**If using local Grafana**:
+- Add Prometheus as a data source: http://host.docker.internal:9090
+- Import dashboards from https://grafana.com/grafana/dashboards/
+
+#### cAdvisor - Exec Format Error
+
+**Issue**: cAdvisor container fails with `exec /usr/bin/cadvisor: exec format error`
+
+**Impact**: Container metrics won't be available in Prometheus
+
+**Workaround**:
+- Use Docker Desktop's built-in metrics
+- Or comment out cAdvisor from docker-compose.alerting.yml
+
+### Recommended Setup for Windows
+
+1. **Core Alerting** (works perfectly):
+   ```bash
+   # Start only the working services
+   docker-compose -f docker/docker-compose.alerting.yml --env-file docker/alerting/.env up -d prometheus alertmanager pushgateway node-exporter
+   ```
+
+2. **Visualization**:
+   - Install Grafana locally on Windows
+   - Or use Grafana Cloud (free tier)
+
+### Testing Alerts on Windows
+
+Even without Grafana, you can test the alerting system:
+
+#### 1. Check Prometheus Targets
+Visit http://localhost:9090/targets to see all monitored endpoints
+
+#### 2. Check Alert Rules
+Visit http://localhost:9090/alerts to see configured alert rules
+
+#### 3. Check AlertManager
+Visit http://localhost:9093 to see active alerts and silences
+
+#### 4. Trigger a Test Alert
+
+Create a test alert by pushing metrics to Pushgateway:
+
+```bash
+# Push a metric that will trigger an alert
+curl -X POST http://localhost:9091/metrics/job/test_job/instance/test_instance --data-binary @- <<EOF
+# TYPE training_job_status gauge
+training_job_status{job_id="test-123",job_name="test_training",status="failed"} 1
+EOF
+```
+
+Wait a few minutes and check:
+- Prometheus alerts: http://localhost:9090/alerts
+- AlertManager: http://localhost:9093
+
+You should receive email notifications if SMTP is configured!
+
+### Full Linux Compatibility
+
+For full compatibility with all services, consider:
+
+1. **WSL2** (Windows Subsystem for Linux 2)
+   - Install WSL2: `wsl --install`
+   - Install Docker in WSL2
+   - Run the full stack from WSL2
+
+2. **Linux VM**
+   - Use VirtualBox or Hyper-V
+   - Run Ubuntu/Debian
+   - Full Docker compatibility
+
+### Summary
+
+The core alerting functionality (Prometheus + AlertManager) works perfectly on Windows. The visualization layer (Grafana) can be run separately or accessed via cloud services.
+
+**What works**: ✅ Alert rules, email notifications, Slack notifications, metric collection  
+**What needs workaround**: ⚠️ Grafana dashboards, cAdvisor container metrics
+
+---
+
 ## References
 
 - [Prometheus Documentation](https://prometheus.io/docs/)
