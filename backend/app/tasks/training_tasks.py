@@ -48,6 +48,8 @@ from app.core.config import settings
 from app.utils.logger import get_logger
 from app.utils.cache import invalidate_model_cache, invalidate_comparison_cache
 from app.services.training_error_handler import handle_training_error
+from app.utils.error_recovery import retry, safe_execute, TransactionManager, CircuitBreaker
+from app.utils.db_recovery import db_retry, ensure_connection
 from app.utils.memory_manager import memory_profiler, get_memory_monitor, MemoryOptimizer
 from app.core.training_exceptions import (
     DataLoadError,
@@ -92,6 +94,8 @@ class TrainingTask(Task):
 # Progress Tracking Helper Functions
 # ============================================================================
 
+@db_retry(max_attempts=3, delay=0.5)
+@ensure_connection
 def initialize_progress_tracking(db: Session, model_run_id: str) -> bool:
     """
     Initialize progress tracking structure in ModelRun.run_metadata.
@@ -138,6 +142,8 @@ def initialize_progress_tracking(db: Session, model_run_id: str) -> bool:
         return False
 
 
+@db_retry(max_attempts=3, delay=0.5)
+@ensure_connection
 def update_training_progress(
     db: Session,
     model_run_id: str,
