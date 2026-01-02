@@ -54,6 +54,7 @@ logs/
 
 # Backups
 backups/
+*.backup
 *.sql
 *.sql.gz
 *.tar.gz.enc

@@ -2,6 +2,7 @@
 
 [![Backend CI](https://github.com/Harith-Y/AI-Playground/workflows/Backend%20CI/badge.svg)](https://github.com/Harith-Y/AI-Playground/actions/workflows/backend-ci.yml)
 [![Frontend CI](https://github.com/Harith-Y/AI-Playground/workflows/Frontend%20CI/badge.svg)](https://github.com/Harith-Y/AI-Playground/actions/workflows/frontend-ci.yml)
+[![Docker Build](https://github.com/Harith-Y/AI-Playground/workflows/Docker%20Build%20and%20Push/badge.svg)](https://github.com/Harith-Y/AI-Playground/actions/workflows/docker-build.yml)
 [![Docker Compose CI](https://github.com/Harith-Y/AI-Playground/workflows/Docker%20Compose%20CI/badge.svg)](https://github.com/Harith-Y/AI-Playground/actions/workflows/docker-compose-ci.yml)
 [![Code Quality](https://github.com/Harith-Y/AI-Playground/workflows/Code%20Quality/badge.svg)](https://github.com/Harith-Y/AI-Playground/actions/workflows/code-quality.yml)
 [![codecov](https://codecov.io/gh/Harith-Y/AI-Playground/branch/main/graph/badge.svg)](https://codecov.io/gh/Harith-Y/AI-Playground)
@@ -410,6 +411,22 @@ docker-compose up -d
 # View logs
 docker-compose logs -f
 ```
+
+**Or use the new build system** (INFRA-11 ✅):
+
+```bash
+# Quick build (all services)
+make build
+
+# Test locally
+make test
+
+# Or use the build scripts directly
+.\docker\build\docker-build.ps1     # Windows
+./docker/build/docker-build.sh      # Linux/Mac
+```
+
+📚 **Full Docker Documentation**: [`docker/README.md`](docker/README.md)
 
 Access the application:
 

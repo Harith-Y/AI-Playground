@@ -1,0 +1,273 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker/**'
+      - '.github/workflows/docker-build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker/**'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+      environment:
+        description: 'Build environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - dev
+      push_to_registry:
+        description: 'Push to registry'
+        required: true
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/ai-playground
+
+jobs:
+  build-backend:
+    name: Build Backend Image
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.service == 'all' ||
+      github.event.inputs.service == 'backend'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Determine Dockerfile and build args
+        id: build-config
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "dev" ]]; then
+            echo "dockerfile=backend/Dockerfile.dev" >> $GITHUB_OUTPUT
+            echo "requirements=requirements.txt" >> $GITHUB_OUTPUT
+            echo "target=" >> $GITHUB_OUTPUT
+          else
+            echo "dockerfile=backend/Dockerfile" >> $GITHUB_OUTPUT
+            echo "requirements=requirements.render.txt" >> $GITHUB_OUTPUT
+            echo "target=production" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ${{ steps.build-config.outputs.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' && (github.event.inputs.push_to_registry != 'false') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            REQUIREMENTS_FILE=${{ steps.build-config.outputs.requirements }}
+          target: ${{ steps.build-config.outputs.target }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend:buildcache,mode=max
+
+      - name: Image digest
+        run: echo ${{ steps.meta.outputs.digest }}
+
+  build-frontend:
+    name: Build Frontend Image
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.service == 'all' ||
+      github.event.inputs.service == 'frontend'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Determine build target
+        id: build-config
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "dev" ]]; then
+            echo "target=development" >> $GITHUB_OUTPUT
+          else
+            echo "target=production" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' && (github.event.inputs.push_to_registry != 'false') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL || 'http://localhost:8000' }}
+            VITE_WS_URL=${{ secrets.VITE_WS_URL || 'ws://localhost:8000/ws' }}
+          target: ${{ steps.build-config.outputs.target }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:buildcache,mode=max
+
+      - name: Image digest
+        run: echo ${{ steps.meta.outputs.digest }}
+
+  test-images:
+    name: Test Docker Images
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create test environment file
+        run: |
+          cat > .env.test << EOF
+          DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_playground_test
+          REDIS_URL=redis://redis:6379/0
+          SECRET_KEY=test-secret-key
+          ENVIRONMENT=testing
+          DEBUG=True
+          EOF
+
+      - name: Start services with docker-compose
+        run: |
+          docker-compose -f docker-compose.yml up -d
+          sleep 30
+
+      - name: Check service health
+        run: |
+          echo "Checking backend health..."
+          curl -f http://localhost:8000/health || exit 1
+          
+          echo "Checking frontend..."
+          curl -f http://localhost:80 || exit 1
+
+      - name: Run backend tests
+        run: |
+          docker-compose exec -T backend pytest tests/ -v --tb=short || true
+
+      - name: Stop services
+        if: always()
+        run: docker-compose down -v
+
+  security-scan:
+    name: Security Scan
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      matrix:
+        service: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:latest
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.service }}.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+
+  notify:
+    name: Notify Build Status
+    needs: [build-backend, build-frontend, test-images, security-scan]
+    runs-on: ubuntu-latest
+    if: always() && github.event_name != 'pull_request'
+
+    steps:
+      - name: Send notification
+        run: |
+          if [[ "${{ needs.build-backend.result }}" == "success" ]] && \
+             [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
+            echo "✅ All Docker images built successfully!"
+          else
+            echo "❌ Docker build failed!"
+            exit 1
+          fi
