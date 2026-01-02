@@ -18,7 +18,7 @@ from app.ml_engine.preprocessing.imputer import MeanImputer, MedianImputer, Mode
 from app.ml_engine.preprocessing.scaler import StandardScaler, MinMaxScaler
 from app.ml_engine.preprocessing.encoder import OneHotEncoder, LabelEncoder
 from app.ml_engine.preprocessing.cleaner import IQROutlierDetector, ZScoreOutlierDetector
-from app.ml_engine.feature_selection.variance_threshold import VarianceThresholdSelector
+from app.ml_engine.feature_selection.variance_threshold import VarianceThreshold
 from app.ml_engine.feature_selection.correlation_selector import CorrelationSelector
 from app.ml_engine.models.classification import RandomForestClassifierWrapper
 from app.ml_engine.models.regression import LinearRegressionWrapper

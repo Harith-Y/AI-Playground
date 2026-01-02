@@ -13,12 +13,12 @@ from sklearn.model_selection import train_test_split
 
 from app.ml_engine.evaluation import (
     calculate_classification_metrics,
-    calculate_confusion_matrix,
-    calculate_roc_curve,
-    calculate_pr_curve,
+    compute_confusion_matrix,
+    compute_roc_curve,
+    compute_pr_curve,
     calculate_regression_metrics,
-    calculate_residual_analysis,
-    calculate_actual_vs_predicted,
+    analyze_residuals,
+    aggregate_actual_vs_predicted,
     calculate_clustering_metrics,
     calculate_feature_importance,
     calculate_permutation_importance,
