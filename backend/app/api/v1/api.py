@@ -10,7 +10,8 @@ from app.api.v1.endpoints import (
     tuning_orchestration,
     metrics,
     code_generation,
-    experiment_config
+    experiment_config,
+    inference
 )
 
 api_router = APIRouter()
@@ -62,6 +63,12 @@ api_router.include_router(
     experiment_config.router,
     prefix="/experiments",
     tags=["experiments"]
+)
+
+api_router.include_router(
+    inference.router,
+    prefix="/inference",
+    tags=["inference"]
 )
 
 # Metrics endpoint (no prefix, no tags - for Prometheus)
