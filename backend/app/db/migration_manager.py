@@ -75,9 +75,14 @@ class MigrationManager:
         if alembic_ini_path:
             self.alembic_ini_path = Path(alembic_ini_path)
         else:
-            # Auto-detect alembic.ini in backend directory
-            backend_dir = Path(__file__).resolve().parent.parent
-            self.alembic_ini_path = backend_dir / "alembic.ini"
+            # Auto-detect alembic.ini - check Render's /app structure first
+            render_path = Path("/app/alembic.ini")
+            if render_path.exists():
+                self.alembic_ini_path = render_path
+            else:
+                # Fall back to local development structure
+                backend_dir = Path(__file__).resolve().parent.parent
+                self.alembic_ini_path = backend_dir / "alembic.ini"
         
         if not self.alembic_ini_path.exists():
             raise MigrationError(f"Alembic config not found: {self.alembic_ini_path}")

@@ -27,6 +27,7 @@ from .metrics import (
     tuning_result_counter,
     tuning_best_score_histogram,
     models_trained_counter,
+    task_queue_length_gauge,  # Import queue length metric from metrics.py
 )
 from app.utils.logger import get_logger
 
@@ -52,12 +53,8 @@ celery_worker_pool_busy = Gauge(
     ['worker_name']
 )
 
-# Queue length tracking
-celery_queue_length = Gauge(
-    'celery_queue_length',
-    'Number of tasks in queue',
-    ['queue_name']
-)
+# Queue length tracking - use the one from metrics.py
+celery_queue_length = task_queue_length_gauge
 
 # Task failure rate
 celery_task_failure_rate = Gauge(
