@@ -405,6 +405,107 @@ def train_model(
         df = MemoryOptimizer.optimize_dataframe_memory(df, aggressive=False)
         logger.info(f"DataFrame memory optimized")
 
+        # Edge case validation before preprocessing (15%)
+        update_training_progress(db, model_run_id, 15, "Validating dataset for edge cases...")
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'current': 15,
+                'total': 100,
+                'status': 'Validating dataset for edge cases...'
+            }
+        )
+
+        from app.ml_engine.validation.edge_case_validator import validate_for_training
+        from app.ml_engine.validation.edge_case_fixes import auto_fix_edge_cases
+
+        # Determine categorical columns for encoding validation
+        categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        if target_column and target_column in categorical_cols:
+            categorical_cols.remove(target_column)
+
+        # Validate dataset for edge cases
+        is_valid, issues = validate_for_training(
+            df=df,
+            target_column=target_column,
+            task_type=None,  # Will be determined from model type
+            config={
+                'test_size': test_size,
+                'use_stratify': False,  # Will check later if needed
+                'use_oversampling': False,  # Will check later if needed
+                'encoding_columns': categorical_cols
+            }
+        )
+
+        # Log validation issues
+        if issues:
+            logger.warning(f"Found {len(issues)} edge case issues in dataset")
+            for issue in issues:
+                logger.warning(
+                    f"[{issue.severity.value.upper()}] {issue.category}: {issue.message}",
+                    extra={
+                        'event': 'edge_case_detected',
+                        'severity': issue.severity.value,
+                        'category': issue.category,
+                        'details': issue.details
+                    }
+                )
+
+        # Apply auto-fixes for critical issues
+        if not is_valid:
+            logger.info("Attempting to auto-fix critical edge case issues...")
+            df_fixed, fixes = auto_fix_edge_cases(
+                df=df,
+                issues=issues,
+                target_column=target_column,
+                encoding_columns=categorical_cols
+            )
+
+            if fixes:
+                logger.info(f"Applied {len(fixes)} auto-fixes:")
+                for fix in fixes:
+                    logger.info(f"  - {fix.description}")
+                df = df_fixed
+
+                # Re-validate after fixes
+                is_valid_after_fix, issues_after_fix = validate_for_training(
+                    df=df,
+                    target_column=target_column,
+                    config={
+                        'test_size': test_size,
+                        'encoding_columns': categorical_cols
+                    }
+                )
+
+                # If still not valid after auto-fix, raise error
+                if not is_valid_after_fix:
+                    critical_issues = [i for i in issues_after_fix if i.severity.value in ['error', 'critical']]
+                    if critical_issues:
+                        error_msg = "Dataset has critical issues that could not be auto-fixed:\n"
+                        for issue in critical_issues:
+                            error_msg += f"  - [{issue.severity.value.upper()}] {issue.message}\n"
+                            error_msg += f"    Recommendation: {issue.recommendation}\n"
+                        raise InsufficientDataError(
+                            message=error_msg,
+                            n_samples=len(df),
+                            min_required=20
+                        )
+            else:
+                # No auto-fixes available, but issues still exist
+                critical_issues = [i for i in issues if i.severity.value in ['error', 'critical']]
+                if critical_issues:
+                    error_msg = "Dataset has critical issues:\n"
+                    for issue in critical_issues:
+                        error_msg += f"  - [{issue.severity.value.upper()}] {issue.message}\n"
+                        error_msg += f"    Recommendation: {issue.recommendation}\n"
+                    raise InsufficientDataError(
+                        message=error_msg,
+                        n_samples=len(df),
+                        min_required=20
+                    )
+
+        logger.info("Edge case validation passed")
+
         # Update progress: Applying preprocessing (20%)
         update_training_progress(db, model_run_id, 20, "Applying preprocessing steps...")
         self.update_state(
@@ -492,15 +593,80 @@ def train_model(
 
             y = df[target_column]
 
+            # Smart stratification: only stratify if feasible
+            use_stratify = False
+            if task_type.value == 'classification':
+                n_classes = len(y.unique())
+                min_class_size = y.value_counts().min()
+                
+                # Only stratify if:
+                # 1. Not too many classes (< 50)
+                # 2. Each class has at least 2 samples (to allow splitting)
+                # 3. Test set will have at least 1 sample per class
+                min_test_samples = int(len(df) * test_size)
+                
+                if n_classes < 50 and min_class_size >= 2 and min_test_samples >= n_classes:
+                    use_stratify = True
+                    logger.info(f"Using stratified split ({n_classes} classes, min class size: {min_class_size})")
+                else:
+                    logger.warning(
+                        f"Skipping stratification: n_classes={n_classes}, "
+                        f"min_class_size={min_class_size}, test_samples={min_test_samples}"
+                    )
+
             # Split into train and test sets
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y,
-                test_size=test_size,
-                random_state=random_state,
-                stratify=y if task_type.value == 'classification' and len(y.unique()) < 50 else None
-            )
+            try:
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y,
+                    test_size=test_size,
+                    random_state=random_state,
+                    stratify=y if use_stratify else None
+                )
+            except ValueError as e:
+                # If stratified split fails, try without stratification
+                if use_stratify:
+                    logger.warning(f"Stratified split failed: {e}. Retrying without stratification...")
+                    X_train, X_test, y_train, y_test = train_test_split(
+                        X, y,
+                        test_size=test_size,
+                        random_state=random_state,
+                        stratify=None
+                    )
+                else:
+                    raise
 
             logger.info(f"Train set: {X_train.shape}, Test set: {X_test.shape}")
+
+            # Validate train/test split results for classification
+            if task_type.value == 'classification':
+                # Check class distribution in train set
+                train_class_counts = y_train.value_counts()
+                test_class_counts = y_test.value_counts()
+                
+                # Warn if some classes missing in test set
+                missing_in_test = set(train_class_counts.index) - set(test_class_counts.index)
+                if missing_in_test:
+                    logger.warning(
+                        f"Classes {missing_in_test} are not present in test set. "
+                        "Evaluation metrics for these classes will be unavailable."
+                    )
+                
+                # Warn if extreme imbalance exists
+                if len(train_class_counts) > 1:
+                    max_count = train_class_counts.max()
+                    min_count = train_class_counts.min()
+                    imbalance_ratio = max_count / min_count
+                    
+                    if imbalance_ratio > 100:
+                        logger.warning(
+                            f"Extreme class imbalance detected: {imbalance_ratio:.1f}:1 ratio. "
+                            "Consider using class weights or resampling techniques."
+                        )
+                    elif imbalance_ratio > 10:
+                        logger.info(
+                            f"Class imbalance detected: {imbalance_ratio:.1f}:1 ratio. "
+                            "Model performance on minority classes may be limited."
+                        )
 
         else:
             # Unsupervised learning (clustering)

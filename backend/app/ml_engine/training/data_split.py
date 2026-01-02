@@ -472,6 +472,56 @@ def _validate_split_inputs(
             f"Need at least {min_samples} samples for splitting. Got: {len(X)}"
         )
     
+    # Check if split will result in valid sets
+    n_test = int(len(X) * test_size)
+    n_train = len(X) - n_test
+    
+    if n_train < 1:
+        raise ValueError(
+            f"Training set would have {n_train} samples with test_size={test_size}. "
+            f"Reduce test_size or increase dataset size."
+        )
+    
+    if n_test < 1:
+        raise ValueError(
+            f"Test set would have {n_test} samples with test_size={test_size}. "
+            f"Increase test_size or dataset size."
+        )
+    
+    # Warn about very small splits
+    if n_train < 5 or n_test < 5:
+        logger.warning(
+            f"Very small split sizes detected: train={n_train}, test={n_test}. "
+            "Results may not be reliable. Consider using cross-validation instead."
+        )
+    
+    # Additional validation for stratification
+    if stratify and y is not None:
+        # Check class distribution
+        if hasattr(y, 'value_counts'):
+            class_counts = y.value_counts()
+        else:
+            unique, counts = np.unique(y, return_counts=True)
+            class_counts = pd.Series(counts, index=unique)
+        
+        min_class_count = class_counts.min()
+        n_classes = len(class_counts)
+        
+        # Need at least 2 samples per class for stratified split
+        if min_class_count < 2:
+            raise ValueError(
+                f"Stratified split requires at least 2 samples per class. "
+                f"Found class(es) with only {min_class_count} sample(s). "
+                "Either remove these classes, disable stratification, or collect more data."
+            )
+        
+        # Check if test set can have all classes
+        if n_test < n_classes:
+            logger.warning(
+                f"Test set ({n_test} samples) is smaller than number of classes ({n_classes}). "
+                "Some classes may not appear in test set. Consider increasing test_size."
+            )
+    
     logger.debug("Split inputs validated successfully")
 
 

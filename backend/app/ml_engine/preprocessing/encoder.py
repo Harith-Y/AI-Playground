@@ -106,6 +106,22 @@ class OneHotEncoder(PreprocessingStep):
 
             # Get unique categories, sorted for consistency
             unique_categories = sorted(X[col].dropna().unique().tolist())
+            n_unique = len(unique_categories)
+            
+            # Warn about high cardinality
+            if n_unique > 100:
+                logger.warning(
+                    f"Column '{col}' has very high cardinality ({n_unique} unique values). "
+                    f"One-hot encoding will create {n_unique - 1 if drop_first else n_unique} features. "
+                    "Consider using alternative encoding methods (target encoding, label encoding) "
+                    "or grouping rare categories."
+                )
+            elif n_unique > 50:
+                logger.warning(
+                    f"Column '{col}' has high cardinality ({n_unique} unique values). "
+                    f"This will create {n_unique - 1 if drop_first else n_unique} features."
+                )
+            
             self.categories_[col] = unique_categories
 
             # Generate feature names
