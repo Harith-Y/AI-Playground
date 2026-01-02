@@ -49,6 +49,7 @@ def unreliable_operation():
 #### Retry Strategies
 
 **Exponential Backoff** (Recommended)
+
 ```python
 @retry(
     max_attempts=5,
@@ -61,6 +62,7 @@ def api_call():
 ```
 
 **Linear Backoff**
+
 ```python
 @retry(
     max_attempts=5,
@@ -72,6 +74,7 @@ def database_query():
 ```
 
 **Fixed Delay**
+
 ```python
 @retry(
     max_attempts=3,
@@ -83,6 +86,7 @@ def file_operation():
 ```
 
 **Fibonacci Backoff**
+
 ```python
 @retry(
     max_attempts=7,
@@ -273,7 +277,7 @@ def update_user_data(db: Session, user_id: int, data: dict):
         user = db.query(User).filter_by(id=user_id).first()
         user.name = data["name"]
         user.email = data["email"]
-        
+
         # If any exception occurs, transaction rolls back
         # Otherwise commits automatically
 ```
@@ -285,7 +289,7 @@ def complex_transaction(db: Session):
     with TransactionManager(db, auto_commit=False) as tx:
         # Do some operations
         update_records(db)
-        
+
         # Check if we should commit
         if validation_passes():
             tx.commit()
@@ -303,7 +307,7 @@ from app.utils.db_recovery import with_savepoint
 def inner_transaction(db: Session):
     # This uses a savepoint
     db.execute(insert_statement)
-    
+
     if error_condition:
         # Rolls back to savepoint, not entire transaction
         raise ValueError("Partial rollback")
@@ -311,13 +315,13 @@ def inner_transaction(db: Session):
 def outer_transaction(db: Session):
     with TransactionManager(db) as tx:
         db.execute(other_statement)
-        
+
         try:
             inner_transaction(db)
         except ValueError:
             # Inner rolled back, outer continues
             pass
-        
+
         db.execute(final_statement)
         # Commits all successfully executed statements
 ```
@@ -480,7 +484,7 @@ def initialize_progress_tracking(db: Session, model_run_id: int) -> dict:
             progress_percentage=0.0
         )
         db.add(progress)
-    
+
     return {"progress_id": progress.id}
 
 @db_retry(max_attempts=3)
@@ -496,7 +500,7 @@ def update_training_progress(
         prog = db.query(TrainingProgress).filter_by(
             model_run_id=model_run_id
         ).first()
-        
+
         if prog:
             prog.progress_percentage = progress
             prog.stage = stage
@@ -512,7 +516,7 @@ def train_model(self, model_run_id: int, config: dict):
             default=None,
             model_run_id
         )
-        
+
         if checkpoint:
             logger.info(f"Resuming from checkpoint: {checkpoint['epoch']}")
             start_epoch = checkpoint['epoch']
@@ -520,16 +524,16 @@ def train_model(self, model_run_id: int, config: dict):
         else:
             start_epoch = 0
             model_state = None
-        
+
         # Initialize with retry
         progress_data = initialize_progress_tracking(db, model_run_id)
-        
+
         # Train with periodic checkpoints
         for epoch in range(start_epoch, config['num_epochs']):
             try:
                 # Training step
                 metrics = train_epoch(model, data, epoch)
-                
+
                 # Update progress with retry
                 update_training_progress(
                     db,
@@ -537,7 +541,7 @@ def train_model(self, model_run_id: int, config: dict):
                     progress=(epoch + 1) / config['num_epochs'] * 100,
                     stage=f"epoch_{epoch + 1}"
                 )
-                
+
                 # Save checkpoint every 10 epochs
                 if epoch % 10 == 0:
                     save_checkpoint(model_run_id, {
@@ -545,7 +549,7 @@ def train_model(self, model_run_id: int, config: dict):
                         'model_state': model.state_dict(),
                         'metrics': metrics
                     })
-                
+
             except Exception as e:
                 logger.error(f"Error in epoch {epoch}: {e}")
                 # Save checkpoint before failing
@@ -555,14 +559,14 @@ def train_model(self, model_run_id: int, config: dict):
                     'error': str(e)
                 })
                 raise
-        
+
         return {"status": "success", "metrics": metrics}
-        
+
     except Exception as e:
         # Retry task if retries available
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e, countdown=60)
-        
+
         # Final failure
         logger.error(f"Training failed after retries: {e}")
         raise
@@ -586,13 +590,13 @@ model_api_circuit = CircuitBreaker(
 @router.post("/predict")
 async def predict(data: PredictRequest):
     """Prediction endpoint with circuit breaker."""
-    
+
     # Check circuit state
     if model_api_circuit.state == CircuitState.OPEN:
         # Use fallback model
         logger.warning("Using local fallback model")
         return local_model_predict(data)
-    
+
     try:
         # Try external model with circuit breaker
         @model_api_circuit
@@ -603,14 +607,14 @@ async def predict(data: PredictRequest):
                 timeout=10
             )
             return response.json()
-        
+
         result = call_external_model()
         return result
-        
+
     except Exception as e:
         # Circuit opened or other error
         logger.error(f"Prediction failed: {e}")
-        
+
         # Use fallback
         return local_model_predict(data)
 ```
@@ -620,6 +624,7 @@ async def predict(data: PredictRequest):
 ### 1. Retry Guidelines
 
 ✅ **DO:**
+
 - Use exponential backoff for external services
 - Add jitter to prevent thundering herd
 - Set reasonable max_attempts (3-5 typically)
@@ -627,6 +632,7 @@ async def predict(data: PredictRequest):
 - Use specific exception types
 
 ❌ **DON'T:**
+
 - Retry non-idempotent operations without checks
 - Retry user input validation errors
 - Use infinite retries
@@ -636,6 +642,7 @@ async def predict(data: PredictRequest):
 ### 2. Circuit Breaker Guidelines
 
 ✅ **DO:**
+
 - Use for external service dependencies
 - Set failure_threshold based on service SLA
 - Monitor circuit state changes
@@ -643,6 +650,7 @@ async def predict(data: PredictRequest):
 - Test recovery behavior
 
 ❌ **DON'T:**
+
 - Use for fast-failing operations
 - Set threshold too low (causes false positives)
 - Use without fallback strategy
@@ -651,6 +659,7 @@ async def predict(data: PredictRequest):
 ### 3. Transaction Guidelines
 
 ✅ **DO:**
+
 - Keep transactions short
 - Use savepoints for partial rollback
 - Handle concurrent updates with optimistic locking
@@ -658,6 +667,7 @@ async def predict(data: PredictRequest):
 - Test rollback scenarios
 
 ❌ **DON'T:**
+
 - Hold transactions during long operations
 - Nest transactions without savepoints
 - Ignore deadlock scenarios
@@ -688,12 +698,14 @@ def safe_database_operation(db: Session):
 ### Metrics to Track
 
 1. **Retry Metrics**
+
    - Retry count per operation
    - Success rate after retries
    - Average retry delay
    - Operations exceeding max retries
 
 2. **Circuit Breaker Metrics**
+
    - Circuit state changes
    - Time in OPEN state
    - Failure rate when CLOSED
@@ -753,14 +765,14 @@ from unittest.mock import Mock, patch
 def test_retry_success_after_failure():
     """Test retry succeeds after transient failure."""
     call_count = [0]
-    
+
     @retry(max_attempts=3, delay=0.1)
     def flaky_function():
         call_count[0] += 1
         if call_count[0] < 2:
             raise ConnectionError("Transient failure")
         return "success"
-    
+
     result = flaky_function()
     assert result == "success"
     assert call_count[0] == 2
@@ -768,18 +780,18 @@ def test_retry_success_after_failure():
 def test_circuit_opens_after_threshold():
     """Test circuit breaker opens after failures."""
     circuit = CircuitBreaker(failure_threshold=3)
-    
+
     @circuit
     def always_fails():
         raise ValueError("Fail")
-    
+
     # Trigger failures
     for _ in range(3):
         with pytest.raises(ValueError):
             always_fails()
-    
+
     assert circuit.state == CircuitState.OPEN
-    
+
     # Next call fails fast
     with pytest.raises(Exception, match="Circuit breaker is OPEN"):
         always_fails()
@@ -791,21 +803,21 @@ def test_circuit_opens_after_threshold():
 @pytest.mark.integration
 def test_database_retry_integration(test_db):
     """Test database retry in real scenario."""
-    
+
     @db_retry(max_attempts=3, delay=0.5)
     def flaky_db_operation(db: Session):
         # Simulate intermittent connection issues
         if random.random() < 0.5:
             raise OperationalError("stmt", "params", "orig")
-        
+
         user = User(name="Test", email="test@example.com")
         db.add(user)
         db.commit()
         return user.id
-    
+
     user_id = flaky_db_operation(test_db)
     assert user_id is not None
-    
+
     # Verify record was created
     user = test_db.query(User).filter_by(id=user_id).first()
     assert user is not None
@@ -856,6 +868,7 @@ critical_circuit = CircuitBreaker(
 ### Common Issues
 
 **1. Retry Loops**
+
 ```python
 # Problem: Retrying non-transient errors
 @retry(max_attempts=5)
@@ -870,6 +883,7 @@ def fetch_and_parse(url):
 ```
 
 **2. Circuit Breaker False Positives**
+
 ```python
 # Problem: Circuit opens due to legitimate load spikes
 circuit = CircuitBreaker(failure_threshold=3)  # Too sensitive
@@ -882,6 +896,7 @@ circuit = CircuitBreaker(
 ```
 
 **3. Transaction Deadlocks**
+
 ```python
 # Problem: Long-held transactions causing deadlocks
 def slow_operation(db: Session):
@@ -894,10 +909,10 @@ def slow_operation(db: Session):
 # Solution: Release transaction between operations
 def fast_operation(db: Session):
     records = db.query(Model).all()
-    
+
     for record in records:
         process(record)  # Process outside transaction
-        
+
         # Quick transaction per record
         with TransactionManager(db):
             record.status = "processed"
@@ -908,17 +923,19 @@ def fast_operation(db: Session):
 ### Adding Error Recovery to Existing Code
 
 1. **Identify Critical Paths**
+
    - Database operations
    - External API calls
    - File I/O operations
    - Long-running computations
 
 2. **Add Appropriate Patterns**
+
    ```python
    # Before
    def fetch_data():
        return requests.get(url).json()
-   
+
    # After
    @retry(max_attempts=3, delay=1.0)
    @timeout(seconds=30)
@@ -927,6 +944,7 @@ def fast_operation(db: Session):
    ```
 
 3. **Test Thoroughly**
+
    - Unit tests for retry logic
    - Integration tests with real failures
    - Load tests with circuit breakers
@@ -946,6 +964,7 @@ def fast_operation(db: Session):
 ## Summary
 
 Error recovery patterns provide:
+
 - ✅ Resilience to transient failures
 - ✅ Protection against cascading failures
 - ✅ Graceful degradation
@@ -953,6 +972,7 @@ Error recovery patterns provide:
 - ✅ Improved system reliability
 
 Choose patterns based on:
+
 - Operation criticality
 - Failure characteristics
 - Performance requirements

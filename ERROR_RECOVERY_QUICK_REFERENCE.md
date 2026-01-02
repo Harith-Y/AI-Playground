@@ -4,18 +4,19 @@ Quick lookup guide for common error recovery patterns.
 
 ## Quick Pattern Selection
 
-| Scenario | Pattern | Code |
-|----------|---------|------|
-| External API call | Retry + Timeout | `@timeout(30) @retry(max_attempts=3)` |
-| Database query | DB Retry | `@db_retry(max_attempts=3)` |
-| File I/O | Retry + Fallback | `@fallback(use_cache) @retry(max_attempts=2)` |
-| External service | Circuit Breaker | `@circuit_breaker` |
-| Batch processing | Batch with Retry | `batch_with_retry(items, func)` |
-| Transaction | Transaction Manager | `with TransactionManager(db):` |
+| Scenario          | Pattern             | Code                                          |
+| ----------------- | ------------------- | --------------------------------------------- |
+| External API call | Retry + Timeout     | `@timeout(30) @retry(max_attempts=3)`         |
+| Database query    | DB Retry            | `@db_retry(max_attempts=3)`                   |
+| File I/O          | Retry + Fallback    | `@fallback(use_cache) @retry(max_attempts=2)` |
+| External service  | Circuit Breaker     | `@circuit_breaker`                            |
+| Batch processing  | Batch with Retry    | `batch_with_retry(items, func)`               |
+| Transaction       | Transaction Manager | `with TransactionManager(db):`                |
 
 ## Common Patterns
 
 ### Retry with Exponential Backoff
+
 ```python
 from app.utils.error_recovery import retry
 
@@ -30,6 +31,7 @@ def api_call():
 ```
 
 ### Database Operation with Retry
+
 ```python
 from app.utils.db_recovery import db_retry, ensure_connection
 
@@ -40,6 +42,7 @@ def query_database(db: Session):
 ```
 
 ### Circuit Breaker for External Service
+
 ```python
 from app.utils.error_recovery import CircuitBreaker
 
@@ -55,6 +58,7 @@ def call_external_api():
 ```
 
 ### Fallback Strategy
+
 ```python
 from app.utils.error_recovery import fallback
 
@@ -67,6 +71,7 @@ def fetch_live_data():
 ```
 
 ### Safe Transaction
+
 ```python
 from app.utils.error_recovery import TransactionManager
 
@@ -79,6 +84,7 @@ def update_records(db: Session, updates: list):
 ```
 
 ### Timeout Protection
+
 ```python
 from app.utils.error_recovery import timeout
 
@@ -89,6 +95,7 @@ def long_operation():
 ```
 
 ### Safe Execution with Default
+
 ```python
 from app.utils.error_recovery import safe_execute
 
@@ -101,6 +108,7 @@ result = safe_execute(
 ```
 
 ### Batch Processing with Retry
+
 ```python
 from app.utils.error_recovery import batch_with_retry
 
@@ -113,6 +121,7 @@ successful, failed = batch_with_retry(
 ```
 
 ### Optimistic Locking
+
 ```python
 from app.utils.db_recovery import atomic_update
 
@@ -126,6 +135,7 @@ success = atomic_update(
 ```
 
 ### Safe Bulk Insert
+
 ```python
 from app.utils.db_recovery import safe_bulk_insert
 
@@ -140,6 +150,7 @@ successful, failed = safe_bulk_insert(
 ## Composition Patterns
 
 ### Full Protection Stack
+
 ```python
 @timeout(seconds=30)                    # Prevent hanging
 @retry(max_attempts=3, delay=1.0)      # Retry failures
@@ -149,6 +160,7 @@ def robust_operation():
 ```
 
 ### Database Operation with Full Recovery
+
 ```python
 @ensure_connection                      # Test connection
 @db_retry(max_attempts=3)              # Retry DB errors
@@ -158,6 +170,7 @@ def safe_db_operation(db: Session):
 ```
 
 ### Celery Task with Retry
+
 ```python
 from celery import Task
 
@@ -173,12 +186,12 @@ def resilient_task(self, data):
 
 ## Retry Strategies
 
-| Strategy | Delay Pattern | Use Case |
-|----------|---------------|----------|
-| Exponential | 1s, 2s, 4s, 8s | External APIs (recommended) |
-| Linear | 1s, 2s, 3s, 4s | Moderate load services |
-| Fixed | 2s, 2s, 2s, 2s | Predictable recovery time |
-| Fibonacci | 1s, 1s, 2s, 3s, 5s | Gradual backoff needed |
+| Strategy    | Delay Pattern      | Use Case                    |
+| ----------- | ------------------ | --------------------------- |
+| Exponential | 1s, 2s, 4s, 8s     | External APIs (recommended) |
+| Linear      | 1s, 2s, 3s, 4s     | Moderate load services      |
+| Fixed       | 2s, 2s, 2s, 2s     | Predictable recovery time   |
+| Fibonacci   | 1s, 1s, 2s, 3s, 5s | Gradual backoff needed      |
 
 ```python
 from app.utils.error_recovery import RetryStrategy
@@ -209,12 +222,14 @@ CLOSED               OPEN
 ```
 
 ### Check Circuit State
+
 ```python
 if circuit.state == CircuitState.OPEN:
     return use_fallback()
 ```
 
 ### Manual Control
+
 ```python
 circuit.reset()      # Force CLOSED
 circuit.open()       # Force OPEN
@@ -224,6 +239,7 @@ circuit.half_open()  # Force HALF_OPEN
 ## Exception Handling
 
 ### Retry Specific Exceptions Only
+
 ```python
 @retry(
     max_attempts=3,
@@ -234,12 +250,14 @@ def network_call():
 ```
 
 ### Database Exceptions (Auto-handled by db_retry)
+
 - `OperationalError`: Connection lost, server restart
 - `DisconnectionError`: Connection pool exhausted
 - `TimeoutError`: Query timeout
 - `IntegrityError`: NOT retried (data issue, not transient)
 
 ### Circuit Breaker Exception Filtering
+
 ```python
 circuit = CircuitBreaker(
     failure_threshold=5,
@@ -250,6 +268,7 @@ circuit = CircuitBreaker(
 ## Logging and Monitoring
 
 ### Retry Callback
+
 ```python
 def log_retry(exc, attempt):
     logger.warning(f"Retry {attempt}: {exc}")
@@ -260,6 +279,7 @@ def monitored_func():
 ```
 
 ### Circuit State Callbacks
+
 ```python
 circuit = CircuitBreaker(
     on_open=lambda: logger.critical("Circuit OPENED!"),
@@ -271,6 +291,7 @@ circuit = CircuitBreaker(
 ## Common Mistakes
 
 ### ❌ Don't Retry Non-Idempotent Operations
+
 ```python
 # BAD: May create duplicate charges
 @retry(max_attempts=3)
@@ -285,6 +306,7 @@ def charge_customer(idempotency_key, amount):
 ```
 
 ### ❌ Don't Retry User Input Errors
+
 ```python
 # BAD: Retries validation errors
 @retry(max_attempts=3)
@@ -299,6 +321,7 @@ def fetch_and_parse(url):
 ```
 
 ### ❌ Don't Hold Transactions During Long Operations
+
 ```python
 # BAD: Holds transaction for minutes
 with TransactionManager(db):
@@ -311,7 +334,7 @@ with TransactionManager(db):
 records = db.query(Model).all()
 for record in records:
     result = expensive_computation(record)
-    
+
     # Quick transaction per record
     with TransactionManager(db):
         record.status = "processed"
@@ -319,6 +342,7 @@ for record in records:
 ```
 
 ### ❌ Don't Ignore Circuit State
+
 ```python
 # BAD: Ignores circuit protection
 @circuit_breaker
@@ -337,6 +361,7 @@ else:
 ## Performance Tips
 
 1. **Use Lower Retry Counts for High-Frequency Operations**
+
    ```python
    @retry(max_attempts=2, delay=0.1)  # Fast fail
    def frequent_operation():
@@ -344,12 +369,14 @@ else:
    ```
 
 2. **Batch Operations: Per-Item Retry**
+
    ```python
    # Don't retry entire batch, retry per item
    successful, failed = batch_with_retry(items, process_item, max_retries=2)
    ```
 
 3. **Circuit Breaker for External Dependencies**
+
    ```python
    # Prevents hammering failing service
    @external_service_circuit
@@ -367,51 +394,54 @@ else:
 ## Testing
 
 ### Mock Failures
+
 ```python
 def test_retry_success():
     call_count = [0]
-    
+
     @retry(max_attempts=3, delay=0.1)
     def flaky():
         call_count[0] += 1
         if call_count[0] < 2:
             raise ConnectionError("Fail")
         return "success"
-    
+
     assert flaky() == "success"
     assert call_count[0] == 2
 ```
 
 ### Test Circuit Breaker
+
 ```python
 def test_circuit_opens():
     circuit = CircuitBreaker(failure_threshold=3)
-    
+
     @circuit
     def fails():
         raise ValueError("Fail")
-    
+
     for _ in range(3):
         with pytest.raises(ValueError):
             fails()
-    
+
     assert circuit.state == CircuitState.OPEN
 ```
 
 ## When to Use Each Pattern
 
-| Pattern | Use When | Don't Use When |
-|---------|----------|----------------|
-| **Retry** | Transient failures (network, DB) | User input errors, validation |
-| **Circuit Breaker** | External dependencies | Internal functions, fast operations |
-| **Fallback** | Acceptable degraded service | Data consistency critical |
-| **Timeout** | Unbounded operations | Fast operations (<1s) |
-| **Transaction** | Multiple DB operations | Long-running processes |
-| **Batch Retry** | Large datasets, some may fail | All-or-nothing operations |
+| Pattern             | Use When                         | Don't Use When                      |
+| ------------------- | -------------------------------- | ----------------------------------- |
+| **Retry**           | Transient failures (network, DB) | User input errors, validation       |
+| **Circuit Breaker** | External dependencies            | Internal functions, fast operations |
+| **Fallback**        | Acceptable degraded service      | Data consistency critical           |
+| **Timeout**         | Unbounded operations             | Fast operations (<1s)               |
+| **Transaction**     | Multiple DB operations           | Long-running processes              |
+| **Batch Retry**     | Large datasets, some may fail    | All-or-nothing operations           |
 
 ## Configuration Recommendations
 
 ### External API
+
 ```python
 @timeout(seconds=30)
 @retry(max_attempts=3, delay=1.0, backoff=2.0, jitter=True)
@@ -421,6 +451,7 @@ def api_call():
 ```
 
 ### Database Query
+
 ```python
 @ensure_connection
 @db_retry(max_attempts=3, delay=0.5)
@@ -430,6 +461,7 @@ def db_query(db: Session):
 ```
 
 ### File Operation
+
 ```python
 @retry(max_attempts=2, delay=0.5)
 @fallback(use_default_file)
@@ -438,6 +470,7 @@ def read_file(path):
 ```
 
 ### Celery Task
+
 ```python
 @celery_app.task(bind=True, max_retries=3)
 @retry(max_attempts=2, delay=5.0)
@@ -450,13 +483,13 @@ def async_task(self, data):
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Too many retries | Lower `max_attempts` or add exception filtering |
-| Retry loops | Only retry transient errors, not validation |
-| Circuit opens too often | Increase `failure_threshold` |
-| Deadlocks | Keep transactions short, use smaller batch sizes |
-| Timeout too strict | Increase timeout or optimize operation |
+| Issue                         | Solution                                            |
+| ----------------------------- | --------------------------------------------------- |
+| Too many retries              | Lower `max_attempts` or add exception filtering     |
+| Retry loops                   | Only retry transient errors, not validation         |
+| Circuit opens too often       | Increase `failure_threshold`                        |
+| Deadlocks                     | Keep transactions short, use smaller batch sizes    |
+| Timeout too strict            | Increase timeout or optimize operation              |
 | No fallback when circuit open | Always provide fallback for circuit-protected calls |
 
 ## See Also
