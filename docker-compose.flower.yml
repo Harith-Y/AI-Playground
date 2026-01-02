@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # Flower - Celery Monitoring Dashboard
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.flower
+    container_name: aiplayground-flower
+    ports:
+      - "5555:5555"
+    environment:
+      # Broker and backend
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+
+      # Flower configuration
+      - FLOWER_PORT=5555
+      - FLOWER_BASIC_AUTH=${FLOWER_BASIC_AUTH:-admin:admin123}
+      - FLOWER_DB=/data/flower.db
+      - FLOWER_DEBUG=${FLOWER_DEBUG:-false}
+
+      # Optional: OAuth configuration (Google, GitHub, etc.)
+      # - FLOWER_OAUTH2_KEY=your_oauth_key
+      # - FLOWER_OAUTH2_SECRET=your_oauth_secret
+      # - FLOWER_OAUTH2_REDIRECT_URI=http://localhost:5555/flower/login
+
+    volumes:
+      # Persist Flower database
+      - flower-data:/data
+
+      # Optional: Mount configuration file
+      # - ./flower_config.py:/app/flower_config.py
+
+    depends_on:
+      - redis
+
+    networks:
+      - aiplayground-network
+
+    restart: unless-stopped
+
+    labels:
+      - "com.aiplayground.service=flower"
+      - "com.aiplayground.description=Celery Monitoring Dashboard"
+
+  # Redis (if not already running)
+  redis:
+    image: redis:7-alpine
+    container_name: aiplayground-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - aiplayground-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  flower-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  aiplayground-network:
+    driver: bridge
