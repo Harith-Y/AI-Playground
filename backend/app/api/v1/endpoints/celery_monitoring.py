@@ -3,9 +3,11 @@ Celery Task Monitoring API Endpoints
 
 Provides endpoints for monitoring Celery task execution, worker status,
 and queue metrics.
+
+Features intelligent caching to reduce load on Celery infrastructure.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Response
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import time
@@ -16,17 +18,35 @@ from app.monitoring.celery_metrics import (
     update_queue_length,
     update_worker_stats,
 )
+from app.monitoring.metrics_cache import (
+    get_task_status_cache,
+    get_worker_status_cache,
+    get_queue_status_cache,
+    get_metrics_summary_cache,
+    get_health_check_cache,
+    get_all_cache_stats,
+)
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 router = APIRouter()
 
+# Cache instances
+task_cache = get_task_status_cache()
+worker_cache = get_worker_status_cache()
+queue_cache = get_queue_status_cache()
+summary_cache = get_metrics_summary_cache()
+health_cache = get_health_check_cache()
+
 
 @router.get("/tasks/status", response_model=Dict[str, Any])
-async def get_task_status():
+async def get_task_status(response: Response, use_cache: bool = True):
     """
     Get current status of Celery tasks.
+
+    Args:
+        use_cache: Whether to use cached data (default: True)
 
     Returns:
         Dictionary with task status information including:
@@ -34,7 +54,21 @@ async def get_task_status():
         - Reserved tasks
         - Scheduled tasks
         - Total pending tasks
+
+    Cache TTL: 2 seconds
     """
+    cache_key = "task_status"
+
+    # Try cache first
+    if use_cache:
+        cached_data = task_cache.get(cache_key)
+        if cached_data is not None:
+            response.headers["X-Cache"] = "HIT"
+            response.headers["X-Cache-Age"] = str(int(time.time() - cached_data.get('_cache_time', 0)))
+            return cached_data
+
+    response.headers["X-Cache"] = "MISS"
+
     try:
         from celery import current_app
         inspect = current_app.control.inspect()
@@ -61,7 +95,7 @@ async def get_task_status():
                     'kwargs': task.get('kwargs')
                 })
 
-        return {
+        result = {
             'timestamp': datetime.utcnow().isoformat(),
             'summary': {
                 'active': total_active,
@@ -70,8 +104,15 @@ async def get_task_status():
                 'total_pending': total_active + total_reserved + total_scheduled
             },
             'active_tasks': active_tasks[:50],  # Limit to 50 for performance
-            'workers': list(active.keys())
+            'workers': list(active.keys()),
+            '_cache_time': time.time()  # Internal field for cache age
         }
+
+        # Cache the result
+        if use_cache:
+            task_cache.set(cache_key, result)
+
+        return result
 
     except Exception as e:
         logger.error(f"Failed to get task status: {e}", exc_info=True)
@@ -79,9 +120,12 @@ async def get_task_status():
 
 
 @router.get("/workers/status", response_model=Dict[str, Any])
-async def get_worker_status():
+async def get_worker_status(response: Response, use_cache: bool = True):
     """
     Get current status of Celery workers.
+
+    Args:
+        use_cache: Whether to use cached data (default: True)
 
     Returns:
         Dictionary with worker status information including:
@@ -89,7 +133,21 @@ async def get_worker_status():
         - Pool size
         - Active tasks
         - Resource usage
+
+    Cache TTL: 5 seconds
     """
+    cache_key = "worker_status"
+
+    # Try cache first
+    if use_cache:
+        cached_data = worker_cache.get(cache_key)
+        if cached_data is not None:
+            response.headers["X-Cache"] = "HIT"
+            response.headers["X-Cache-Age"] = str(int(time.time() - cached_data.get('_cache_time', 0)))
+            return cached_data
+
+    response.headers["X-Cache"] = "MISS"
+
     try:
         from celery import current_app
         inspect = current_app.control.inspect()
@@ -118,11 +176,18 @@ async def get_worker_status():
         # Update worker stats metrics
         update_worker_stats(celery_app)
 
-        return {
+        result = {
             'timestamp': datetime.utcnow().isoformat(),
             'total_workers': len(workers),
-            'workers': workers
+            'workers': workers,
+            '_cache_time': time.time()
         }
+
+        # Cache the result
+        if use_cache:
+            worker_cache.set(cache_key, result)
+
+        return result
 
     except Exception as e:
         logger.error(f"Failed to get worker status: {e}", exc_info=True)
@@ -130,13 +195,28 @@ async def get_worker_status():
 
 
 @router.get("/queues/status", response_model=Dict[str, Any])
-async def get_queue_status():
+async def get_queue_status(response: Response, use_cache: bool = True):
     """
     Get current status of Celery queues.
 
+    Args:
+        use_cache: Whether to use cached data (default: True)
+
     Returns:
         Dictionary with queue status information
+
+    Cache TTL: 3 seconds
     """
+    cache_key = "queue_status"
+
+    if use_cache:
+        cached_data = queue_cache.get(cache_key)
+        if cached_data is not None:
+            response.headers["X-Cache"] = "HIT"
+            return cached_data
+
+    response.headers["X-Cache"] = "MISS"
+
     try:
         # Update queue metrics
         update_queue_length(celery_app, queue_name='celery')
@@ -144,11 +224,17 @@ async def get_queue_status():
         # Get metrics summary
         summary = get_celery_metrics_summary(celery_app)
 
-        return {
+        result = {
             'timestamp': datetime.utcnow().isoformat(),
             'queues': summary.get('queues', {}),
-            'total_pending': summary.get('tasks', {}).get('total_pending', 0)
+            'total_pending': summary.get('tasks', {}).get('total_pending', 0),
+            '_cache_time': time.time()
         }
+
+        if use_cache:
+            queue_cache.set(cache_key, result)
+
+        return result
 
     except Exception as e:
         logger.error(f"Failed to get queue status: {e}", exc_info=True)
@@ -156,23 +242,44 @@ async def get_queue_status():
 
 
 @router.get("/metrics/summary", response_model=Dict[str, Any])
-async def get_metrics_summary():
+async def get_metrics_summary(response: Response, use_cache: bool = True):
     """
     Get comprehensive metrics summary for Celery tasks.
+
+    Args:
+        use_cache: Whether to use cached data (default: True)
 
     Returns:
         Dictionary with:
         - Worker statistics
         - Task statistics
         - Queue statistics
+
+    Cache TTL: 5 seconds
     """
+    cache_key = "metrics_summary"
+
+    if use_cache:
+        cached_data = summary_cache.get(cache_key)
+        if cached_data is not None:
+            response.headers["X-Cache"] = "HIT"
+            return cached_data
+
+    response.headers["X-Cache"] = "MISS"
+
     try:
         summary = get_celery_metrics_summary(celery_app)
 
-        return {
+        result = {
             'timestamp': datetime.utcnow().isoformat(),
-            **summary
+            **summary,
+            '_cache_time': time.time()
         }
+
+        if use_cache:
+            summary_cache.set(cache_key, result)
+
+        return result
 
     except Exception as e:
         logger.error(f"Failed to get metrics summary: {e}", exc_info=True)
@@ -347,3 +454,91 @@ async def get_detailed_stats():
     except Exception as e:
         logger.error(f"Failed to get detailed stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get detailed stats: {str(e)}")
+
+
+@router.get("/cache/stats")
+async def get_cache_stats():
+    """
+    Get statistics about cache performance.
+
+    Returns:
+        Cache statistics for all endpoint caches
+    """
+    try:
+        stats = get_all_cache_stats()
+
+        # Add overall summary
+        total_hits = sum(cache['hits'] for cache in stats.values())
+        total_misses = sum(cache['misses'] for cache in stats.values())
+        total_requests = total_hits + total_misses
+        overall_hit_rate = (total_hits / total_requests * 100) if total_requests > 0 else 0
+
+        return {
+            'timestamp': datetime.utcnow().isoformat(),
+            'caches': stats,
+            'summary': {
+                'total_hits': total_hits,
+                'total_misses': total_misses,
+                'total_requests': total_requests,
+                'overall_hit_rate_percent': overall_hit_rate
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get cache stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get cache stats: {str(e)}")
+
+
+@router.post("/cache/invalidate")
+async def invalidate_cache(cache_name: Optional[str] = None):
+    """
+    Invalidate monitoring caches.
+
+    Args:
+        cache_name: Specific cache to invalidate (optional)
+                   Options: task_status, worker_status, queue_status,
+                           metrics_summary, health_check
+                   If not provided, all caches are invalidated
+
+    Returns:
+        Confirmation message
+    """
+    try:
+        if cache_name:
+            # Invalidate specific cache
+            cache_map = {
+                'task_status': task_cache,
+                'worker_status': worker_cache,
+                'queue_status': queue_cache,
+                'metrics_summary': summary_cache,
+                'health_check': health_cache
+            }
+
+            if cache_name not in cache_map:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid cache name. Choose from: {', '.join(cache_map.keys())}"
+                )
+
+            cache_map[cache_name].clear()
+            message = f"Cache '{cache_name}' invalidated"
+
+        else:
+            # Invalidate all caches
+            from app.monitoring.metrics_cache import invalidate_all_metrics_caches
+            invalidate_all_metrics_caches()
+            message = "All monitoring caches invalidated"
+
+        logger.info(message)
+
+        return {
+            'timestamp': datetime.utcnow().isoformat(),
+            'message': message,
+            'cache_name': cache_name or 'all'
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to invalidate cache: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to invalidate cache: {str(e)}")
