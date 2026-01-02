@@ -11,7 +11,8 @@ from app.api.v1.endpoints import (
     metrics,
     code_generation,
     experiment_config,
-    inference
+    inference,
+    celery_monitoring
 )
 
 api_router = APIRouter()
@@ -75,4 +76,11 @@ api_router.include_router(
 api_router.include_router(
     metrics.router,
     tags=["monitoring"]
+)
+
+# Celery monitoring endpoints
+api_router.include_router(
+    celery_monitoring.router,
+    prefix="/celery",
+    tags=["celery-monitoring"]
 )

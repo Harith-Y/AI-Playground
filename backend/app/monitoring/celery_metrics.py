@@ -10,6 +10,7 @@ import psutil
 from typing import Any, Dict
 from celery import signals
 from celery.app.task import Task
+from prometheus_client import Gauge, Counter, Histogram
 
 from .metrics import (
     task_duration_histogram,
@@ -33,6 +34,85 @@ logger = get_logger(__name__)
 
 # Store task start times
 _task_start_times: Dict[str, float] = {}
+
+# ============================================================================
+# Additional Celery-Specific Metrics
+# ============================================================================
+
+# Worker pool metrics
+celery_worker_pool_size = Gauge(
+    'celery_worker_pool_size',
+    'Number of worker processes in the pool',
+    ['worker_name']
+)
+
+celery_worker_pool_busy = Gauge(
+    'celery_worker_pool_busy',
+    'Number of busy worker processes',
+    ['worker_name']
+)
+
+# Queue length tracking
+celery_queue_length = Gauge(
+    'celery_queue_length',
+    'Number of tasks in queue',
+    ['queue_name']
+)
+
+# Task failure rate
+celery_task_failure_rate = Gauge(
+    'celery_task_failure_rate',
+    'Task failure rate (failures per minute)',
+    ['task_name']
+)
+
+# Task retry tracking
+celery_task_retry_counter = Counter(
+    'celery_task_retries_total',
+    'Total number of task retries',
+    ['task_name', 'reason']
+)
+
+# Task timeout tracking
+celery_task_timeout_counter = Counter(
+    'celery_task_timeouts_total',
+    'Total number of task timeouts',
+    ['task_name']
+)
+
+# Prefetch multiplier tracking
+celery_worker_prefetch_count = Gauge(
+    'celery_worker_prefetch_count',
+    'Number of tasks prefetched by worker',
+    ['worker_name']
+)
+
+# Task result backend latency
+celery_result_backend_latency = Histogram(
+    'celery_result_backend_latency_seconds',
+    'Latency of result backend operations',
+    ['operation'],
+    buckets=(0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0)
+)
+
+# Task ETA (estimated time of arrival) tracking
+celery_task_eta_delta = Histogram(
+    'celery_task_eta_delta_seconds',
+    'Difference between scheduled ETA and actual execution time',
+    ['task_name'],
+    buckets=(0, 1, 5, 10, 30, 60, 300, 600, 1800, 3600)
+)
+
+# Percentile tracking for task duration
+celery_task_duration_percentiles = Gauge(
+    'celery_task_duration_percentile_seconds',
+    'Task duration percentiles',
+    ['task_name', 'percentile']
+)
+
+# Store failure counts for rate calculation
+_task_failure_counts: Dict[str, list] = {}
+_failure_rate_window = 60.0  # 1 minute window
 
 
 def setup_celery_metrics(celery_app):
@@ -124,11 +204,11 @@ def setup_celery_metrics(celery_app):
         )
     
     @signals.task_failure.connect
-    def task_failure_handler(sender=None, task_id=None, exception=None, 
+    def task_failure_handler(sender=None, task_id=None, exception=None,
                             traceback=None, **kwargs):
         """Called when task fails."""
         task_name = sender.name if sender else 'unknown'
-        
+
         # Calculate duration if available
         start_time = _task_start_times.pop(task_id, None)
         if start_time:
@@ -137,16 +217,23 @@ def setup_celery_metrics(celery_app):
                 task_name=task_name,
                 status='failure'
             ).observe(duration)
-        
+
         # Track failure
         task_counter.labels(
             task_name=task_name,
             status='failure'
         ).inc()
-        
+
+        # Track failure rate
+        _update_failure_rate(task_name)
+
+        # Check for timeout
+        if 'TimeLimitExceeded' in str(type(exception).__name__):
+            celery_task_timeout_counter.labels(task_name=task_name).inc()
+
         # Decrement active tasks
         active_tasks_gauge.labels(task_name=task_name).dec()
-        
+
         # Track specific failures
         if 'train_model' in task_name:
             training_result_counter.labels(
@@ -159,7 +246,7 @@ def setup_celery_metrics(celery_app):
                 tuning_method='unknown',
                 result='failure'
             ).inc()
-        
+
         logger.error(
             f"Task failed: {task_name}",
             extra={
@@ -175,12 +262,18 @@ def setup_celery_metrics(celery_app):
     def task_retry_handler(sender=None, task_id=None, reason=None, **kwargs):
         """Called when task is retried."""
         task_name = sender.name if sender else 'unknown'
-        
+
         task_counter.labels(
             task_name=task_name,
             status='retry'
         ).inc()
-        
+
+        # Track retry with reason
+        celery_task_retry_counter.labels(
+            task_name=task_name,
+            reason=str(reason) if reason else 'unknown'
+        ).inc()
+
         logger.warning(
             f"Task retried: {task_name}",
             extra={
@@ -319,26 +412,175 @@ def _track_tuning_metrics(result: Dict[str, Any], duration: float):
         logger.error(f"Failed to track tuning metrics: {e}")
 
 
+def _update_failure_rate(task_name: str):
+    """
+    Update failure rate for a task.
+
+    Args:
+        task_name: Name of the task
+    """
+    current_time = time.time()
+
+    if task_name not in _task_failure_counts:
+        _task_failure_counts[task_name] = []
+
+    # Add current failure
+    _task_failure_counts[task_name].append(current_time)
+
+    # Remove failures outside the time window
+    cutoff_time = current_time - _failure_rate_window
+    _task_failure_counts[task_name] = [
+        t for t in _task_failure_counts[task_name] if t > cutoff_time
+    ]
+
+    # Calculate failures per minute
+    failure_count = len(_task_failure_counts[task_name])
+    failure_rate = failure_count / (_failure_rate_window / 60.0)
+
+    celery_task_failure_rate.labels(task_name=task_name).set(failure_rate)
+
+
+def update_queue_length(celery_app, queue_name: str = 'celery'):
+    """
+    Update queue length metrics.
+
+    Args:
+        celery_app: Celery application instance
+        queue_name: Name of the queue to monitor
+    """
+    try:
+        from celery import current_app
+        inspect = current_app.control.inspect()
+
+        # Get active queues
+        active = inspect.active()
+        reserved = inspect.reserved()
+        scheduled = inspect.scheduled()
+
+        total_tasks = 0
+        if active:
+            total_tasks += sum(len(tasks) for tasks in active.values())
+        if reserved:
+            total_tasks += sum(len(tasks) for tasks in reserved.values())
+        if scheduled:
+            total_tasks += sum(len(tasks) for tasks in scheduled.values())
+
+        celery_queue_length.labels(queue_name=queue_name).set(total_tasks)
+
+        logger.debug(f"Queue length for {queue_name}: {total_tasks}")
+
+    except Exception as e:
+        logger.error(f"Failed to update queue length: {e}")
+
+
+def update_worker_stats(celery_app):
+    """
+    Update worker pool statistics.
+
+    Args:
+        celery_app: Celery application instance
+    """
+    try:
+        from celery import current_app
+        inspect = current_app.control.inspect()
+
+        # Get worker stats
+        stats = inspect.stats()
+
+        if stats:
+            for worker_name, worker_stats in stats.items():
+                # Pool size
+                pool_size = worker_stats.get('pool', {}).get('max-concurrency', 0)
+                celery_worker_pool_size.labels(worker_name=worker_name).set(pool_size)
+
+                # Active tasks (proxy for busy workers)
+                active_tasks = inspect.active()
+                if active_tasks and worker_name in active_tasks:
+                    busy_count = len(active_tasks[worker_name])
+                    celery_worker_pool_busy.labels(worker_name=worker_name).set(busy_count)
+
+                # Prefetch count
+                prefetch_count = worker_stats.get('prefetch_count', 0)
+                celery_worker_prefetch_count.labels(worker_name=worker_name).set(prefetch_count)
+
+                logger.debug(
+                    f"Worker {worker_name}: pool_size={pool_size}, "
+                    f"prefetch={prefetch_count}"
+                )
+
+    except Exception as e:
+        logger.error(f"Failed to update worker stats: {e}")
+
+
+def get_celery_metrics_summary(celery_app) -> Dict[str, Any]:
+    """
+    Get a summary of Celery metrics.
+
+    Args:
+        celery_app: Celery application instance
+
+    Returns:
+        Dictionary with metrics summary
+    """
+    try:
+        from celery import current_app
+        inspect = current_app.control.inspect()
+
+        active = inspect.active() or {}
+        reserved = inspect.reserved() or {}
+        scheduled = inspect.scheduled() or {}
+        stats = inspect.stats() or {}
+
+        total_active = sum(len(tasks) for tasks in active.values())
+        total_reserved = sum(len(tasks) for tasks in reserved.values())
+        total_scheduled = sum(len(tasks) for tasks in scheduled.values())
+
+        return {
+            'workers': {
+                'total': len(stats),
+                'names': list(stats.keys())
+            },
+            'tasks': {
+                'active': total_active,
+                'reserved': total_reserved,
+                'scheduled': total_scheduled,
+                'total_pending': total_active + total_reserved + total_scheduled
+            },
+            'queues': {
+                'celery': total_active + total_reserved + total_scheduled
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get metrics summary: {e}")
+        return {
+            'error': str(e),
+            'workers': {'total': 0, 'names': []},
+            'tasks': {'active': 0, 'reserved': 0, 'scheduled': 0, 'total_pending': 0},
+            'queues': {}
+        }
+
+
 def track_resource_usage():
     """
     Track current resource usage.
-    
+
     Should be called periodically (e.g., every 30 seconds).
     """
     try:
         process = psutil.Process()
-        
+
         # Memory usage
         memory_info = process.memory_info()
         memory_usage_gauge.labels(process_type='celery_worker').set(
             memory_info.rss
         )
-        
+
         # CPU usage
         cpu_percent = process.cpu_percent(interval=1.0)
         cpu_usage_gauge.labels(process_type='celery_worker').set(
             cpu_percent
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to track resource usage: {e}")
