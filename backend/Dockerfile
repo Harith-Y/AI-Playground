@@ -3,7 +3,7 @@
 ARG REQUIREMENTS_FILE=requirements.render.txt
 
 # Stage 1: Base image with dependencies
-FROM python:3.11-slim as base
+FROM python:3.14-slim as base
 
 ARG REQUIREMENTS_FILE
 
@@ -37,7 +37,7 @@ RUN pip install --upgrade pip && \
     rm -rf /root/.cache/pip
 
 # Stage 2: Production image (optimized for Render)
-FROM python:3.11-slim as production
+FROM python:3.14-slim as production
 
 # Copy Python packages from base
 COPY --from=base /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
