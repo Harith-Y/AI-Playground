@@ -106,8 +106,9 @@ def delete_file_after_delay(file_path: Path, delay_seconds: int = 300):
 # Dependency to get current user (placeholder - implement based on your auth)
 def get_current_user(db: Session = Depends(get_db)) -> User:
     """Get current authenticated user."""
-    # TODO: Implement proper authentication
-    # For now, return first user or create test user
+    # Authentication: In production, extract from JWT token or OAuth
+    # Example: decode JWT from request.headers['Authorization']
+    # For development, return first user or create test user
     user = db.query(User).first()
     if not user:
         user = User(email="test@example.com")

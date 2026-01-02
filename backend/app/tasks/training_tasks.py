@@ -41,9 +41,8 @@ def deserialize_transformer(binary_data):
     return pickle.loads(binary_data)
 
 from app.ml_engine.evaluation.classification_metrics import calculate_classification_metrics
-# TODO: Import regression and clustering metrics when implemented
-# from app.ml_engine.evaluation.regression_metrics import calculate_regression_metrics
-# from app.ml_engine.evaluation.clustering_metrics import calculate_clustering_metrics
+from app.ml_engine.evaluation.regression_metrics import calculate_regression_metrics
+from app.ml_engine.evaluation.clustering_metrics import calculate_clustering_metrics
 from app.core.config import settings
 from app.utils.logger import get_logger
 from app.utils.cache import invalidate_model_cache, invalidate_comparison_cache

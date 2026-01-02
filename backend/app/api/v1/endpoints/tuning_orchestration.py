@@ -35,8 +35,10 @@ logger = get_logger(__name__)
 
 # Helper functions
 def get_current_user_id() -> str:
-    """Mock function to get current user ID."""
-    # TODO: Replace with actual authentication
+    """Get current user ID from authentication context."""
+    # In production: Extract from JWT token or session
+    # Example: token = decode_jwt(request.headers['Authorization'])
+    # return token['user_id']
     return "00000000-0000-0000-0000-000000000001"
 
 

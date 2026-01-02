@@ -826,26 +826,26 @@ if __name__ == '__main__':
     print("=" * 80)
     print()
     
-    # TODO: Add your data loading code here
-    # df = pd.read_csv('your_data.csv')
+    # Step 1: Load your data
+    # Example: df = pd.read_csv('your_data.csv')
     
-    # TODO: Run preprocessing
-    # df_clean = preprocess_data(df)
+    # Step 2: Run preprocessing
+    # Example: df_clean = preprocess_data(df)
     
-    # TODO: Split data
-    # X_train, X_test, y_train, y_test = split_data(df_clean, target_column)
+    # Step 3: Split data into train/test sets
+    # Example: X_train, X_test, y_train, y_test = split_data(df_clean, target_column)
     
-    # TODO: Train model
-    # model = train_model(X_train, y_train)
+    # Step 4: Train model
+    # Example: model = train_model(X_train, y_train)
     
-    # TODO: Evaluate model
-    # results = evaluate_model(model, X_test, y_test)
+    # Step 5: Evaluate model performance
+    # Example: results = evaluate_model(model, X_test, y_test)
     
-    # TODO: Make predictions
-    # predictions = predict(model, X_new)
+    # Step 6: Make predictions on new data
+    # Example: predictions = predict(model, X_new)
     
     print("\\nPipeline template generated successfully!")
-    print("Uncomment and modify the TODO sections to run your pipeline.")
+    print("Replace the example code above with your actual data paths and parameters.")
 '''
     sections.append(main_code)
     
