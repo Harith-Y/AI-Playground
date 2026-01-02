@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from app.utils.logger import get_logger
+from app.utils.memory_manager import get_memory_monitor, MemoryOptimizer, memory_profiler
 
 logger = get_logger(__name__)
 
@@ -140,12 +141,14 @@ class ChunkedDataLoader:
 
     def iter_chunks(self) -> Iterator[pd.DataFrame]:
         """
-        Iterate over dataset chunks.
+        Iterate over dataset chunks with memory monitoring.
 
         Yields:
             DataFrame chunks
         """
         logger.info(f"Reading {self.file_path} in chunks of {self.chunk_size}")
+
+        memory_monitor = get_memory_monitor()
 
         try:
             chunk_reader = pd.read_csv(
@@ -158,6 +161,17 @@ class ChunkedDataLoader:
 
             for i, chunk in enumerate(chunk_reader):
                 logger.debug(f"Processing chunk {i+1}, shape: {chunk.shape}")
+
+                # Optimize chunk memory
+                chunk = MemoryOptimizer.optimize_dataframe_memory(chunk, aggressive=False)
+
+                # Check memory usage periodically
+                if i % 10 == 0:
+                    snapshot = memory_monitor.get_current_snapshot()
+                    if snapshot.percent > 85.0:
+                        logger.warning(f"High memory usage detected: {snapshot.percent:.1f}% - Running GC")
+                        MemoryOptimizer.aggressive_gc()
+
                 yield chunk
 
         except Exception as e:
@@ -182,33 +196,34 @@ class ChunkedDataLoader:
         chunks_processed = []
         total_rows = 0
 
-        for chunk in self.iter_chunks():
-            try:
-                # Apply transformation
-                processed_chunk = transform_fn(chunk)
-                total_rows += len(processed_chunk)
+        with memory_profiler("Chunked Data Processing"):
+            for chunk in self.iter_chunks():
+                try:
+                    # Apply transformation
+                    processed_chunk = transform_fn(chunk)
+                    total_rows += len(processed_chunk)
 
-                if output_path:
-                    # Write to file incrementally
-                    mode = 'w' if total_rows == len(processed_chunk) else 'a'
-                    header = total_rows == len(processed_chunk)
-                    processed_chunk.to_csv(
-                        output_path,
-                        mode=mode,
-                        header=header,
-                        index=False
-                    )
-                else:
-                    # Store in memory (use with caution for large datasets)
-                    chunks_processed.append(processed_chunk)
+                    if output_path:
+                        # Write to file incrementally
+                        mode = 'w' if total_rows == len(processed_chunk) else 'a'
+                        header = total_rows == len(processed_chunk)
+                        processed_chunk.to_csv(
+                            output_path,
+                            mode=mode,
+                            header=header,
+                            index=False
+                        )
+                    else:
+                        # Store in memory (use with caution for large datasets)
+                        chunks_processed.append(processed_chunk)
 
-                # Clean up
-                del chunk, processed_chunk
-                gc.collect()
+                    # Clean up
+                    del chunk, processed_chunk
+                    gc.collect()
 
-            except Exception as e:
-                logger.error(f"Error processing chunk: {e}", exc_info=True)
-                raise
+                except Exception as e:
+                    logger.error(f"Error processing chunk: {e}", exc_info=True)
+                    raise
 
         logger.info(f"Processed {total_rows:,} total rows")
 
@@ -280,7 +295,7 @@ class MemoryEfficientPreprocessor:
         target_column: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Fit and transform data in chunks.
+        Fit and transform data in chunks with memory profiling.
 
         Args:
             file_path: Input CSV path
@@ -293,15 +308,16 @@ class MemoryEfficientPreprocessor:
         """
         logger.info(f"Starting chunked fit_transform: {file_path} -> {output_path}")
 
-        loader = ChunkedDataLoader(file_path, chunk_size=self.chunk_size)
+        with memory_profiler("Memory-Efficient Preprocessing"):
+            loader = ChunkedDataLoader(file_path, chunk_size=self.chunk_size)
 
-        # First pass: Fit transformers (e.g., calculate means, medians)
-        logger.info("Pass 1: Fitting transformers")
-        self._fit_chunked(loader, steps, target_column)
+            # First pass: Fit transformers (e.g., calculate means, medians)
+            logger.info("Pass 1: Fitting transformers")
+            self._fit_chunked(loader, steps, target_column)
 
-        # Second pass: Transform data
-        logger.info("Pass 2: Transforming data")
-        stats = self._transform_chunked(loader, output_path, steps, target_column)
+            # Second pass: Transform data
+            logger.info("Pass 2: Transforming data")
+            stats = self._transform_chunked(loader, output_path, steps, target_column)
 
         logger.info("Chunked fit_transform completed")
         return stats

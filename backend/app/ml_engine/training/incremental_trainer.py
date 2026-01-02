@@ -18,6 +18,7 @@ from app.ml_engine.utils.dataset_optimizer import (
     get_optimal_chunk_size
 )
 from app.utils.logger import get_logger
+from app.utils.memory_manager import memory_profiler, get_memory_monitor, MemoryOptimizer
 
 logger = get_logger(__name__)
 
@@ -97,38 +98,39 @@ class IncrementalTrainer:
         """
         logger.info(f"Starting incremental training on {file_path}")
 
-        # Get dataset metrics
-        dataset_metrics = DatasetMetrics.from_file(file_path)
+        with memory_profiler("Incremental Training"):
+            # Get dataset metrics
+            dataset_metrics = DatasetMetrics.from_file(file_path)
 
-        # Calculate optimal chunk size if not provided
-        if self.chunk_size is None:
-            self.chunk_size = get_optimal_chunk_size(dataset_metrics)
+            # Calculate optimal chunk size if not provided
+            if self.chunk_size is None:
+                self.chunk_size = get_optimal_chunk_size(dataset_metrics)
 
-        # Initialize data loader
-        loader = ChunkedDataLoader(
-            file_path,
-            chunk_size=self.chunk_size
-        )
-
-        # First pass: Fit scaler if needed
-        if scale_features:
-            logger.info("Pass 1: Fitting scaler")
-            self.scaler = self._fit_scaler_incremental(
-                loader,
-                target_column,
-                feature_columns
+            # Initialize data loader
+            loader = ChunkedDataLoader(
+                file_path,
+                chunk_size=self.chunk_size
             )
 
-        # Second pass: Train model incrementally
-        logger.info("Pass 2: Training model incrementally")
-        stats = self._train_incremental(
-            loader,
-            target_column,
-            feature_columns,
-            validation_split,
-            classes,
-            random_state
-        )
+            # First pass: Fit scaler if needed
+            if scale_features:
+                logger.info("Pass 1: Fitting scaler")
+                self.scaler = self._fit_scaler_incremental(
+                    loader,
+                    target_column,
+                    feature_columns
+                )
+
+            # Second pass: Train model incrementally
+            logger.info("Pass 2: Training model incrementally")
+            stats = self._train_incremental(
+                loader,
+                target_column,
+                feature_columns,
+                validation_split,
+                classes,
+                random_state
+            )
 
         logger.info("Incremental training completed")
         return stats

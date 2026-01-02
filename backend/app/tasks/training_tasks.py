@@ -48,6 +48,7 @@ from app.core.config import settings
 from app.utils.logger import get_logger
 from app.utils.cache import invalidate_model_cache, invalidate_comparison_cache
 from app.services.training_error_handler import handle_training_error
+from app.utils.memory_manager import memory_profiler, get_memory_monitor, MemoryOptimizer
 from app.core.training_exceptions import (
     DataLoadError,
     PreprocessingError,
@@ -331,10 +332,15 @@ def train_model(
     task_start_time = time.time()
     db: Session = SessionLocal()
 
+    # Initialize memory monitoring for this training task
+    memory_monitor = get_memory_monitor()
+    memory_monitor.set_baseline()
+    logger.info(f"Training task started - baseline memory: {memory_monitor.get_current_snapshot().rss_mb:.2f}MB")
+
     try:
         # Initialize progress tracking in database
         initialize_progress_tracking(db, model_run_id)
-        
+
         # Update progress: Initializing (0%)
         update_training_progress(db, model_run_id, 0, "Initializing training...")
         self.update_state(
@@ -370,28 +376,34 @@ def train_model(
             }
         )
 
-        # 2. Load dataset
+        # 2. Load dataset with memory profiling
         logger.info(f"Loading dataset from {dataset.file_path}")
-        try:
-            df = pd.read_csv(dataset.file_path)
-        except FileNotFoundError:
-            raise DataLoadError(
-                message=f"Dataset file not found: {dataset.file_path}",
-                file_path=dataset.file_path
-            )
-        except pd.errors.EmptyDataError:
-            raise DataLoadError(
-                message="Dataset file is empty",
-                file_path=dataset.file_path
-            )
-        except Exception as e:
-            raise DataLoadError(
-                message=f"Failed to load dataset: {str(e)}",
-                file_path=dataset.file_path
-            )
+        with memory_profiler("Data Loading") as load_monitor:
+            try:
+                df = pd.read_csv(dataset.file_path)
+            except FileNotFoundError:
+                raise DataLoadError(
+                    message=f"Dataset file not found: {dataset.file_path}",
+                    file_path=dataset.file_path
+                )
+            except pd.errors.EmptyDataError:
+                raise DataLoadError(
+                    message="Dataset file is empty",
+                    file_path=dataset.file_path
+                )
+            except Exception as e:
+                raise DataLoadError(
+                    message=f"Failed to load dataset: {str(e)}",
+                    file_path=dataset.file_path
+                )
 
         initial_shape = df.shape
         logger.info(f"Dataset loaded: {initial_shape[0]} rows, {initial_shape[1]} columns")
+
+        # Optimize DataFrame memory usage
+        logger.info("Optimizing DataFrame memory usage...")
+        df = MemoryOptimizer.optimize_dataframe_memory(df, aggressive=False)
+        logger.info(f"DataFrame memory optimized")
 
         # Update progress: Applying preprocessing (20%)
         update_training_progress(db, model_run_id, 20, "Applying preprocessing steps...")
@@ -502,6 +514,13 @@ def train_model(
             y_train = None
             y_test = None
 
+        # Check memory before training
+        memory_snapshot = memory_monitor.get_current_snapshot()
+        if memory_snapshot.percent > 85.0:
+            logger.warning(f"High memory usage before training: {memory_snapshot.percent:.1f}%")
+            logger.info("Running garbage collection to free memory...")
+            MemoryOptimizer.aggressive_gc()
+
         # Update progress: Training model (50%)
         update_training_progress(db, model_run_id, 50, f"Training {model_info.name}...")
         self.update_state(
@@ -535,19 +554,20 @@ def train_model(
                 config=hyperparameters or {}
             )
 
-        # 7. Train the model
+        # 7. Train the model with memory profiling
         training_start = time.time()
 
-        try:
-            if task_type.value in ['classification', 'regression']:
-                model.fit(X_train, y_train)
-            else:
-                model.fit(X_train)
-        except Exception as e:
-            raise ModelTrainingError(
-                message=f"Model training failed: {str(e)}",
-                model_type=model_type
-            )
+        with memory_profiler(f"Model Training - {model_info.name}"):
+            try:
+                if task_type.value in ['classification', 'regression']:
+                    model.fit(X_train, y_train)
+                else:
+                    model.fit(X_train)
+            except Exception as e:
+                raise ModelTrainingError(
+                    message=f"Model training failed: {str(e)}",
+                    model_type=model_type
+                )
 
         training_duration = time.time() - training_start
         logger.info(f"Model training completed in {training_duration:.2f} seconds")
@@ -699,6 +719,14 @@ def train_model(
 
         # Calculate total execution time
         total_execution_time = time.time() - task_start_time
+
+        # Log final memory usage
+        final_memory = memory_monitor.get_current_snapshot()
+        memory_delta = memory_monitor.get_memory_delta()
+        logger.info(
+            f"Training completed - Final memory: {final_memory.rss_mb:.2f}MB, "
+            f"Delta: {memory_delta:+.2f}MB, Peak: {memory_monitor.get_peak_memory():.2f}MB"
+        )
 
         # Update progress: Complete (100%)
         update_training_progress(db, model_run_id, 100, "Training completed successfully!")
