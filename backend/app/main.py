@@ -99,6 +99,41 @@ def create_app() -> FastAPI:
 		- Deployment verification
 		"""
 		return {"status": "ok", "version": settings.VERSION}
+	
+	# Database migration status endpoint
+	@app.get(
+		"/health/migrations",
+		tags=["health"],
+		summary="Migration Status",
+		description="Check database migration status",
+		responses={
+			200: {
+				"description": "Migration status",
+				"content": {
+					"application/json": {
+						"example": {
+							"current_revision": "abc123",
+							"head_revision": "abc123",
+							"is_up_to_date": True,
+							"pending_count": 0
+						}
+					}
+				}
+			}
+		}
+	)
+	async def migration_status():
+		"""
+		Database migration status endpoint.
+		
+		Returns:
+		- current_revision: Current database revision
+		- head_revision: Latest available revision
+		- is_up_to_date: Whether database is current
+		- pending_count: Number of pending migrations
+		"""
+		from app.db.migration_manager import check_migration_status
+		return check_migration_status()
 
 	return app
 
