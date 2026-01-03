@@ -7,13 +7,14 @@ import pandas as pd
 from pathlib import Path
 from typing import List
 from uuid import UUID
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import get_current_user_id, verify_resource_ownership
+from app.core.security import get_current_user_id, verify_resource_ownership, decode_token, get_password_hash
 from app.db.session import get_db
 from app.models.dataset import Dataset
+from app.models.user import User
 from app.services.r2_storage_service import get_storage_service
 from app.schemas.dataset import (
     DatasetRead,
@@ -23,6 +24,43 @@ from app.schemas.dataset import (
 )
 
 router = APIRouter()
+
+
+async def get_user_or_guest(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> UUID:
+    """
+    Get the current authenticated user ID, or create/return a guest user ID.
+    This allows the playground to work without forcing login, while still supporting auth.
+    """
+    # 1. Try to extract token
+    authorization: str = request.headers.get("Authorization")
+    if authorization:
+        scheme, _, param = authorization.partition(" ")
+        if scheme.lower() == "bearer":
+            try:
+                payload = decode_token(param)
+                user_id = payload.get("sub")
+                if user_id:
+                    return UUID(user_id)
+            except Exception:
+                pass # Token invalid, fall back to guest
+
+    # 2. Fallback to guest
+    guest_email = "guest@aiplayground.local"
+    guest_user = db.query(User).filter(User.email == guest_email).first()
+    if not guest_user:
+        guest_user = User(
+            email=guest_email,
+            password_hash=get_password_hash("guest_password"),
+            is_active=True
+        )
+        db.add(guest_user)
+        db.commit()
+        db.refresh(guest_user)
+    
+    return guest_user.id
 
 
 @router.post(
@@ -83,7 +121,7 @@ router = APIRouter()
 async def upload_dataset(
     file: UploadFile = File(..., description="Dataset file to upload (CSV, XLSX, XLS, or JSON format)"),
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_current_user_id)
+    user_id: UUID = Depends(get_user_or_guest)
 ):
     """
     Upload a dataset file and extract metadata.
