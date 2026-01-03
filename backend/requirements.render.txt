@@ -42,6 +42,10 @@ python-jose==3.5.0
 python-multipart==0.0.21
 email-validator==2.1.0
 
+# Storage (Cloudflare R2 / S3-compatible)
+boto3==1.35.95
+botocore==1.35.95
+
 # Utilities
 python-dotenv==1.2.1
 python-dateutil==2.9.0.post0
