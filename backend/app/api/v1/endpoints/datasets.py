@@ -1,5 +1,6 @@
 # Dataset upload, preview, stats endpoints
 
+import io
 import os
 import uuid as uuid_lib
 import pandas as pd
@@ -13,6 +14,7 @@ from app.core.config import settings
 from app.core.security import get_current_user_id, verify_resource_ownership
 from app.db.session import get_db
 from app.models.dataset import Dataset
+from app.services.r2_storage_service import get_storage_service
 from app.schemas.dataset import (
     DatasetRead,
     DatasetPreviewResponse,
@@ -131,23 +133,33 @@ async def upload_dataset(
     # Generate unique dataset ID
     dataset_id = str(uuid.uuid4())
 
-    # Create user-specific upload directory
-    upload_path = Path(settings.UPLOAD_DIR) / user_id / dataset_id
-    upload_path.mkdir(parents=True, exist_ok=True)
+    # Get storage service (R2 or local filesystem)
+    storage_service = get_storage_service()
+    
+    # Define file path (user_id/dataset_id/filename)
+    file_storage_path = f"{user_id}/{dataset_id}/{file.filename}"
+    
+    # Upload file to R2 or local storage
+    try:
+        file_url = storage_service.upload_file(
+            file_content=content,
+            file_path=file_storage_path,
+            content_type=file.content_type
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload file: {str(e)}"
+        )
 
-    # Save file
-    file_path = upload_path / file.filename
-    with open(file_path, "wb") as f:
-        f.write(content)
-
-    # Extract metadata using pandas
+    # Extract metadata using pandas (load from bytes)
     try:
         if file_ext == ".csv":
-            df = pd.read_csv(file_path)
+            df = pd.read_csv(io.BytesIO(content))
         elif file_ext in [".xlsx", ".xls"]:
-            df = pd.read_excel(file_path)
+            df = pd.read_excel(io.BytesIO(content))
         elif file_ext == ".json":
-            df = pd.read_json(file_path)
+            df = pd.read_json(io.BytesIO(content))
 
         # Calculate statistics
         row_count = len(df)
@@ -160,9 +172,12 @@ async def upload_dataset(
         missing_values = {col: int(df[col].isna().sum()) for col in df.columns}
 
     except Exception as e:
-        # Clean up file if metadata extraction fails
-        file_path.unlink()
-        upload_path.rmdir()
+        # Clean up uploaded file on error
+        try:
+            storage_service.delete_file(file_storage_path)
+        except:
+            pass  # Ignore cleanup errors
+        
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to process file: {str(e)}"
@@ -173,7 +188,7 @@ async def upload_dataset(
         id=dataset_id,
         user_id=user_id,
         name=Path(file.filename).stem,  # filename without extension
-        file_path=str(file_path),
+        file_path=file_storage_path,  # Store R2 path or local filesystem path
         rows=row_count,
         cols=column_count,
         dtypes=dtypes,

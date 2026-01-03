@@ -6,6 +6,7 @@ Contains middleware for:
 - Security logging
 - Error tracking
 - Performance monitoring
+- Rate limiting
 """
 
 from app.middleware.logging_middleware import (
@@ -13,9 +14,12 @@ from app.middleware.logging_middleware import (
     SecurityLoggingMiddleware,
     ErrorLoggingMiddleware
 )
+from app.middleware.rate_limit import RateLimitMiddleware, create_rate_limiter
 
 __all__ = [
     'RequestLoggingMiddleware',
     'SecurityLoggingMiddleware',
     'ErrorLoggingMiddleware',
+    'RateLimitMiddleware',
+    'create_rate_limiter',
 ]

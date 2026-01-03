@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from time import perf_counter
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from app.core.api_docs import get_openapi_config, get_custom_openapi_schema, API
 from app.utils.logger import get_logger, set_correlation_id
 from app.api.v1.api import api_router
 from app.monitoring.middleware import PerformanceMonitoringMiddleware
+from app.middleware import create_rate_limiter
 
 
 def create_app() -> FastAPI:
@@ -32,6 +34,23 @@ def create_app() -> FastAPI:
 	app.openapi = lambda: get_custom_openapi_schema(app)
 
 	logger = get_logger("backend")
+
+	# Add CORS middleware for frontend access
+	origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",")]
+	app.add_middleware(
+		CORSMiddleware,
+		allow_origins=origins,
+		allow_credentials=True,
+		allow_methods=["*"],
+		allow_headers=["*"],
+	)
+	logger.info(f"CORS middleware added with origins: {origins}")
+
+	# Add rate limiting middleware
+	if settings.ENABLE_RATE_LIMITING:
+		rate_limiter = create_rate_limiter()
+		app.add_middleware(rate_limiter)
+		logger.info("Rate limiting middleware added")
 
 	# Add performance monitoring middleware
 	app.add_middleware(PerformanceMonitoringMiddleware)

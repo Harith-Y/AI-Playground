@@ -45,6 +45,22 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
     LOG_DIR: str = "./backend/logs"  # Relative to project root by default
     
+    # CORS (for frontend access)
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    
+    # Rate Limiting
+    ENABLE_RATE_LIMITING: bool = False
+    RATE_LIMIT_PER_MINUTE: int = 60
+    RATE_LIMIT_PER_HOUR: int = 1000
+    
+    # Cloudflare R2 Storage (S3-compatible)
+    R2_ACCOUNT_ID: Optional[str] = None
+    R2_ACCESS_KEY_ID: Optional[str] = None
+    R2_SECRET_ACCESS_KEY: Optional[str] = None
+    R2_BUCKET_NAME: str = "aiplayground-storage"
+    R2_PUBLIC_URL: Optional[str] = None
+    USE_R2_STORAGE: bool = False  # Set to True to use R2 instead of local filesystem
+    
     class Config:
         env_file = str(ENV_FILE)
         env_file_encoding = "utf-8"
