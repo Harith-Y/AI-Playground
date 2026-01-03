@@ -6,10 +6,14 @@ import {
   IconButton,
   Box,
   Button,
+  Tooltip,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useNavigate } from 'react-router-dom';
+import { useThemeContext } from '../../contexts/ThemeContext';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -17,6 +21,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const navigate = useNavigate();
+  const { mode, toggleTheme } = useThemeContext();
 
   const handleLogoClick = () => {
     navigate('/');
@@ -101,6 +106,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             Experiments
           </Button>
         </Box>
+
+        <Tooltip title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+          <IconButton onClick={toggleTheme} color="inherit" aria-label="toggle theme" sx={{ mr: 1 }}>
+            {mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+          </IconButton>
+        </Tooltip>
 
         <IconButton color="inherit" aria-label="account">
           <AccountCircleIcon />

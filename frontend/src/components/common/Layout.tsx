@@ -22,10 +22,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <Box sx={{ 
-      display: 'flex', 
-      minHeight: '100vh', 
-      background: 'linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)' 
+    <Box sx={{
+      display: 'flex',
+      minHeight: '100vh',
+      background: theme.palette.mode === 'light'
+        ? 'linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)'
+        : 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)'
     }}>
       {/* Header */}
       <Header onMenuClick={handleDrawerToggle} />
