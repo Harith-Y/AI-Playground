@@ -243,7 +243,17 @@ async def upload_dataset(
     db.commit()
     db.refresh(dataset)
 
-    return dataset
+    # Convert to Pydantic model manually to avoid validation errors
+    return DatasetRead(
+        id=dataset.id,
+        user_id=dataset.user_id,
+        name=dataset.name,
+        file_path=dataset.file_path,
+        shape=None, # Dataset model doesn't have shape dict, it has rows/cols
+        dtypes=dataset.dtypes,
+        missing_values=dataset.missing_values,
+        uploaded_at=dataset.uploaded_at
+    )
 
 
 @router.get(
