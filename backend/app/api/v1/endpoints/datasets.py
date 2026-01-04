@@ -169,7 +169,7 @@ async def upload_dataset(
         )
 
     # Generate unique dataset ID
-    dataset_id = str(uuid.uuid4())
+    dataset_id = str(uuid_lib.uuid4())
 
     # Get storage service (R2 or local filesystem)
     storage_service = get_storage_service()
