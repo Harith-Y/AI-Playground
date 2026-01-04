@@ -185,6 +185,9 @@ async def upload_dataset(
             content_type=file.content_type
         )
     except Exception as e:
+        import traceback
+        print(f"Upload error: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload file: {str(e)}"
@@ -211,6 +214,9 @@ async def upload_dataset(
 
     except Exception as e:
         # Clean up uploaded file on error
+        import traceback
+        print(f"Processing error: {str(e)}")
+        print(traceback.format_exc())
         try:
             storage_service.delete_file(file_storage_path)
         except:
