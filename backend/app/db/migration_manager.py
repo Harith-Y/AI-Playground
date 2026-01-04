@@ -311,8 +311,11 @@ class MigrationManager:
                 return False
         
         except Exception as e:
-            logger.error(f"Migration failed: {e}", exc_info=True)
-            return False
+            import traceback
+            error_msg = f"Migration failed: {e}\n{traceback.format_exc()}"
+            logger.error(error_msg)
+            # Re-raise the exception so the caller knows it failed
+            raise MigrationError(error_msg) from e
     
     def downgrade(self, revision: str = "-1") -> bool:
         """
