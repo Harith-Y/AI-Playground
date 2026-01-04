@@ -36,8 +36,21 @@ class R2StorageService:
         else:
             self.s3_client = None
             self.local_storage_path = Path(settings.UPLOAD_DIR)
-            self.local_storage_path.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Local filesystem storage initialized at: {self.local_storage_path}")
+            
+            # Try to create directory, fallback to /tmp if permission denied
+            try:
+                self.local_storage_path.mkdir(parents=True, exist_ok=True)
+                # Test write permission
+                test_file = self.local_storage_path / ".test_write"
+                test_file.touch()
+                test_file.unlink()
+                logger.info(f"Local filesystem storage initialized at: {self.local_storage_path}")
+            except (PermissionError, OSError) as e:
+                logger.warning(f"Failed to initialize storage at {self.local_storage_path}: {e}")
+                logger.warning("Falling back to /tmp/uploads")
+                self.local_storage_path = Path("/tmp/uploads")
+                self.local_storage_path.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Local filesystem storage initialized at: {self.local_storage_path}")
     
     def _validate_r2_config(self) -> bool:
         """Check if R2 configuration is complete"""

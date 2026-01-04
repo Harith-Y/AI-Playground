@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # File Storage
-    UPLOAD_DIR: str = "./uploads"
+    UPLOAD_DIR: str = str(BASE_DIR / "uploads")
     MAX_UPLOAD_SIZE: int = 104857600  # 100MB
     
     # Environment
