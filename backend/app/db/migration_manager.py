@@ -356,12 +356,13 @@ class MigrationManager:
         logger.error("Migration failed after all retry attempts")
         return False
     
-    def auto_migrate(self, wait_for_db: bool = True) -> bool:
+    def auto_migrate(self, wait_for_db: bool = True, raise_exceptions: bool = False) -> bool:
         """
         Automatically run migrations on startup.
         
         Args:
             wait_for_db: Wait for database to be available
+            raise_exceptions: Whether to raise exceptions instead of returning False
         
         Returns:
             True if successful, False otherwise
@@ -384,7 +385,23 @@ class MigrationManager:
                 logger.info(f"Applying {status['pending_count']} pending migration(s)...")
                 
                 if self.auto_upgrade:
-                    success = self.upgrade_with_retry()
+                    # We need to handle the retry logic here to respect raise_exceptions
+                    success = False
+                    last_error = None
+                    
+                    for attempt in range(1, self.max_retry_attempts + 1):
+                        try:
+                            if self.upgrade_to_head():
+                                success = True
+                                break
+                        except Exception as e:
+                            last_error = e
+                            if attempt < self.max_retry_attempts:
+                                logger.warning(f"Migration attempt {attempt} failed, retrying...")
+                                time.sleep(self.retry_delay)
+                    
+                    if not success and last_error and raise_exceptions:
+                        raise last_error
                     
                     if success:
                         logger.info("=== Automatic migration completed successfully ===")
@@ -401,6 +418,8 @@ class MigrationManager:
         
         except Exception as e:
             logger.error(f"Auto-migration error: {e}", exc_info=True)
+            if raise_exceptions:
+                raise
             return False
     
     def create_revision(
@@ -494,10 +513,11 @@ def run_migrations_on_startup(
     """
     try:
         manager = MigrationManager(auto_upgrade=auto_upgrade)
-        success = manager.auto_migrate(wait_for_db=wait_for_db)
+        # Pass fail_on_error as raise_exceptions to get the real error
+        success = manager.auto_migrate(wait_for_db=wait_for_db, raise_exceptions=fail_on_error)
         
         if not success and fail_on_error:
-            raise MigrationError("Database migration failed")
+            raise MigrationError("Database migration failed (unknown error)")
         
         return success
     
