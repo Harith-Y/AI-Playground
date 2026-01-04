@@ -40,11 +40,12 @@ def create_app() -> FastAPI:
 	app.add_middleware(
 		CORSMiddleware,
 		allow_origins=origins,
+		allow_origin_regex=r"https://.*\.vercel\.app",
 		allow_credentials=True,
 		allow_methods=["*"],
 		allow_headers=["*"],
 	)
-	logger.info(f"CORS middleware added with origins: {origins}")
+	logger.info(f"CORS middleware added with origins: {origins} and Vercel regex")
 
 	# Add rate limiting middleware
 	if settings.ENABLE_RATE_LIMITING:
