@@ -83,10 +83,11 @@ export const handleApiError = (error: any): ApiError => {
     
     if (axiosError.response) {
       // Server responded with error
+      const data = axiosError.response.data as any;
       return {
-        message: axiosError.response.data?.message || 'An error occurred',
+        message: data?.message || data?.detail || 'An error occurred',
         statusCode: axiosError.response.status,
-        errors: axiosError.response.data?.errors,
+        errors: data?.errors,
       };
     } else if (axiosError.request) {
       // Request made but no response

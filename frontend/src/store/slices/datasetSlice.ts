@@ -3,6 +3,13 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import type { Dataset, DatasetStats, ColumnInfo } from '../../types/dataset';
 import { datasetService } from '../../services/datasetService';
 
+const getErrorMessage = (error: any, defaultMessage: string): string => {
+  if (typeof error === 'string') return error;
+  if (typeof error?.message === 'string') return error.message;
+  if (typeof error?.detail === 'string') return error.detail;
+  return defaultMessage;
+};
+
 interface DatasetState {
   currentDataset: Dataset | null;
   datasets: Dataset[];
@@ -33,7 +40,7 @@ export const uploadDataset = createAsyncThunk(
       const response = await datasetService.uploadDataset(file);
       return response;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to upload dataset');
+      return rejectWithValue(getErrorMessage(error, 'Failed to upload dataset'));
     }
   }
 );
@@ -45,7 +52,7 @@ export const fetchDatasets = createAsyncThunk(
       const response = await datasetService.getDatasets();
       return response;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch datasets');
+      return rejectWithValue(getErrorMessage(error, 'Failed to fetch datasets'));
     }
   }
 );
@@ -57,7 +64,7 @@ export const fetchDatasetStats = createAsyncThunk(
       const response = await datasetService.getDatasetStats(datasetId);
       return response;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch dataset stats');
+      return rejectWithValue(getErrorMessage(error, 'Failed to fetch dataset stats'));
     }
   }
 );
@@ -69,7 +76,7 @@ export const fetchDatasetPreview = createAsyncThunk(
       const response = await datasetService.getDatasetPreview(datasetId);
       return response;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch dataset preview');
+      return rejectWithValue(getErrorMessage(error, 'Failed to fetch dataset preview'));
     }
   }
 );
@@ -81,7 +88,7 @@ export const fetchDataset = createAsyncThunk(
       const response = await datasetService.getDataset(datasetId);
       return response;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch dataset');
+      return rejectWithValue(getErrorMessage(error, 'Failed to fetch dataset'));
     }
   }
 );
@@ -93,7 +100,7 @@ export const deleteDataset = createAsyncThunk(
       await datasetService.deleteDataset(datasetId);
       return datasetId;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to delete dataset');
+      return rejectWithValue(getErrorMessage(error, 'Failed to delete dataset'));
     }
   }
 );

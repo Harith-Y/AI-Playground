@@ -145,7 +145,13 @@ const DatasetUploadPage: React.FC = () => {
         await dispatch(fetchDatasetPreview(result.id));
       }
     } catch (err: any) {
-      setSnackbarMessage(err || 'Failed to upload dataset');
+      let errorMessage = 'Failed to upload dataset';
+      if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (typeof err?.message === 'string') {
+        errorMessage = err.message;
+      }
+      setSnackbarMessage(errorMessage);
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
