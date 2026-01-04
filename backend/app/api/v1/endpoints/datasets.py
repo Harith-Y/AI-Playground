@@ -35,6 +35,10 @@ async def get_user_or_guest(
     Get the current authenticated user ID, or create/return a guest user ID.
     This allows the playground to work without forcing login, while still supporting auth.
     """
+    import logging
+    logger = logging.getLogger("backend")
+    logger.info("Attempting to resolve user (auth or guest)...")
+
     # 1. Try to extract token
     authorization: str = request.headers.get("Authorization")
     if authorization:
@@ -44,24 +48,34 @@ async def get_user_or_guest(
                 payload = decode_token(param)
                 user_id = payload.get("sub")
                 if user_id:
+                    logger.info(f"Authenticated user found: {user_id}")
                     return UUID(user_id)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Token validation failed: {e}")
                 pass # Token invalid, fall back to guest
 
     # 2. Fallback to guest
-    guest_email = "guest@aiplayground.local"
-    guest_user = db.query(User).filter(User.email == guest_email).first()
-    if not guest_user:
-        guest_user = User(
-            email=guest_email,
-            password_hash=get_password_hash("guest_password"),
-            is_active=True
-        )
-        db.add(guest_user)
-        db.commit()
-        db.refresh(guest_user)
-    
-    return guest_user.id
+    try:
+        guest_email = "guest@aiplayground.local"
+        guest_user = db.query(User).filter(User.email == guest_email).first()
+        if not guest_user:
+            logger.info("Creating guest user...")
+            guest_user = User(
+                email=guest_email,
+                password_hash=get_password_hash("guest_password"),
+                is_active=True
+            )
+            db.add(guest_user)
+            db.commit()
+            db.refresh(guest_user)
+        
+        logger.info(f"Using guest user: {guest_user.id}")
+        return guest_user.id
+    except Exception as e:
+        logger.error(f"Failed to get/create guest user: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Failed to initialize guest user")
 
 
 @router.post(
@@ -126,26 +140,10 @@ async def upload_dataset(
 ):
     """
     Upload a dataset file and extract metadata.
-
-    This endpoint accepts dataset files in multiple formats and performs the following operations:
-
-    - **Validates** file type (must be CSV, XLSX, XLS, or JSON)
-    - **Validates** file size (must be under configured limit, default 100MB)
-    - **Extracts metadata** including row count, column count, data types, and missing values
-    - **Saves** file to persistent storage in user-specific directory
-    - **Creates** database record with all metadata
-
-    **Supported Formats:**
-    - CSV (.csv)
-    - Excel (.xlsx, .xls)
-    - JSON (.json)
-
-    **Returns:**
-    - Dataset ID for use in other endpoints
-    - Complete metadata including row/column counts
-    - Data types for each column
-    - Missing value counts per column
     """
+    import logging
+    logger = logging.getLogger("backend")
+    logger.info(f"Starting dataset upload for user {user_id}. Filename: {file.filename}")
 
     # Validate file extension
     allowed_extensions = {".csv", ".xlsx", ".xls", ".json"}
