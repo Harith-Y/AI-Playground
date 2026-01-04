@@ -155,6 +155,65 @@ def create_app() -> FastAPI:
 		from app.db.migration_manager import check_migration_status
 		return check_migration_status()
 
+	@app.post(
+		"/health/migrations/run",
+		tags=["health"],
+		summary="Run Migrations",
+		description="Manually trigger database migrations",
+		responses={
+			200: {
+				"description": "Migration result",
+				"content": {
+					"application/json": {
+						"example": {
+							"success": True,
+							"message": "Migrations applied successfully"
+						}
+					}
+				}
+			},
+			500: {
+				"description": "Migration failed",
+				"content": {
+					"application/json": {
+						"example": {
+							"success": False,
+							"error": "Migration error details"
+						}
+					}
+				}
+			}
+		}
+	)
+	async def run_migrations():
+		"""
+		Manually trigger database migrations.
+		Useful if automatic migrations failed on startup.
+		"""
+		from app.db.migration_manager import run_migrations_on_startup
+		from fastapi import HTTPException
+		
+		try:
+			success = run_migrations_on_startup(
+				auto_upgrade=True,
+				wait_for_db=False, # DB should be up if app is running
+				fail_on_error=True
+			)
+			if success:
+				return {"success": True, "message": "Migrations applied successfully"}
+			else:
+				raise HTTPException(status_code=500, detail="Migrations failed (check logs)")
+		except Exception as e:
+			import traceback
+			return JSONResponse(
+				status_code=500,
+				content={
+					"success": False, 
+					"error": str(e),
+					"traceback": traceback.format_exc()
+				}
+			)
+
 	return app
 
 
