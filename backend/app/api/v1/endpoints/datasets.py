@@ -333,7 +333,7 @@ async def upload_dataset(
 )
 async def list_datasets(
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_current_user_id),
+    user_id: UUID = Depends(get_user_or_guest),
     skip: int = 0,
     limit: int = 100
 ):
@@ -392,7 +392,7 @@ async def list_datasets(
 async def get_dataset(
     dataset_id: str,
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_current_user_id)
+    user_id: UUID = Depends(get_user_or_guest)
 ):
     """
     Get detailed information about a specific dataset.
@@ -441,7 +441,7 @@ async def get_dataset(
 async def delete_dataset(
     dataset_id: str,
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_current_user_id)
+    user_id: UUID = Depends(get_user_or_guest)
 ):
     """
     Delete a dataset and remove its file from storage.
@@ -550,7 +550,7 @@ async def delete_dataset(
 async def get_dataset_preview(
     dataset_id: str,
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_current_user_id),
+    user_id: UUID = Depends(get_user_or_guest),
     rows: int = 10
 ):
     """
@@ -705,7 +705,7 @@ async def get_dataset_preview(
 async def get_dataset_stats(
     dataset_id: str,
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_current_user_id)
+    user_id: UUID = Depends(get_user_or_guest)
 ):
     """
     Get comprehensive statistical summary of the dataset.

@@ -6,21 +6,41 @@ class DatasetService {
    * Upload a dataset file
    */
   async uploadDataset(file: File): Promise<Dataset> {
-    return api.upload<Dataset>('/api/v1/datasets/upload', file);
+    const response = await api.upload<any>('/api/v1/datasets/upload', file);
+    return this.mapBackendDatasetToFrontend(response, file.size);
   }
 
   /**
    * Get all datasets
    */
   async getDatasets(): Promise<Dataset[]> {
-    return api.get<Dataset[]>('/api/v1/datasets');
+    const response = await api.get<any[]>('/api/v1/datasets');
+    return response.map(d => this.mapBackendDatasetToFrontend(d));
   }
 
   /**
    * Get dataset by ID
    */
   async getDataset(id: string): Promise<Dataset> {
-    return api.get<Dataset>(`/api/v1/datasets/${id}`);
+    const response = await api.get<any>(`/api/v1/datasets/${id}`);
+    return this.mapBackendDatasetToFrontend(response);
+  }
+
+  private mapBackendDatasetToFrontend(backendData: any, fileSize?: number): Dataset {
+    return {
+      id: backendData.id,
+      name: backendData.name,
+      filename: backendData.name, // Assuming name is filename
+      size: fileSize || 0, // Backend doesn't return size yet
+      rowCount: backendData.shape?.rows || 0,
+      columnCount: backendData.shape?.cols || 0,
+      createdAt: backendData.uploaded_at || new Date().toISOString(),
+      updatedAt: backendData.uploaded_at || new Date().toISOString(),
+      status: 'uploaded', // Default status
+      rows: backendData.shape?.rows,
+      columns: backendData.shape?.cols,
+      shape: [backendData.shape?.rows || 0, backendData.shape?.cols || 0]
+    };
   }
 
   /**
