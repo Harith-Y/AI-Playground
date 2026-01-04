@@ -112,8 +112,8 @@ class ApiService {
    */
   async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
     try {
-      const response = await apiClient.get<ApiResponse<T>>(url, config);
-      return response.data.data;
+      const response = await apiClient.get<any>(url, config);
+      return response.data?.data !== undefined ? response.data.data : response.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -128,8 +128,8 @@ class ApiService {
     config?: AxiosRequestConfig
   ): Promise<T> {
     try {
-      const response = await apiClient.post<ApiResponse<T>>(url, data, config);
-      return response.data.data;
+      const response = await apiClient.post<any>(url, data, config);
+      return response.data?.data !== undefined ? response.data.data : response.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -144,8 +144,8 @@ class ApiService {
     config?: AxiosRequestConfig
   ): Promise<T> {
     try {
-      const response = await apiClient.put<ApiResponse<T>>(url, data, config);
-      return response.data.data;
+      const response = await apiClient.put<any>(url, data, config);
+      return response.data?.data !== undefined ? response.data.data : response.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -160,8 +160,8 @@ class ApiService {
     config?: AxiosRequestConfig
   ): Promise<T> {
     try {
-      const response = await apiClient.patch<ApiResponse<T>>(url, data, config);
-      return response.data.data;
+      const response = await apiClient.patch<any>(url, data, config);
+      return response.data?.data !== undefined ? response.data.data : response.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -172,8 +172,8 @@ class ApiService {
    */
   async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
     try {
-      const response = await apiClient.delete<ApiResponse<T>>(url, config);
-      return response.data.data;
+      const response = await apiClient.delete<any>(url, config);
+      return response.data?.data !== undefined ? response.data.data : response.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -199,7 +199,7 @@ class ApiService {
         });
       }
 
-      const response = await apiClient.post<ApiResponse<T>>(url, formData, {
+      const response = await apiClient.post<any>(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -217,7 +217,7 @@ class ApiService {
         },
       });
 
-      return response.data.data;
+      return response.data?.data !== undefined ? response.data.data : response.data;
     } catch (error) {
       throw handleApiError(error);
     }
