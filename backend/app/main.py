@@ -185,15 +185,28 @@ def create_app() -> FastAPI:
 			}
 		}
 	)
-	async def run_migrations():
+	async def run_migrations(reset: bool = False):
 		"""
 		Manually trigger database migrations.
 		Useful if automatic migrations failed on startup.
+		
+		Args:
+			reset: If True, will attempt to drop alembic_version table to force re-sync
 		"""
-		from app.db.migration_manager import run_migrations_on_startup
+		from app.db.migration_manager import run_migrations_on_startup, MigrationManager
 		from fastapi import HTTPException
+		from sqlalchemy import text
 		
 		try:
+			if reset:
+				logger.warning("Resetting migration history requested...")
+				manager = MigrationManager()
+				engine = manager._create_engine()
+				with engine.connect() as conn:
+					conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+					conn.commit()
+				logger.info("alembic_version table dropped.")
+
 			success = run_migrations_on_startup(
 				auto_upgrade=True,
 				wait_for_db=False, # DB should be up if app is running
