@@ -4,11 +4,15 @@ import io
 import os
 import uuid as uuid_lib
 import pandas as pd
+import traceback
+import logging
 from pathlib import Path
 from typing import List
 from uuid import UUID
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import ProgrammingError, OperationalError
 
 from app.core.config import settings
 from app.core.security import get_current_user_id, verify_resource_ownership, decode_token, get_password_hash
@@ -24,7 +28,14 @@ from app.schemas.dataset import (
     DatasetShape,
 )
 
+# Check for required dependencies
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
+
 router = APIRouter()
+logger = logging.getLogger("backend")
 
 
 async def get_user_or_guest(
@@ -35,8 +46,6 @@ async def get_user_or_guest(
     Get the current authenticated user ID, or create/return a guest user ID.
     This allows the playground to work without forcing login, while still supporting auth.
     """
-    import logging
-    logger = logging.getLogger("backend")
     logger.info("Attempting to resolve user (auth or guest)...")
 
     # 1. Try to extract token
@@ -57,7 +66,17 @@ async def get_user_or_guest(
     # 2. Fallback to guest
     try:
         guest_email = "guest@aiplayground.local"
-        guest_user = db.query(User).filter(User.email == guest_email).first()
+        # Check if table exists by trying to query
+        try:
+            guest_user = db.query(User).filter(User.email == guest_email).first()
+        except (ProgrammingError, OperationalError) as e:
+            logger.error(f"Database error (missing table?): {e}")
+            # Try to provide a helpful error message
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Database error: Tables might be missing. Please run migrations. Error: {str(e)}"
+            )
+
         if not guest_user:
             logger.info("Creating guest user...")
             guest_user = User(
@@ -71,11 +90,12 @@ async def get_user_or_guest(
         
         logger.info(f"Using guest user: {guest_user.id}")
         return guest_user.id
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get/create guest user: {e}")
-        import traceback
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="Failed to initialize guest user")
+        raise HTTPException(status_code=500, detail=f"Failed to initialize guest user: {str(e)}")
 
 
 @router.post(
@@ -141,128 +161,140 @@ async def upload_dataset(
     """
     Upload a dataset file and extract metadata.
     """
-    import logging
-    logger = logging.getLogger("backend")
-    logger.info(f"Starting dataset upload for user {user_id}. Filename: {file.filename}")
-
-    # Validate file extension
-    allowed_extensions = {".csv", ".xlsx", ".xls", ".json"}
-    file_ext = Path(file.filename).suffix.lower()
-
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File type {file_ext} not supported. Allowed: {', '.join(allowed_extensions)}"
-        )
-
-    # Read file content
-    content = await file.read()
-    file_size = len(content)
-
-    # Validate file size
-    if file_size > settings.MAX_UPLOAD_SIZE:
-        max_size_mb = settings.MAX_UPLOAD_SIZE / (1024 * 1024)
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File size exceeds maximum allowed size of {max_size_mb}MB"
-        )
-
-    # Generate unique dataset ID
-    dataset_uuid = uuid_lib.uuid4()
-    dataset_id = str(dataset_uuid)
-
-    # Get storage service (R2 or local filesystem)
-    storage_service = get_storage_service()
-    
-    # Define file path (user_id/dataset_id/filename)
-    file_storage_path = f"{user_id}/{dataset_id}/{file.filename}"
-    
-    # Upload file to R2 or local storage
     try:
-        file_url = storage_service.upload_file(
-            file_content=content,
-            file_path=file_storage_path,
-            content_type=file.content_type
-        )
-    except Exception as e:
-        import traceback
-        print(f"Upload error: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload file: {str(e)}"
-        )
+        logger.info(f"Starting dataset upload for user {user_id}. Filename: {file.filename}")
 
-    # Extract metadata using pandas (load from bytes)
-    try:
-        if file_ext == ".csv":
-            df = pd.read_csv(io.BytesIO(content))
-        elif file_ext in [".xlsx", ".xls"]:
-            df = pd.read_excel(io.BytesIO(content))
-        elif file_ext == ".json":
-            df = pd.read_json(io.BytesIO(content))
+        # Validate file extension
+        allowed_extensions = {".csv", ".xlsx", ".xls", ".json"}
+        file_ext = Path(file.filename).suffix.lower()
 
-        # Calculate statistics
-        row_count = len(df)
-        column_count = len(df.columns)
-
-        # Data types as dict
-        dtypes = {col: str(dtype) for col, dtype in df.dtypes.items()}
-
-        # Missing values per column
-        missing_values = {col: int(df[col].isna().sum()) for col in df.columns}
-
-    except Exception as e:
-        # Clean up uploaded file on error
-        import traceback
-        print(f"Processing error: {str(e)}")
-        print(traceback.format_exc())
-        try:
-            storage_service.delete_file(file_storage_path)
-        except:
-            pass  # Ignore cleanup errors
+        if file_ext not in allowed_extensions:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File type {file_ext} not supported. Allowed: {', '.join(allowed_extensions)}"
+            )
         
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to process file: {str(e)}"
-        )
+        # Check for Excel dependencies if needed
+        if file_ext in [".xlsx", ".xls"] and openpyxl is None:
+             raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Excel support is not installed on the server (missing openpyxl)."
+            )
 
-    # Create database record
-    try:
-        dataset = Dataset(
-            id=dataset_uuid, # Pass UUID object
-            user_id=user_id,
-            name=Path(file.filename).stem,  # filename without extension
-            file_path=file_storage_path,  # Store R2 path or local filesystem path
-            rows=row_count,
-            cols=column_count,
-            dtypes=dtypes,
-            missing_values=missing_values
-        )
+        # Read file content
+        content = await file.read()
+        file_size = len(content)
 
-        db.add(dataset)
-        db.commit()
-        db.refresh(dataset)
+        # Validate file size
+        if file_size > settings.MAX_UPLOAD_SIZE:
+            max_size_mb = settings.MAX_UPLOAD_SIZE / (1024 * 1024)
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File size exceeds maximum allowed size of {max_size_mb}MB"
+            )
+
+        # Generate unique dataset ID
+        dataset_uuid = uuid_lib.uuid4()
+        dataset_id = str(dataset_uuid)
+
+        # Get storage service (R2 or local filesystem)
+        storage_service = get_storage_service()
+        
+        # Define file path (user_id/dataset_id/filename)
+        file_storage_path = f"{user_id}/{dataset_id}/{file.filename}"
+        
+        # Upload file to R2 or local storage
+        try:
+            file_url = storage_service.upload_file(
+                file_content=content,
+                file_path=file_storage_path,
+                content_type=file.content_type
+            )
+        except Exception as e:
+            logger.error(f"Upload error: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload file: {str(e)}"
+            )
+
+        # Extract metadata using pandas (load from bytes)
+        try:
+            if file_ext == ".csv":
+                df = pd.read_csv(io.BytesIO(content))
+            elif file_ext in [".xlsx", ".xls"]:
+                df = pd.read_excel(io.BytesIO(content))
+            elif file_ext == ".json":
+                df = pd.read_json(io.BytesIO(content))
+
+            # Calculate statistics
+            row_count = len(df)
+            column_count = len(df.columns)
+
+            # Data types as dict
+            dtypes = {col: str(dtype) for col, dtype in df.dtypes.items()}
+
+            # Missing values per column
+            missing_values = {col: int(df[col].isna().sum()) for col in df.columns}
+
+        except Exception as e:
+            # Clean up uploaded file on error
+            logger.error(f"Processing error: {str(e)}")
+            logger.error(traceback.format_exc())
+            try:
+                storage_service.delete_file(file_storage_path)
+            except:
+                pass  # Ignore cleanup errors
+            
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to process file: {str(e)}"
+            )
+
+        # Create database record
+        try:
+            dataset = Dataset(
+                id=dataset_uuid, # Pass UUID object
+                user_id=user_id,
+                name=Path(file.filename).stem,  # filename without extension
+                file_path=file_storage_path,  # Store R2 path or local filesystem path
+                rows=row_count,
+                cols=column_count,
+                dtypes=dtypes,
+                missing_values=missing_values
+            )
+
+            db.add(dataset)
+            db.commit()
+            db.refresh(dataset)
+        except Exception as e:
+            logger.error(f"Database error: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error: {str(e)}"
+            )
+
+        # Convert to Pydantic model manually to avoid validation errors
+        return DatasetRead(
+            id=dataset.id,
+            user_id=dataset.user_id,
+            name=dataset.name,
+            file_path=dataset.file_path,
+            shape=DatasetShape(rows=dataset.rows, cols=dataset.cols) if dataset.rows is not None and dataset.cols is not None else None,
+            dtypes=dataset.dtypes,
+            missing_values=dataset.missing_values,
+            uploaded_at=dataset.uploaded_at
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        print(f"Database error: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database error: {str(e)}"
+        logger.error(f"Unexpected error in upload_dataset: {e}")
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Internal Server Error: {str(e)}", "traceback": traceback.format_exc()}
         )
-
-    # Convert to Pydantic model manually to avoid validation errors
-    return DatasetRead(
-        id=dataset.id,
-        user_id=dataset.user_id,
-        name=dataset.name,
-        file_path=dataset.file_path,
-        shape=DatasetShape(rows=dataset.rows, cols=dataset.cols) if dataset.rows is not None and dataset.cols is not None else None,
-        dtypes=dataset.dtypes,
-        missing_values=dataset.missing_values,
-        uploaded_at=dataset.uploaded_at
-    )
 
 
 @router.get(
