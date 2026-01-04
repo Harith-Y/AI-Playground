@@ -263,7 +263,7 @@ async def upload_dataset(
                 id=dataset_uuid, # Pass UUID object
                 user_id=user_id,
                 name=Path(file.filename).stem,  # filename without extension
-                file_path=file_storage_path,  # Store R2 path or local filesystem path
+                file_path=file_url,  # Store absolute path or URL
                 rows=row_count,
                 cols=column_count,
                 dtypes=dtypes,
@@ -749,16 +749,32 @@ async def get_dataset_stats(
     verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
     # Load file
-    file_path = Path(dataset.file_path)
-    if not file_path.exists():
+    file_path_str = str(dataset.file_path)
+    is_url = file_path_str.startswith("http://") or file_path_str.startswith("https://")
+    
+    if not is_url and not Path(file_path_str).exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Dataset file not found on disk"
+            detail=f"Dataset file not found on disk: {file_path_str}"
         )
 
     try:
         # Read file based on extension
-        file_ext = file_path.suffix.lower()
+        if is_url:
+            file_path = file_path_str
+            file_ext = Path(file_path_str).suffix.lower()
+        else:
+            file_path = Path(file_path_str)
+            file_ext = file_path.suffix.lower()
+
+        # Read file based on extension
+        if is_url:
+            file_path = file_path_str
+            file_ext = Path(file_path_str).suffix.lower()
+        else:
+            file_path = Path(file_path_str)
+            file_ext = file_path.suffix.lower()
+
         if file_ext == ".csv":
             df = pd.read_csv(file_path)
         elif file_ext in [".xlsx", ".xls"]:
