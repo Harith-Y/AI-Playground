@@ -79,9 +79,15 @@ async def get_user_or_guest(
 
         if not guest_user:
             logger.info("Creating guest user...")
+            
+            # Workaround for passlib/bcrypt compatibility issue
+            # passlib 1.7.4 + bcrypt 5.0.0 can cause "password cannot be longer than 72 bytes" error
+            import bcrypt
+            hashed_pwd = bcrypt.hashpw(b"guest_password", bcrypt.gensalt()).decode('utf-8')
+            
             guest_user = User(
                 email=guest_email,
-                password_hash=get_password_hash("guest_password"),
+                password_hash=hashed_pwd,
                 is_active=True
             )
             db.add(guest_user)
