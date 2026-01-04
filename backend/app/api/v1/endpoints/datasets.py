@@ -21,6 +21,7 @@ from app.schemas.dataset import (
     DatasetPreviewResponse,
     DatasetStatsResponse,
     ColumnInfo,
+    DatasetShape,
 )
 
 router = APIRouter()
@@ -169,7 +170,8 @@ async def upload_dataset(
         )
 
     # Generate unique dataset ID
-    dataset_id = str(uuid_lib.uuid4())
+    dataset_uuid = uuid_lib.uuid4()
+    dataset_id = str(dataset_uuid)
 
     # Get storage service (R2 or local filesystem)
     storage_service = get_storage_service()
@@ -228,20 +230,29 @@ async def upload_dataset(
         )
 
     # Create database record
-    dataset = Dataset(
-        id=dataset_id,
-        user_id=user_id,
-        name=Path(file.filename).stem,  # filename without extension
-        file_path=file_storage_path,  # Store R2 path or local filesystem path
-        rows=row_count,
-        cols=column_count,
-        dtypes=dtypes,
-        missing_values=missing_values
-    )
+    try:
+        dataset = Dataset(
+            id=dataset_uuid, # Pass UUID object
+            user_id=user_id,
+            name=Path(file.filename).stem,  # filename without extension
+            file_path=file_storage_path,  # Store R2 path or local filesystem path
+            rows=row_count,
+            cols=column_count,
+            dtypes=dtypes,
+            missing_values=missing_values
+        )
 
-    db.add(dataset)
-    db.commit()
-    db.refresh(dataset)
+        db.add(dataset)
+        db.commit()
+        db.refresh(dataset)
+    except Exception as e:
+        import traceback
+        print(f"Database error: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
 
     # Convert to Pydantic model manually to avoid validation errors
     return DatasetRead(
@@ -249,7 +260,7 @@ async def upload_dataset(
         user_id=dataset.user_id,
         name=dataset.name,
         file_path=dataset.file_path,
-        shape=None, # Dataset model doesn't have shape dict, it has rows/cols
+        shape=DatasetShape(rows=dataset.rows, cols=dataset.cols) if dataset.rows is not None and dataset.cols is not None else None,
         dtypes=dataset.dtypes,
         missing_values=dataset.missing_values,
         uploaded_at=dataset.uploaded_at
