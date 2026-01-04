@@ -19,6 +19,8 @@ from app.models import (
     User,
     Dataset,
     PreprocessingStep,
+    PreprocessingHistory,
+    PreprocessingPipeline,
     FeatureEngineering,
     Experiment,
     ModelRun,
