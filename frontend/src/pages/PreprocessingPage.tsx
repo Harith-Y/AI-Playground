@@ -52,8 +52,6 @@ const PreprocessingPage: React.FC = () => {
     isExecuting,
     error,
     pipelineResult,
-    currentTaskId,
-    taskStatus,
     history,
     historyIndex,
   } = useAppSelector((state) => state.preprocessing);
@@ -61,15 +59,12 @@ const PreprocessingPage: React.FC = () => {
 
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<PreprocessingStep | null>(null);
-  const [showProgressDialog, setShowProgressDialog] = useState(false);
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success',
   });
-
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (currentDataset?.id) {
@@ -208,46 +203,12 @@ const PreprocessingPage: React.FC = () => {
     }
   };
 
-  // Poll for task status
+  // Show result dialog when pipeline completes
   useEffect(() => {
-    if (currentTaskId && isExecuting) {
-      // Start polling every 2 seconds
-      pollingIntervalRef.current = setInterval(() => {
-        dispatch(getPreprocessingTaskStatus(currentTaskId));
-      }, 2000);
-
-      return () => {
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-      };
+    if (pipelineResult) {
+      setShowResultDialog(true);
     }
-  }, [currentTaskId, isExecuting, dispatch]);
-
-  // Handle task completion
-  useEffect(() => {
-    if (taskStatus) {
-      if (taskStatus.state === 'SUCCESS' && pipelineResult) {
-        // Stop polling
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-        setShowProgressDialog(false);
-        setShowResultDialog(true);
-      } else if (taskStatus.state === 'FAILURE') {
-        // Stop polling on failure
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-        setShowProgressDialog(false);
-        const errorMessage = getErrorMessage(taskStatus.error || 'Pipeline execution failed');
-        showSnackbar(errorMessage, 'error');
-      }
-    }
-  }, [taskStatus, pipelineResult]);
+  }, [pipelineResult]);
 
   const handleCloseResultDialog = () => {
     setShowResultDialog(false);
@@ -500,55 +461,8 @@ const PreprocessingPage: React.FC = () => {
         </Alert>
       </Snackbar>
 
-      {/* Progress Dialog */}
-      <Dialog
-        open={showProgressDialog}
-        maxWidth="sm"
-        fullWidth
-        disableEscapeKeyDown
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Transform />
-            <Typography variant="h6">Executing Preprocessing Pipeline</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ py: 2 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              {taskStatus?.status || 'Starting preprocessing...'}
-            </Typography>
-
-            <Box sx={{ mt: 2, mb: 1 }}>
-              <LinearProgress
-                variant="determinate"
-                value={taskStatus?.progress || 0}
-                sx={{ height: 8, borderRadius: 4 }}
-              />
-            </Box>
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="caption" color="text.secondary">
-                {taskStatus?.progress || 0}% complete
-              </Typography>
-              {taskStatus?.current_step && (
-                <Chip
-                  label={taskStatus.current_step}
-                  size="small"
-                  color="primary"
-                  variant="outlined"
-                />
-              )}
-            </Box>
-
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="caption" color="text.secondary">
-                Task ID: {currentTaskId}
-              </Typography>
-            </Box>
-          </Box>
-        </DialogContent>
-      </Dialog>
+      {/* Progress Dialog - removed for synchronous execution */}
+      {/* Synchronous execution shows loading state in button and completes immediately */}
 
       {/* Result Dialog */}
       <Dialog
