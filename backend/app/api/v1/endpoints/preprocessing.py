@@ -16,11 +16,14 @@ import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from sqlalchemy.exc import ProgrammingError, OperationalError
 
 from app.db.session import get_db
 from app.models.preprocessing_step import PreprocessingStep
 from app.models.dataset import Dataset
 from app.models.preprocessing_history import PreprocessingHistory
+from app.models.user import User
+from app.core.security import decode_token
 from app.schemas.preprocessing import (
     PreprocessingStepCreate,
     PreprocessingStepUpdate,
@@ -45,10 +48,71 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# Mock authentication - replace with actual auth later
-def get_current_user_id() -> str:
-    """Mock function to get current user ID. Replace with actual auth."""
-    return "00000000-0000-0000-0000-000000000001"
+async def get_user_or_guest(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> uuid.UUID:
+    """
+    Get the current authenticated user ID, or create/return a guest user ID.
+    This allows the playground to work without forcing login, while still supporting auth.
+    """
+    logger.info("Attempting to resolve user (auth or guest)...")
+
+    # 1. Try to extract token
+    authorization: str = request.headers.get("Authorization")
+    if authorization:
+        scheme, _, param = authorization.partition(" ")
+        if scheme.lower() == "bearer":
+            try:
+                payload = decode_token(param)
+                user_id = payload.get("sub")
+                if user_id:
+                    logger.info(f"Authenticated user found: {user_id}")
+                    return uuid.UUID(user_id)
+            except Exception as e:
+                logger.warning(f"Token validation failed: {e}")
+                pass # Token invalid, fall back to guest
+
+    # 2. Fallback to guest
+    try:
+        guest_email = "guest@aiplayground.local"
+        # Check if table exists by trying to query
+        try:
+            guest_user = db.query(User).filter(User.email == guest_email).first()
+        except (ProgrammingError, OperationalError) as e:
+            logger.error(f"Database error (missing table?): {e}")
+            # Try to provide a helpful error message
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Database error: Tables might be missing. Please run migrations. Error: {str(e)}"
+            )
+
+        if not guest_user:
+            logger.info("Creating guest user...")
+            
+            # Workaround for passlib/bcrypt compatibility issue
+            import bcrypt
+            hashed_pwd = bcrypt.hashpw(b"guest_password", bcrypt.gensalt()).decode('utf-8')
+            
+            guest_user = User(
+                email=guest_email,
+                password_hash=hashed_pwd,
+                is_active=True
+            )
+            db.add(guest_user)
+            db.commit()
+            db.refresh(guest_user)
+        
+        logger.info(f"Using guest user: {guest_user.id}")
+        return guest_user.id
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to initialize guest user: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initialize guest user: {str(e)}"
+        )
 
 
 @router.post(
@@ -79,8 +143,9 @@ def get_current_user_id() -> str:
 )
 async def create_preprocessing_step(
     step: PreprocessingStepCreate,
+    request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Create a new preprocessing step.
@@ -169,8 +234,9 @@ async def create_preprocessing_step(
 )
 async def list_preprocessing_steps(
     dataset_id: Optional[str] = Query(None, description="Filter by dataset ID"),
+    request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     List all preprocessing steps.
@@ -201,7 +267,7 @@ async def list_preprocessing_steps(
 async def get_preprocessing_step(
     step_id: str,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    request: Request, user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """Get a specific preprocessing step by ID."""
     step = db.query(PreprocessingStep).join(Dataset).filter(
@@ -234,8 +300,9 @@ async def get_preprocessing_step(
 async def update_preprocessing_step(
     step_id: str,
     step_update: PreprocessingStepUpdate,
+    request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Update a preprocessing step.
@@ -285,8 +352,9 @@ async def update_preprocessing_step(
 )
 async def delete_preprocessing_step(
     step_id: str,
+    request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Delete a preprocessing step.
@@ -353,7 +421,7 @@ async def reorder_preprocessing_steps(
     dataset_id: str = Query(..., description="Dataset ID"),
     step_ids: List[str] = Query(..., description="Ordered list of step IDs"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    request: Request, user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Reorder preprocessing steps for a dataset.
@@ -446,7 +514,7 @@ async def reorder_preprocessing_steps(
 async def apply_preprocessing_pipeline(
     request: PreprocessingApplyRequest = Body(...),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    request: Request, user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Apply the complete preprocessing pipeline to a dataset.
@@ -803,7 +871,7 @@ def _save_transformed_dataset(df: pd.DataFrame, name: str, original_path: str) -
 async def apply_preprocessing_pipeline_async(
     request: PreprocessingApplyRequest = Body(...),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    request: Request, user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Apply preprocessing pipeline asynchronously using Celery.
@@ -1120,7 +1188,7 @@ async def preview_preprocessing_transformations(
     request: PreprocessingApplyRequest = Body(...),
     sample_size: int = Query(10, ge=1, le=100, description="Number of rows to preview"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    request: Request, user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Preview preprocessing transformations with before/after comparison.
@@ -1242,7 +1310,7 @@ async def get_preprocessing_history(
     operation_type: Optional[str] = Query(None, description="Filter by operation type"),
     status_filter: Optional[str] = Query(None, description="Filter by status (success/failure)"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    request: Request, user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Get preprocessing history for a dataset with pagination and filtering.
@@ -1305,7 +1373,7 @@ async def get_preprocessing_history(
 async def get_preprocessing_history_record(
     history_id: uuid.UUID,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    request: Request, user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Get a specific preprocessing history record.
@@ -1339,7 +1407,7 @@ async def get_preprocessing_history_record(
 async def delete_preprocessing_history(
     history_id: uuid.UUID,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    request: Request, user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Delete a preprocessing history record.
