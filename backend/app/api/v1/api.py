@@ -12,7 +12,8 @@ from app.api.v1.endpoints import (
     code_generation,
     experiment_config,
     inference,
-    celery_monitoring
+    celery_monitoring,
+    visualizations
 )
 
 api_router = APIRouter()
@@ -83,4 +84,11 @@ api_router.include_router(
     celery_monitoring.router,
     prefix="/celery",
     tags=["celery-monitoring"]
+)
+
+# Dataset visualizations for EDA
+api_router.include_router(
+    visualizations.router,
+    prefix="/visualizations",
+    tags=["visualizations"]
 )
