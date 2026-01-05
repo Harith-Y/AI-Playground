@@ -140,15 +140,32 @@ const handleConfigChange = useCallback((config: FeatureSelectionConfig) => {
           <Box>
             <Typography variant="h4" component="h1" fontWeight={600}>
               Feature Engineering
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Analyze and select the most important features
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Error Alert (non-blocking) */}
+      {error && (correlationMatrix || featureImportance.length > 0) && (
+        <ErrorState
+          message={error}
+          onRetry={handleRetry}
+          variant="alert"
+        />
+      )}
+
       {/* Success Alert */}
       {showSuccess && (
         <Alert severity="success" icon={<CheckCircle />} sx={{ mb: 3 }}>
           Feature selection saved! You can now proceed to model training with {featureConfig.inputFeatures.length} selected features.
-        </AfeatureColumns && featureColumns.length > 0 ? (
-            <>
-              <FeatureSelection
-                datasetId={currentDataset!.id}
-                columns={featureCorder: '1px solid #e2e8f0' }}>
+        </Alert>
+      )}
+
+      {/* Feature Selection Section */}
+      <Card sx={{ mb: 3, border: '1px solid #e2e8f0' }}>
         <CardContent>
           <Typography variant="h6" gutterBottom fontWeight={600} color="primary.main">
             Feature Selection
@@ -157,11 +174,11 @@ const handleConfigChange = useCallback((config: FeatureSelectionConfig) => {
             Select input features and target column for model training
           </Typography>
           
-          {columns && columns.length > 0 ? (
+          {featureColumns && featureColumns.length > 0 ? (
             <>
               <FeatureSelection
                 datasetId={currentDataset!.id}
-                columns={columns}
+                columns={featureColumns}
                 initialConfig={featureConfig}
                 onConfigChange={handleConfigChange}
                 onValidationChange={handleValidationChange}
@@ -185,23 +202,6 @@ const handleConfigChange = useCallback((config: FeatureSelectionConfig) => {
           )}
         </CardContent>
       </Card>
-
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Analyze and select the most important features
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-
-      {/* Error Alert (non-blocking) */}
-      {error && (correlationMatrix || featureImportance.length > 0) && (
-        <ErrorState
-          message={error}
-          onRetry={handleRetry}
-          variant="alert"
-        />
-      )}
 
       <Grid container spacing={3}>
         {/* Correlation Matrix */}
