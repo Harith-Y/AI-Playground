@@ -242,8 +242,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
     );
   }
 
-  const beforeStats = selectedColumn ? getNumericStats(previewData.before.data, selectedColumn) : null;
-  const afterStats = selectedColumn ? getNumericStats(previewData.after.data, selectedColumn) : null;
+  const beforeStats = selectedColumn && previewData.before?.data ? getNumericStats(previewData.before.data, selectedColumn) : null;
+  const afterStats = selectedColumn && previewData.after?.data ? getNumericStats(previewData.after.data, selectedColumn) : null;
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -606,7 +606,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                       </Typography>
                       <ResponsiveContainer width="100%" height={300}>
                         {isNumericColumn(selectedColumn) ? (
-                          <BarChart data={getHistogramData(previewData.before.data, selectedColumn)}>
+                          <BarChart data={getHistogramData(previewData.before?.data || [], selectedColumn)}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="range" angle={-45} textAnchor="end" height={80} />
                             <YAxis />
@@ -617,7 +617,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                         ) : (
                           <PieChart>
                             <Pie
-                              data={getValueDistribution(previewData.before.data, selectedColumn)}
+                              data={getValueDistribution(previewData.before?.data || [], selectedColumn)}
                               dataKey="value"
                               nameKey="name"
                               cx="50%"
@@ -625,7 +625,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                               outerRadius={80}
                               label
                             >
-                              {getValueDistribution(previewData.before.data, selectedColumn).map((_, index) => (
+                              {getValueDistribution(previewData.before?.data || [], selectedColumn).map((_, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                             </Pie>
@@ -645,7 +645,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                       </Typography>
                       <ResponsiveContainer width="100%" height={300}>
                         {isNumericColumn(selectedColumn) ? (
-                          <BarChart data={getHistogramData(previewData.after.data, selectedColumn)}>
+                          <BarChart data={getHistogramData(previewData.after?.data || [], selectedColumn)}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="range" angle={-45} textAnchor="end" height={80} />
                             <YAxis />
@@ -656,7 +656,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                         ) : (
                           <PieChart>
                             <Pie
-                              data={getValueDistribution(previewData.after.data, selectedColumn)}
+                              data={getValueDistribution(previewData.after?.data || [], selectedColumn)}
                               dataKey="value"
                               nameKey="name"
                               cx="50%"
@@ -664,7 +664,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                               outerRadius={80}
                               label
                             >
-                              {getValueDistribution(previewData.after.data, selectedColumn).map((_, index) => (
+                              {getValueDistribution(previewData.after?.data || [], selectedColumn).map((_, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                             </Pie>
