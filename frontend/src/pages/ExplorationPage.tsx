@@ -393,7 +393,7 @@ const ExplorationPage: React.FC = () => {
       {!loading && visualizations.length > 0 && (
         <Grid container spacing={3}>
           {visualizations.map((viz, idx) => (
-            <Grid item xs={12} md={viz.type === 'correlation' ? 12 : 6} key={idx}>
+            <Grid size={{ xs: 12, md: viz.type === 'correlation' ? 12 : 6 }} key={idx}>
               <Card sx={{ border: '1px solid #e2e8f0' }}>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>{viz.title}</Typography>
