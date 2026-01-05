@@ -519,8 +519,8 @@ async def reorder_preprocessing_steps(
     }
 )
 async def apply_preprocessing_pipeline(
-    req_body: PreprocessingApplyRequest = Body(...),
     request: Request,
+    req_body: PreprocessingApplyRequest = Body(...),
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
@@ -877,8 +877,8 @@ def _save_transformed_dataset(df: pd.DataFrame, name: str, original_path: str) -
     }
 )
 async def apply_preprocessing_pipeline_async(
-    req_body: PreprocessingApplyRequest = Body(...),
     request: Request,
+    req_body: PreprocessingApplyRequest = Body(...),
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
@@ -1194,8 +1194,8 @@ def _create_data_preview(df: pd.DataFrame, sample_size: int = 10) -> DataPreview
     }
 )
 async def preview_preprocessing_transformations(
-    req_body: PreprocessingApplyRequest = Body(...),
     request: Request,
+    req_body: PreprocessingApplyRequest = Body(...),
     sample_size: int = Query(10, ge=1, le=100, description="Number of rows to preview"),
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_user_or_guest)
