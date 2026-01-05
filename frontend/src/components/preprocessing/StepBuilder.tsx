@@ -353,11 +353,19 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
                 Parameters
               </Typography>
               <Grid container spacing={2}>
-                {selectedConfig.parameterSchema.map((field) => (
-                  <Grid size={{ xs: 12, sm: 6 }} key={field.name}>
-                    {renderParameterField(field)}
-                  </Grid>
-                ))}
+                {selectedConfig.parameterSchema
+                  .filter((field) => {
+                    // Conditionally show fill_value only when strategy is "constant"
+                    if (field.name === 'fill_value') {
+                      return parameters['strategy'] === 'constant';
+                    }
+                    return true;
+                  })
+                  .map((field) => (
+                    <Grid size={{ xs: 12, sm: 6 }} key={field.name}>
+                      {renderParameterField(field)}
+                    </Grid>
+                  ))}
               </Grid>
             </Grid>
           )}

@@ -619,10 +619,12 @@ async def get_dataset_preview(
         columns = []
         for col in df_full.columns:
             col_data = df_full[col]
+            dtype_str = str(col_data.dtype)
             columns.append(
                 ColumnInfo(
                     name=col,
-                    dataType=str(col_data.dtype),
+                    dataType=dtype_str,
+                    dtype=dtype_str,  # Add dtype alias for frontend
                     nullCount=int(col_data.isna().sum()),
                     uniqueCount=int(col_data.nunique()),
                     sampleValues=col_data.dropna().head(5).tolist()
@@ -810,10 +812,12 @@ async def get_dataset_stats(
         columns = []
         for col in df.columns:
             col_data = df[col]
+            dtype_str = str(col_data.dtype)
             columns.append(
                 ColumnInfo(
                     name=col,
-                    dataType=str(col_data.dtype),
+                    dataType=dtype_str,
+                    dtype=dtype_str,  # Add dtype alias for frontend
                     nullCount=int(col_data.isna().sum()),
                     uniqueCount=int(col_data.nunique()),
                     sampleValues=col_data.dropna().head(5).tolist()

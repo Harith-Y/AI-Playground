@@ -81,7 +81,8 @@ class MigrationManager:
                 self.alembic_ini_path = render_path
             else:
                 # Fall back to local development structure
-                backend_dir = Path(__file__).resolve().parent.parent
+                # From backend/app/db/migration_manager.py, go up 3 levels to backend/
+                backend_dir = Path(__file__).resolve().parent.parent.parent
                 self.alembic_ini_path = backend_dir / "alembic.ini"
         
         if not self.alembic_ini_path.exists():

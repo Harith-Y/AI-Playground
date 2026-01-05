@@ -49,6 +49,7 @@ class ColumnInfo(BaseModel):
 	"""Column metadata for dataset preview"""
 	name: str
 	dataType: str
+	dtype: str  # Alias for dataType (required by frontend)
 	nullCount: int
 	uniqueCount: int
 	sampleValues: List[Any]
