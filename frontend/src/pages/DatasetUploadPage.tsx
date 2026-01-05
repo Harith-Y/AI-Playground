@@ -608,9 +608,11 @@ const DatasetUploadPage: React.FC = () => {
                       <TableBody>
                         {preview.map((row, idx) => (
                           <TableRow key={idx} hover>
-                            {columns.map((col) => (
+                            {columns.map((col, colIdx) => (
                               <TableCell key={col.name}>
-                                {row[col.name]?.toString() || '-'}
+                                {Array.isArray(row) 
+                                  ? (row[colIdx]?.toString() || '-')
+                                  : (row[col.name]?.toString() || '-')}
                               </TableCell>
                             ))}
                           </TableRow>

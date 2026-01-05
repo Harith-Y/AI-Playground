@@ -158,8 +158,10 @@ const datasetSlice = createSlice({
       })
       .addCase(fetchDatasetStats.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.stats = action.payload.stats;
-        state.columns = action.payload.columns;
+        // The payload contains both stats and columns
+        const { columns, ...statsData } = action.payload;
+        state.stats = statsData;
+        state.columns = columns;
       })
       .addCase(fetchDatasetStats.rejected, (state, action) => {
         state.isLoading = false;
@@ -172,7 +174,8 @@ const datasetSlice = createSlice({
       })
       .addCase(fetchDatasetPreview.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.preview = action.payload;
+        // The payload contains the preview array in the 'preview' property
+        state.preview = action.payload.preview;
       })
       .addCase(fetchDatasetPreview.rejected, (state, action) => {
         state.isLoading = false;
