@@ -84,7 +84,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
 
   // Get common columns between before and after
   const commonColumns = useMemo(() => {
-    if (!previewData) return [];
+    if (!previewData || !previewData.before || !previewData.after) return [];
+    if (!previewData.before.columns || !previewData.after.columns) return [];
     return previewData.before.columns.filter((col) =>
       previewData.after.columns.includes(col)
     );
