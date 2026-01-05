@@ -67,11 +67,16 @@ def create_app() -> FastAPI:
 		start = perf_counter()
 		logger.info(f"Request start method={request.method} path={request.url.path}")
 
+		response = None
 		try:
 			response = await call_next(request)
+			return response
+		except Exception as e:
+			logger.error(f"Request error method={request.method} path={request.url.path} error={str(e)}")
+			raise
 		finally:
 			duration_ms = (perf_counter() - start) * 1000.0
-			status = getattr(response, "status_code", 0)
+			status = getattr(response, "status_code", 0) if response else 500
 			logger.info(
 				f"Request end method={request.method} path={request.url.path} status={status} duration_ms={duration_ms:.2f}"
 			)
