@@ -333,7 +333,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
       </Grid>
 
       {/* Column Changes Alert */}
-      {previewData.before.columns.length !== previewData.after.columns.length && (
+      {previewData.before?.columns && previewData.after?.columns && 
+       previewData.before.columns.length !== previewData.after.columns.length && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Columns changed: {previewData.before.columns.length} → {previewData.after.columns.length}
           {previewData.after.columns.length > previewData.before.columns.length && (
@@ -372,7 +373,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      {previewData.before.columns.slice(0, 6).map((col) => (
+                      {previewData.before?.columns?.slice(0, 6).map((col) => (
                         <TableCell key={col}>
                           <Box>
                             <Typography variant="caption" fontWeight={600}>
@@ -399,7 +400,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                   <TableBody>
                     {previewData.before.data.slice(0, 10).map((row, idx) => (
                       <TableRow key={idx} hover>
-                        {previewData.before.columns.slice(0, 6).map((col) => (
+                        {previewData.before?.columns?.slice(0, 6).map((col) => (
                           <TableCell key={col}>
                             {row[col] == null ? (
                               <Typography variant="caption" color="text.secondary" fontStyle="italic">
@@ -419,7 +420,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                   </TableBody>
                 </Table>
               </TableContainer>
-              {previewData.before.columns.length > 6 && (
+              {previewData.before?.columns && previewData.before.columns.length > 6 && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                   Showing 6 of {previewData.before.columns.length} columns
                 </Typography>
@@ -435,7 +436,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      {previewData.after.columns.slice(0, 6).map((col) => (
+                      {previewData.after?.columns?.slice(0, 6).map((col) => (
                         <TableCell key={col}>
                           <Box>
                             <Typography variant="caption" fontWeight={600}>
@@ -462,7 +463,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                   <TableBody>
                     {previewData.after.data.slice(0, 10).map((row, idx) => (
                       <TableRow key={idx} hover>
-                        {previewData.after.columns.slice(0, 6).map((col) => (
+                        {previewData.after?.columns?.slice(0, 6).map((col) => (
                           <TableCell key={col}>
                             {row[col] == null ? (
                               <Typography variant="caption" color="text.secondary" fontStyle="italic">
@@ -482,7 +483,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                   </TableBody>
                 </Table>
               </TableContainer>
-              {previewData.after.columns.length > 6 && (
+              {previewData.after?.columns && previewData.after.columns.length > 6 && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                   Showing 6 of {previewData.after.columns.length} columns
                 </Typography>
