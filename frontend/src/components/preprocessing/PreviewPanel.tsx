@@ -192,7 +192,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
   }
 
   // Empty data state (no rows)
-  if (previewData && previewData.before.shape[0] === 0) {
+  if (previewData && previewData.before && previewData.before.shape && previewData.before.shape[0] === 0) {
     return (
       <Paper sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{ textAlign: 'center' }}>
@@ -209,7 +209,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
   }
 
   // Empty columns state
-  if (previewData && previewData.before.shape[1] === 0) {
+  if (previewData && previewData.before && previewData.before.shape && previewData.before.shape[1] === 0) {
     return (
       <Paper sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{ textAlign: 'center' }}>
@@ -307,7 +307,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                 Before
               </Typography>
               <Typography variant="h6" fontWeight={600}>
-                {previewData.before.shape[0]} × {previewData.before.shape[1]}
+                {previewData.before?.shape ? `${previewData.before.shape[0]} × ${previewData.before.shape[1]}` : 'N/A'}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 rows × columns
@@ -322,7 +322,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                 After
               </Typography>
               <Typography variant="h6" fontWeight={600}>
-                {previewData.after.shape[0]} × {previewData.after.shape[1]}
+                {previewData.after?.shape ? `${previewData.after.shape[0]} × ${previewData.after.shape[1]}` : 'N/A'}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 rows × columns
