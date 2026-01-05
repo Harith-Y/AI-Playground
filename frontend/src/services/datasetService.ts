@@ -47,14 +47,30 @@ class DatasetService {
    * Get dataset statistics
    */
   async getDatasetStats(id: string): Promise<{ stats: DatasetStats; columns: ColumnInfo[] }> {
-    return api.get(`/api/v1/datasets/${id}/stats`);
+    try {
+      console.log(`[DatasetService] Fetching stats for dataset ${id}`);
+      const response = await api.get(`/api/v1/datasets/${id}/stats`);
+      console.log(`[DatasetService] Stats response:`, response);
+      return response;
+    } catch (error) {
+      console.error(`[DatasetService] Error fetching stats:`, error);
+      throw error;
+    }
   }
 
   /**
    * Get dataset preview (first N rows)
    */
   async getDatasetPreview(id: string, rows: number = 10): Promise<any[]> {
-    return api.get(`/api/v1/datasets/${id}/preview?rows=${rows}`);
+    try {
+      console.log(`[DatasetService] Fetching preview for dataset ${id}`);
+      const response = await api.get(`/api/v1/datasets/${id}/preview?rows=${rows}`);
+      console.log(`[DatasetService] Preview response:`, response);
+      return response;
+    } catch (error) {
+      console.error(`[DatasetService] Error fetching preview:`, error);
+      throw error;
+    }
   }
 
   /**

@@ -139,10 +139,21 @@ const DatasetUploadPage: React.FC = () => {
       setSnackbarOpen(true);
       setSelectedFile(null);
 
-      // Fetch stats and preview
+      // Fetch stats and preview independently (don't block on errors)
       if (result.id) {
-        await dispatch(fetchDatasetStats(result.id));
-        await dispatch(fetchDatasetPreview(result.id));
+        try {
+          await dispatch(fetchDatasetStats(result.id)).unwrap();
+        } catch (statsError: any) {
+          console.error('Failed to fetch dataset stats:', statsError);
+          // Don't show error to user if stats fail - it's non-critical
+        }
+
+        try {
+          await dispatch(fetchDatasetPreview(result.id)).unwrap();
+        } catch (previewError: any) {
+          console.error('Failed to fetch dataset preview:', previewError);
+          // Don't show error to user if preview fails - it's non-critical
+        }
       }
     } catch (err: any) {
       let errorMessage = 'Failed to upload dataset';
@@ -364,6 +375,29 @@ const DatasetUploadPage: React.FC = () => {
                 </Box>
               </Box>
             </Paper>
+
+            {/* Loading State for Stats */}
+            {currentDataset && !stats && isLoading && (
+              <Paper
+                sx={{
+                  mb: 3,
+                  border: '1px solid #e2e8f0',
+                  background: '#FFFFFF',
+                  p: 3,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <DataArray color="primary" />
+                  <Typography variant="h6" fontWeight={600}>
+                    Dataset Statistics
+                  </Typography>
+                </Box>
+                <LinearProgress sx={{ height: 8, borderRadius: 4 }} />
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                  Loading dataset statistics and metadata...
+                </Typography>
+              </Paper>
+            )}
 
             {/* Statistics */}
             {stats && (
