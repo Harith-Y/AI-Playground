@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import {
   CloudUpload,
+  BarChart,
   Transform,
   TrendingUp,
   ModelTraining,
@@ -28,6 +29,13 @@ const HomePage: React.FC = () => {
       icon: <CloudUpload sx={{ fontSize: 40 }} />,
       path: '/dataset-upload',
       color: '#1976d2',
+    },
+    {
+      title: 'Explore Data',
+      description: 'Visualize and analyze your data',
+      icon: <BarChart sx={{ fontSize: 40 }} />,
+      path: '/exploration',
+      color: '#0288d1',
     },
     {
       title: 'Preprocess Data',
