@@ -16,6 +16,7 @@ import CorrelationMatrix from '../components/features/CorrelationMatrix';
 import FeatureImportance from '../components/features/FeatureImportance';
 import FeatureSelection from '../components/features/FeatureSelection';
 import type { FeatureSelectionConfig, FeatureSelectionValidation } from '../types/featureSelection';
+import { getColumnDataType } from '../types/featureSelection';
 
 const FeatureEngineeringPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -23,6 +24,19 @@ const FeatureEngineeringPage: React.FC = () => {
     (state) => state.feature
   );
   const { currentDataset, columns } = useAppSelector((state) => state.dataset);
+  
+  // Convert dataset columns to feature selection format
+  const featureColumns = React.useMemo(() => {
+    if (!columns) return [];
+    return columns.map(col => ({
+      name: col.name,
+      dataType: getColumnDataType(col.dtype),
+      dtype: col.dtype,
+      missing_count: col.nullCount,
+      unique_count: col.uniqueCount,
+      sample_values: col.sampleValues,
+    }));
+  }, [columns]);
   
   // Feature selection state
   const [featureConfig, setFeatureConfig] = useState<FeatureSelectionConfig>({
@@ -130,11 +144,11 @@ const handleConfigChange = useCallback((config: FeatureSelectionConfig) => {
       {showSuccess && (
         <Alert severity="success" icon={<CheckCircle />} sx={{ mb: 3 }}>
           Feature selection saved! You can now proceed to model training with {featureConfig.inputFeatures.length} selected features.
-        </Alert>
-      )}
-
-      {/* Feature Selection Section */}
-      <Card sx={{ mb: 3, border: '1px solid #e2e8f0' }}>
+        </AfeatureColumns && featureColumns.length > 0 ? (
+            <>
+              <FeatureSelection
+                datasetId={currentDataset!.id}
+                columns={featureCorder: '1px solid #e2e8f0' }}>
         <CardContent>
           <Typography variant="h6" gutterBottom fontWeight={600} color="primary.main">
             Feature Selection
