@@ -1,5 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 interface FeatureImportance {
   feature: string;
@@ -34,7 +37,8 @@ export const fetchFeatureImportance = createAsyncThunk(
   'feature/fetchImportance',
   async (_datasetId: string, { rejectWithValue }) => {
     try {
-      // TODO: Implement API call
+      // Feature importance is only available after model training
+      // This is a placeholder that returns empty data
       return [];
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch feature importance');
@@ -44,12 +48,18 @@ export const fetchFeatureImportance = createAsyncThunk(
 
 export const fetchCorrelationMatrix = createAsyncThunk(
   'feature/fetchCorrelation',
-  async (_datasetId: string, { rejectWithValue }) => {
+  async (datasetId: string, { rejectWithValue }) => {
     try {
-      // TODO: Implement API call
-      return { features: [], matrix: [] };
+      const response = await axios.get(
+        `${API_URL}/api/v1/visualizations/${datasetId}/correlation`
+      );
+      const data = response.data.data;
+      return {
+        features: data.columns || [],
+        matrix: data.matrix || []
+      };
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch correlation matrix');
+      return rejectWithValue(error.response?.data?.detail || error.message || 'Failed to fetch correlation matrix');
     }
   }
 );

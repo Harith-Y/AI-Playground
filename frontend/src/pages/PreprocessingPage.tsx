@@ -38,7 +38,7 @@ import {
   moveStepDown,
   removeStepLocal,
 } from '../store/slices/preprocessingSlice';
-import { fetchDatasetStats } from '../store/slices/datasetSlice';
+import { fetchDatasetStats, setCurrentDataset, fetchDataset } from '../store/slices/datasetSlice';
 import type { PreprocessingStep, PreprocessingStepCreate } from '../types/preprocessing';
 import { validateDatasetForPreprocessing, getErrorMessage } from '../utils/preprocessingValidation';
 import PreviewPanel from '../components/preprocessing/PreviewPanel';
@@ -213,6 +213,20 @@ const PreprocessingPage: React.FC = () => {
   const handleCloseResultDialog = () => {
     setShowResultDialog(false);
     dispatch(clearPipelineResult());
+  };
+
+  const handleLoadPreprocessedDataset = async () => {
+    if (pipelineResult?.output_dataset_id) {
+      try {
+        const dataset = await dispatch(fetchDataset(pipelineResult.output_dataset_id)).unwrap();
+        dispatch(setCurrentDataset(dataset));
+        await dispatch(fetchDatasetStats(pipelineResult.output_dataset_id));
+        showSnackbar('Preprocessed dataset loaded successfully', 'success');
+        handleCloseResultDialog();
+      } catch (error: any) {
+        showSnackbar('Failed to load preprocessed dataset', 'error');
+      }
+    }
   };
 
   const handleRefreshSteps = () => {
@@ -543,7 +557,16 @@ const PreprocessingPage: React.FC = () => {
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle2" gutterBottom fontWeight={600}>
                     Preview (first {pipelineResult.preview.length} rows):
-                  </Typography>
+          {pipelineResult?.output_dataset_id && (
+            <Button 
+              onClick={handleLoadPreprocessedDataset} 
+              variant="contained"
+              color="primary"
+            >
+              Load Preprocessed Data
+            </Button>
+          )}
+          <Button onClick={handleCloseResultDialog} variant="outl
                   <Box sx={{ overflowX: 'auto' }}>
                     <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
                       <pre style={{ fontSize: '12px', margin: 0 }}>
