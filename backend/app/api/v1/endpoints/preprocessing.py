@@ -23,7 +23,7 @@ from app.models.preprocessing_step import PreprocessingStep
 from app.models.dataset import Dataset
 from app.models.preprocessing_history import PreprocessingHistory
 from app.models.user import User
-from app.core.security import decode_token
+from app.core.security import decode_token, verify_resource_ownership
 from app.schemas.preprocessing import (
     PreprocessingStepCreate,
     PreprocessingStepUpdate,
@@ -164,16 +164,21 @@ async def create_preprocessing_step(
     - Encoding: `{"method": "onehot"}` or `{"method": "label"}`
     - Outlier: `{"method": "iqr", "threshold": 1.5}` or `{"method": "zscore", "threshold": 3}`
     """
-    # Verify dataset exists and belongs to user
-    dataset = db.query(Dataset).filter(
-        and_(Dataset.id == step.dataset_id, Dataset.user_id == user_id)
-    ).first()
+    # Verify dataset exists
+    dataset = db.query(Dataset).filter(Dataset.id == step.dataset_id).first()
 
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset {step.dataset_id} not found or access denied"
+            detail=f"Dataset {step.dataset_id} not found"
         )
+    
+    # For guest users (guest@aiplayground.local), skip ownership check
+    # For authenticated users, verify ownership
+    guest_user = db.query(User).filter(User.email == "guest@aiplayground.local").first()
+    if guest_user and user_id != guest_user.id:
+        # Not a guest user, verify ownership
+        verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
     # If order not specified, add to end
     if step.order is None:
