@@ -113,7 +113,12 @@ class ApiService {
   async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
     try {
       const response = await apiClient.get<any>(url, config);
-      return response.data?.data !== undefined ? response.data.data : response.data;
+      // Only unwrap if the response has a 'data' field that is an object with actual nested data
+      // Don't unwrap if 'data' is just a regular field in the response (like in VisualizationResponse)
+      if (response.data?.data !== undefined && !response.data.type && !response.data.title) {
+        return response.data.data;
+      }
+      return response.data;
     } catch (error) {
       throw handleApiError(error);
     }
