@@ -398,7 +398,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {previewData.before.data.slice(0, 10).map((row, idx) => (
+                    {previewData.before?.data?.slice(0, 10).map((row, idx) => (
                       <TableRow key={idx} hover>
                         {previewData.before?.columns?.slice(0, 6).map((col) => (
                           <TableCell key={col}>
@@ -461,7 +461,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {previewData.after.data.slice(0, 10).map((row, idx) => (
+                    {previewData.after?.data?.slice(0, 10).map((row, idx) => (
                       <TableRow key={idx} hover>
                         {previewData.after?.columns?.slice(0, 6).map((col) => (
                           <TableCell key={col}>
