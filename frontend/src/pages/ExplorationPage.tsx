@@ -88,6 +88,7 @@ const ExplorationPage: React.FC = () => {
     setError(null);
     try {
       const response = await api.get(`/api/v1/visualizations/${currentDataset.id}/histogram/${selectedColumn}`);
+      console.log('Histogram response:', response);
       setVisualizations([response]);
     } catch (err: any) {
       setError(err.message || 'Failed to load histogram');
@@ -103,6 +104,7 @@ const ExplorationPage: React.FC = () => {
     setError(null);
     try {
       const response = await api.get(`/api/v1/visualizations/${currentDataset.id}/correlation`);
+      console.log('Correlation response:', response);
       setVisualizations([response]);
     } catch (err: any) {
       setError(err.message || 'Failed to load correlation matrix');
@@ -120,6 +122,7 @@ const ExplorationPage: React.FC = () => {
       const response = await api.get(
         `/api/v1/visualizations/${currentDataset.id}/scatter/${selectedXColumn}/${selectedYColumn}`
       );
+      console.log('Scatter response:', response);
       setVisualizations([response]);
     } catch (err: any) {
       setError(err.message || 'Failed to load scatter plot');
