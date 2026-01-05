@@ -601,8 +601,8 @@ async def apply_preprocessing_pipeline(
 
         # Save transformed dataset if requested
         output_dataset_id = None
-        if request.save_output:
-            output_name = request.output_name or f"{dataset.name}_preprocessed"
+        if req_body.save_output:
+            output_name = req_body.output_name or f"{dataset.name}_preprocessed"
             output_path = _save_transformed_dataset(df, output_name, dataset.file_path)
 
             # Create new dataset record
@@ -910,8 +910,8 @@ async def apply_preprocessing_pipeline_async(
             'event': 'api_async_request',
             'dataset_id': str(req_body.dataset_id),
             'user_id': user_id,
-            'save_output': request.save_output,
-            'output_name': request.output_name
+            'save_output': req_body.save_output,
+            'output_name': req_body.output_name
         }
     )
 
@@ -966,8 +966,8 @@ async def apply_preprocessing_pipeline_async(
     task = apply_preprocessing_task.delay(
         dataset_id=str(req_body.dataset_id),
         user_id=user_id,
-        save_output=request.save_output,
-        output_name=request.output_name
+        save_output=req_body.save_output,
+        output_name=req_body.output_name
     )
 
     logger.info(
