@@ -46,7 +46,7 @@ class DatasetService {
   /**
    * Get dataset statistics
    */
-  async getDatasetStats(id: string): Promise<{ stats: DatasetStats; columns: ColumnInfo[] }> {
+  async getDatasetStats(id: string): Promise<DatasetStats & { columns: ColumnInfo[] }> {
     const response = await api.get(`/api/v1/datasets/${id}/stats`);
     return response;
   }
@@ -54,7 +54,7 @@ class DatasetService {
   /**
    * Get dataset preview (first N rows)
    */
-  async getDatasetPreview(id: string, rows: number = 10): Promise<any[]> {
+  async getDatasetPreview(id: string, rows: number = 10): Promise<{ preview: any[]; columns: ColumnInfo[]; totalRows: number; displayedRows: number }> {
     const response = await api.get(`/api/v1/datasets/${id}/preview?rows=${rows}`);
     return response;
   }
