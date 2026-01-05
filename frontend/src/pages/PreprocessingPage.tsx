@@ -72,11 +72,11 @@ const PreprocessingPage: React.FC = () => {
       dispatch(fetchPreprocessingSteps(currentDataset.id));
 
       // Fetch dataset stats if not already loaded
-      if (columns.length === 0) {
+      if (!columns || columns.length === 0) {
         dispatch(fetchDatasetStats(currentDataset.id));
       }
     }
-  }, [currentDataset?.id, dispatch, columns.length]);
+  }, [currentDataset?.id, dispatch, columns?.length]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -334,7 +334,7 @@ const PreprocessingPage: React.FC = () => {
               variant="contained"
               startIcon={<Add />}
               onClick={handleAddStep}
-              disabled={isProcessing || columns.length === 0}
+              disabled={isProcessing || !columns || columns.length === 0}
             >
               Add Step
             </Button>
@@ -347,7 +347,7 @@ const PreprocessingPage: React.FC = () => {
           </Alert>
         )}
 
-        {columns.length === 0 && (
+        {(!columns || columns.length === 0) && (
           <Alert severity="warning" sx={{ mb: 2 }}>
             Loading dataset information...
           </Alert>
