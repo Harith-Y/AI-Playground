@@ -59,7 +59,7 @@ click==8.3.1
 
 # Monitoring
 prometheus-client==0.21.0
-psutil==6.1.1
+psutil==7.2.1
 
 # HTTP
 httpx==0.28.1
