@@ -557,16 +557,7 @@ const PreprocessingPage: React.FC = () => {
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle2" gutterBottom fontWeight={600}>
                     Preview (first {pipelineResult.preview.length} rows):
-          {pipelineResult?.output_dataset_id && (
-            <Button 
-              onClick={handleLoadPreprocessedDataset} 
-              variant="contained"
-              color="primary"
-            >
-              Load Preprocessed Data
-            </Button>
-          )}
-          <Button onClick={handleCloseResultDialog} variant="outl
+                  </Typography>
                   <Box sx={{ overflowX: 'auto' }}>
                     <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
                       <pre style={{ fontSize: '12px', margin: 0 }}>
@@ -580,7 +571,16 @@ const PreprocessingPage: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseResultDialog} variant="contained">
+          {pipelineResult?.output_dataset_id && (
+            <Button 
+              onClick={handleLoadPreprocessedDataset} 
+              variant="contained"
+              color="primary"
+            >
+              Load Preprocessed Data
+            </Button>
+          )}
+          <Button onClick={handleCloseResultDialog} variant="outlined">
             Close
           </Button>
         </DialogActions>
