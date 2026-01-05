@@ -29,8 +29,7 @@ import {
   updatePreprocessingStep,
   deletePreprocessingStep,
   reorderPreprocessingSteps,
-  applyPreprocessingPipelineAsync,
-  getPreprocessingTaskStatus,
+  applyPreprocessingPipeline,
   clearError,
   clearPipelineResult,
   undo,
@@ -195,15 +194,14 @@ const PreprocessingPage: React.FC = () => {
     }
 
     try {
-      // Start async preprocessing task
-      await dispatch(applyPreprocessingPipelineAsync({
+      // Execute preprocessing synchronously
+      const result = await dispatch(applyPreprocessingPipeline({
         dataset_id: currentDataset!.id,
         save_output: true,
         output_name: `${currentDataset!.name}_preprocessed`,
       })).unwrap();
 
-      setShowProgressDialog(true);
-      showSnackbar('Preprocessing pipeline started', 'success');
+      showSnackbar('Preprocessing pipeline completed successfully', 'success');
     } catch (error: any) {
       const errorMessage = getErrorMessage(error);
       showSnackbar(errorMessage, 'error');
