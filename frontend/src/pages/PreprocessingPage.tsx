@@ -415,8 +415,10 @@ const PreprocessingPage: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
+                // Use center alignment only when empty, otherwise top
+                justifyContent: steps.length === 0 ? 'center' : 'flex-start',
                 bgcolor: 'background.paper',
+                overflowY: 'auto', // Enable scrolling
               }}
             >
               {steps.length === 0 ? (
@@ -425,35 +427,58 @@ const PreprocessingPage: React.FC = () => {
                   message="Click 'Add Step' to start building your data preprocessing pipeline. You can add multiple steps and drag to reorder them."
                 />
               ) : (
-                <Box sx={{ textAlign: 'center', maxWidth: 600 }}>
-                  <Typography variant="h6" gutterBottom fontWeight={600}>
+                <Box sx={{ textAlign: 'center', maxWidth: 600, width: '100%' }}>
+                  <Typography variant="h6" gutterBottom fontWeight={600} sx={{ mt: 2 }}>
                     Pipeline Preview
                   </Typography>
                   <Typography variant="body2" color="text.secondary" paragraph>
                     Your preprocessing pipeline has <strong>{steps.length}</strong> step{steps.length !== 1 ? 's' : ''}.
                     Steps will be executed in the order shown in the sidebar.
                   </Typography>
-                  <Box sx={{ mt: 4, textAlign: 'left' }}>
+                  <Box sx={{ mt: 4, textAlign: 'left', width: '100%' }}>
                     <Typography variant="subtitle2" gutterBottom fontWeight={600}>
                       Pipeline Steps:
                     </Typography>
                     {steps.map((step, index) => (
-                      <Box
+                      <Paper
                         key={step.id}
+                        elevation={0}
                         sx={{
                           p: 2,
-                          mb: 1,
+                          mb: 2,
                           border: '1px solid',
                           borderColor: 'divider',
-                          borderRadius: 1,
+                          borderRadius: 2,
                           bgcolor: 'grey.50',
+                          transition: 'all 0.2s',
+                          '&:hover': {
+                            bgcolor: 'grey.100',
+                            borderColor: 'primary.light',
+                            transform: 'translateY(-2px)',
+                            boxShadow: 2,
+                          }
                         }}
                       >
-                        <Typography variant="body2">
-                          <strong>{index + 1}.</strong> {step.step_type}
-                          {step.column_name && ` on column "${step.column_name}"`}
-                        </Typography>
-                      </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Chip 
+                            label={index + 1} 
+                            size="small" 
+                            color="primary" 
+                            variant="outlined" 
+                            sx={{ fontWeight: 'bold' }} 
+                          />
+                          <Box>
+                            <Typography variant="body1" fontWeight={500}>
+                              {step.step_type}
+                            </Typography>
+                            {step.column_name && (
+                              <Typography variant="body2" color="text.secondary">
+                                on column "<strong>{step.column_name}</strong>"
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      </Paper>
                     ))}
                   </Box>
                 </Box>

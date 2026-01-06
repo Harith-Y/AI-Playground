@@ -301,9 +301,11 @@ const FeatureSelector: React.FC<FeatureSelectorProps> = ({
                           <Checkbox
                             checked={isSelected}
                             disabled={isDisabled}
+                            onChange={() => handleFeatureToggle(column.name)}
                             onClick={(e) => e.stopPropagation()}
                           />
                         }
+                        sx={{ flex: 1, mr: 0 }}
                         label={
                           <Box>
                             <Typography variant="body2" fontWeight={isSelected ? 600 : 400}>

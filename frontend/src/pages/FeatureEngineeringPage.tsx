@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Typography, Box, Container, Grid, Card, CardContent, Button, Alert } from '@mui/material';
 import { TrendingUp, CheckCircle } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
@@ -19,6 +20,7 @@ import type { FeatureSelectionConfig, FeatureSelectionValidation } from '../type
 import { getColumnDataType } from '../types/featureSelection';
 
 const FeatureEngineeringPage: React.FC = () => {
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { correlationMatrix, featureImportance, isLoading, error, selectedFeatures } = useAppSelector(
     (state) => state.feature
@@ -77,7 +79,12 @@ const handleConfigChange = useCallback((config: FeatureSelectionConfig) => {
       // Save selected features to Redux store
       dispatch(setSelectedFeatures(featureConfig.inputFeatures));
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+      
+      // Navigate to modeling page after a brief delay to show success
+      setTimeout(() => {
+        setShowSuccess(false);
+        navigate('/modeling');
+      }, 1000);
     }
   };
 

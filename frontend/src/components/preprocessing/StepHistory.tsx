@@ -240,9 +240,8 @@ const StepHistory: React.FC<StepHistoryProps> = ({
                                     display="block"
                                     color="text.secondary"
                                     sx={{
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap',
+                                      mt: 0.5,
+                                      wordBreak: 'break-word',
                                     }}
                                   >
                                     {formatParameters(step.parameters)}
