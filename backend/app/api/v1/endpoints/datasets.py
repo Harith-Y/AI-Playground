@@ -416,7 +416,27 @@ async def get_dataset(
     # Verify ownership (allows admins to access any dataset)
     verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
-    return dataset
+    # Return dataset with computed fields for frontend compatibility
+    return {
+        "id": dataset.id,
+        "user_id": dataset.user_id,
+        "name": dataset.name,
+        "file_path": dataset.file_path,
+        "shape": {"rows": dataset.rows or 0, "cols": dataset.cols or 0} if dataset.rows or dataset.cols else None,
+        "dtypes": dataset.dtypes,
+        "missing_values": dataset.missing_values,
+        "uploaded_at": dataset.uploaded_at,
+        "rows": dataset.rows,
+        "cols": dataset.cols,
+        # Computed fields for frontend
+        "rowCount": dataset.rows or 0,
+        "columnCount": dataset.cols or 0,
+        "size": (dataset.rows or 0) * (dataset.cols or 0) * 8,  # rough estimate
+        "filename": dataset.file_path.split('/')[-1] if dataset.file_path else "",
+        "createdAt": dataset.uploaded_at.isoformat() if dataset.uploaded_at else None,
+        "updatedAt": dataset.uploaded_at.isoformat() if dataset.uploaded_at else None,
+        "status": "ready"
+    }
 
 
 @router.delete(
