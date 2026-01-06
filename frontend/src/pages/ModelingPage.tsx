@@ -240,7 +240,7 @@ const ModelingPage: React.FC = () => {
                     hyperparameters: {} 
                   } : null}
                   onModelSelect={handleModelSelect}
-                  disabled={activeStep !== 1 && !selectedModel}
+                  disabled={!currentDataset} // Always enable model selection if we have a dataset
                 />
               </CardContent>
             </Card>
