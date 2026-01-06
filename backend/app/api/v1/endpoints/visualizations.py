@@ -16,6 +16,9 @@ import logging
 from app.db.session import get_db
 from app.models.dataset import Dataset
 from app.core.security import get_current_user_id
+from app.services.r2_storage_service import get_storage_service
+from app.core.config import settings
+from urllib.parse import urlparse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -54,21 +57,34 @@ def get_user_or_guest(db: Session = Depends(get_db)) -> UUID:
 
 def load_dataset_df(dataset: Dataset) -> pd.DataFrame:
     """Load dataset file into pandas DataFrame"""
-    file_path = Path(dataset.file_path)
-    if not file_path.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Dataset file not found on disk"
-        )
-    
-    file_ext = file_path.suffix.lower()
     try:
+        storage_service = get_storage_service()
+        file_path = dataset.file_path
+        
+        # Determine the key/path to retrieve
+        key = file_path
+        if file_path.startswith("http://") or file_path.startswith("https://"):
+            if settings.R2_PUBLIC_URL and file_path.startswith(settings.R2_PUBLIC_URL):
+                key = file_path[len(settings.R2_PUBLIC_URL):].lstrip('/')
+            else:
+                # Attempt to extract key from standard R2 URL
+                parsed = urlparse(file_path)
+                path_parts = parsed.path.lstrip('/').split('/', 1)
+                if len(path_parts) > 1 and path_parts[0] == settings.R2_BUCKET_NAME:
+                    key = path_parts[1]
+                else:
+                    key = parsed.path.lstrip('/')
+        
+        # Download content
+        content = storage_service.download_file(key)
+        
+        file_ext = Path(file_path).suffix.lower()
         if file_ext == ".csv":
-            df = pd.read_csv(file_path)
+            df = pd.read_csv(io.BytesIO(content))
         elif file_ext in [".xlsx", ".xls"]:
-            df = pd.read_excel(file_path)
+            df = pd.read_excel(io.BytesIO(content))
         elif file_ext == ".json":
-            df = pd.read_json(file_path)
+            df = pd.read_json(io.BytesIO(content))
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -76,6 +92,7 @@ def load_dataset_df(dataset: Dataset) -> pd.DataFrame:
             )
         return df
     except Exception as e:
+        logger.error(f"Error loading dataset: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to read dataset: {str(e)}"

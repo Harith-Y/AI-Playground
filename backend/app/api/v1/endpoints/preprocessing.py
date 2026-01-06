@@ -6,6 +6,7 @@ Users can create, read, update, delete, and reorder preprocessing steps for thei
 """
 
 import uuid
+import io
 import os
 import time
 import logging
@@ -23,6 +24,7 @@ from app.models.preprocessing_step import PreprocessingStep
 from app.models.dataset import Dataset
 from app.models.preprocessing_history import PreprocessingHistory
 from app.models.user import User
+from app.services.r2_storage_service import get_storage_service
 from app.core.security import decode_token, verify_resource_ownership
 from app.schemas.preprocessing import (
     PreprocessingStepCreate,
@@ -603,7 +605,7 @@ async def apply_preprocessing_pipeline(
         output_dataset_id = None
         if req_body.save_output:
             output_name = req_body.output_name or f"{dataset.name}_preprocessed"
-            output_path = _save_transformed_dataset(df, output_name, dataset.file_path)
+            output_path = _save_transformed_dataset(df, output_name, user_id, dataset.id)
 
             # Create new dataset record
             new_dataset = Dataset(
@@ -829,24 +831,42 @@ def _apply_single_step(df: pd.DataFrame, step: PreprocessingStep) -> tuple[pd.Da
     return df, stats
 
 
-def _save_transformed_dataset(df: pd.DataFrame, name: str, original_path: str) -> str:
+def _save_transformed_dataset(df: pd.DataFrame, name: str, user_id: uuid.UUID, dataset_id: uuid.UUID) -> str:
     """
-    Save the transformed dataset to disk.
+    Save the transformed dataset to storage (R2).
 
     Returns:
-        Path to the saved file
+        URL/Path to the saved file
     """
-    # Create output directory if it doesn't exist
-    output_dir = Path(original_path).parent / "preprocessed"
-    output_dir.mkdir(exist_ok=True)
-
-    # Generate output filename
-    output_path = output_dir / f"{name}.csv"
-
-    # Save the dataset
-    df.to_csv(output_path, index=False)
-
-    return str(output_path)
+    storage_service = get_storage_service()
+    
+    # Create valid filename
+    filename = f"{name}.csv" if not name.endswith('.csv') else name
+    
+    # Path structure: user_id/dataset_id/preprocessed/filename
+    file_path = f"{str(user_id)}/{str(dataset_id)}/preprocessed/{filename}"
+    
+    # Convert DataFrame to CSV in memory
+    buffer = io.BytesIO()
+    df.to_csv(buffer, index=False)
+    content = buffer.getvalue()
+    
+    # Upload
+    try:
+        url = storage_service.upload_file(
+            file_content=content,
+            file_path=file_path,
+            content_type="text/csv"
+        )
+        return url
+    except Exception as e:
+        # Fallback to local storage if R2 fails (or for development)
+        # This mirrors the old behavior but with specific error handling
+        # For now, just re-raise properly structured error
+        raise HTTPException(
+             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+             detail=f"Failed to save transformed dataset: {str(e)}"
+        )
 
 
 # ============================================================================

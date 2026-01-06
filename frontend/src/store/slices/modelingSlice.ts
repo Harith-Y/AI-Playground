@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { Model, TrainingMetrics, Hyperparameters } from '../../types/model';
+import { modelService } from '../../services/modelService';
 
 interface ModelingState {
   selectedModel: string | null;
@@ -34,16 +35,26 @@ const initialState: ModelingState = {
 export const trainModel = createAsyncThunk(
   'modeling/trainModel',
   async (
-    _params: {
+    params: {
       datasetId: string;
       modelType: string;
       hyperparameters: Hyperparameters;
+      targetColumn?: string;
+      selectedFeatures?: string[];
+      experimentId?: string;
     },
     { rejectWithValue }
   ) => {
     try {
-      // TODO: Implement API call
-      return {} as Model;
+      const result = await modelService.trainModel(
+        params.datasetId,
+        params.modelType,
+        params.hyperparameters,
+        params.targetColumn,
+        params.selectedFeatures,
+        params.experimentId
+      );
+      return result;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to train model');
     }
