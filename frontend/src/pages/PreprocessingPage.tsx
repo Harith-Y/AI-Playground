@@ -38,7 +38,7 @@ import {
   moveStepDown,
   removeStepLocal,
 } from '../store/slices/preprocessingSlice';
-import { fetchDatasetStats, setCurrentDataset, fetchDataset } from '../store/slices/datasetSlice';
+import { fetchDatasetStats, setCurrentDataset, fetchDataset, fetchDatasetPreview } from '../store/slices/datasetSlice';
 import type { PreprocessingStep, PreprocessingStepCreate } from '../types/preprocessing';
 import { validateDatasetForPreprocessing, getErrorMessage } from '../utils/preprocessingValidation';
 import PreviewPanel from '../components/preprocessing/PreviewPanel';
@@ -218,13 +218,20 @@ const PreprocessingPage: React.FC = () => {
   const handleLoadPreprocessedDataset = async () => {
     if (pipelineResult?.output_dataset_id) {
       try {
+        // Fetch dataset details
         const dataset = await dispatch(fetchDataset(pipelineResult.output_dataset_id)).unwrap();
         dispatch(setCurrentDataset(dataset));
-        await dispatch(fetchDatasetStats(pipelineResult.output_dataset_id));
+        
+        // Fetch all dataset information in parallel
+        await Promise.all([
+          dispatch(fetchDatasetStats(pipelineResult.output_dataset_id)),
+          dispatch(fetchDatasetPreview(pipelineResult.output_dataset_id)),
+        ]);
+        
         showSnackbar('Preprocessed dataset loaded successfully', 'success');
         handleCloseResultDialog();
       } catch (error: any) {
-        showSnackbar('Failed to load preprocessed dataset', 'error');
+        showSnackbar('Failed to load preprocessed dataset: ' + (error.message || 'Unknown error'), 'error');
       }
     }
   };
