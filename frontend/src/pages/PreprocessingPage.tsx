@@ -218,6 +218,10 @@ const PreprocessingPage: React.FC = () => {
   const handleLoadPreprocessedDataset = async () => {
     if (pipelineResult?.output_dataset_id) {
       try {
+        // Clear the pipeline result first to prevent dialog from reopening
+        dispatch(clearPipelineResult());
+        setShowResultDialog(false);
+        
         // Fetch dataset details
         const dataset = await dispatch(fetchDataset(pipelineResult.output_dataset_id)).unwrap();
         dispatch(setCurrentDataset(dataset));
@@ -230,7 +234,6 @@ const PreprocessingPage: React.FC = () => {
         ]);
         
         showSnackbar('Preprocessed dataset loaded successfully', 'success');
-        handleCloseResultDialog();
       } catch (error: any) {
         showSnackbar('Failed to load preprocessed dataset: ' + (error.message || 'Unknown error'), 'error');
       }
