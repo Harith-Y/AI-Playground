@@ -416,6 +416,12 @@ async def get_dataset(
     # Verify ownership (allows admins to access any dataset)
     verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
+    # Get actual file size from filesystem
+    import os
+    file_size = 0
+    if dataset.file_path and os.path.exists(dataset.file_path):
+        file_size = os.path.getsize(dataset.file_path)
+
     # Return dataset with computed fields for frontend compatibility
     return {
         "id": dataset.id,
@@ -431,7 +437,7 @@ async def get_dataset(
         # Computed fields for frontend
         "rowCount": dataset.rows or 0,
         "columnCount": dataset.cols or 0,
-        "size": (dataset.rows or 0) * (dataset.cols or 0) * 8,  # rough estimate
+        "size": file_size,  # actual file size in bytes
         "filename": dataset.file_path.split('/')[-1] if dataset.file_path else "",
         "createdAt": dataset.uploaded_at.isoformat() if dataset.uploaded_at else None,
         "updatedAt": dataset.uploaded_at.isoformat() if dataset.uploaded_at else None,

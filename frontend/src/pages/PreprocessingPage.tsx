@@ -222,10 +222,11 @@ const PreprocessingPage: React.FC = () => {
         const dataset = await dispatch(fetchDataset(pipelineResult.output_dataset_id)).unwrap();
         dispatch(setCurrentDataset(dataset));
         
-        // Fetch all dataset information in parallel
+        // Fetch all dataset information in parallel (including steps for new dataset)
         await Promise.all([
           dispatch(fetchDatasetStats(pipelineResult.output_dataset_id)),
           dispatch(fetchDatasetPreview(pipelineResult.output_dataset_id)),
+          dispatch(fetchPreprocessingSteps(pipelineResult.output_dataset_id)),
         ]);
         
         showSnackbar('Preprocessed dataset loaded successfully', 'success');
