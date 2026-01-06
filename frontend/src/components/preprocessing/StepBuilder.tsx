@@ -66,8 +66,8 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
     const config = STEP_TYPE_CONFIGS[type];
     const defaultParams: Record<string, any> = {};
     
-    if (config && config.parameterFields) {
-      config.parameterFields.forEach(field => {
+    if (config && config.parameterSchema) {
+      config.parameterSchema.forEach((field: ParameterField) => {
         if (field.defaultValue !== undefined) {
           defaultParams[field.name] = field.defaultValue;
         }
