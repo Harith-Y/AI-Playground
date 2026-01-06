@@ -25,10 +25,12 @@ import {
   Timeline,
 } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
+import { ModelSelector, HyperparameterEditor } from '../components/model';
 import {
   fetchModels,
   clearModelError,
   setSelectedModel,
+  setHyperparameters,
 } from '../store/slices/modelingSlice';
 import LoadingState from '../components/common/LoadingState';
 import ErrorState from '../components/common/ErrorState';
@@ -56,6 +58,7 @@ const ModelingPage: React.FC = () => {
     logs,
   } = useAppSelector((state) => state.modeling);
   const { currentDataset } = useAppSelector((state) => state.dataset);
+  const { taskType } = useAppSelector((state) => state.feature);
 
   const [activeStep, setActiveStep] = useState(0);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
@@ -105,6 +108,11 @@ const ModelingPage: React.FC = () => {
     }
   };
 
+  const handleModelSelect = (selection: any) => {
+    dispatch(setSelectedModel(selection.modelId));
+    dispatch(setHyperparameters(selection.hyperparameters));
+  };
+  
   if (isLoading && models.length === 0) {
     return <LoadingState message="Loading model configurations..." />;
   }
@@ -223,22 +231,17 @@ const ModelingPage: React.FC = () => {
                   )}
                 </Box>
                 <Divider sx={{ mb: 2 }} />
-                {models.length === 0 ? (
-                  <EmptyState
-                    title="No Models Available"
-                    message="Model configurations will appear here once loaded"
-                    icon={<Psychology sx={{ fontSize: 48 }} />}
-                  />
-                ) : (
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Choose a machine learning algorithm
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Model selection interface will be implemented in the next phase
-                    </Typography>
-                  </Box>
-                )}
+                
+                <ModelSelector
+                  taskType={(taskType as any) || 'classification'}
+                  selectedModel={selectedModel ? { 
+                    modelId: selectedModel, 
+                    taskType: (taskType as any) || 'classification', 
+                    hyperparameters: {} 
+                  } : null}
+                  onModelSelect={handleModelSelect}
+                  disabled={activeStep !== 1 && !selectedModel}
+                />
               </CardContent>
             </Card>
 
