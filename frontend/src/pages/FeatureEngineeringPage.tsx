@@ -8,6 +8,8 @@ import {
   fetchFeatureImportance,
   clearFeatureError,
   setSelectedFeatures,
+  setTargetColumn,
+  setTaskType,
   setAvailableFeatures,
 } from '../store/slices/featureSlice';
 import LoadingState from '../components/common/LoadingState';
@@ -22,9 +24,15 @@ import { getColumnDataType } from '../types/featureSelection';
 const FeatureEngineeringPage: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { correlationMatrix, featureImportance, isLoading, error, selectedFeatures } = useAppSelector(
-    (state) => state.feature
-  );
+  const { 
+    correlationMatrix, 
+    featureImportance, 
+    isLoading, 
+    error, 
+    selectedFeatures,
+    targetColumn,
+    taskType
+  } = useAppSelector((state) => state.feature);
   const { currentDataset, columns } = useAppSelector((state) => state.dataset);
   
   // Convert dataset columns to feature selection format
@@ -58,14 +66,25 @@ const FeatureEngineeringPage: React.FC = () => {
   }, [columns, dispatch]);
 
   useEffect(() => {
-    // Restore selected features if they exist
+    // Restore selected features configuration from Redux if it exists
     if (selectedFeatures && selectedFeatures.length > 0) {
       setFeatureConfig(prev => ({
         ...prev,
         inputFeatures: selectedFeatures,
+        targetColumn: targetColumn || prev.targetColumn,
+        taskType: (taskType as any) || prev.taskType,
+        excludedColumns: targetColumn ? [targetColumn] : prev.excludedColumns,
+      }));
+    } else if (targetColumn) {
+       // Even if no features selected, if there is a target, restore it
+       setFeatureConfig(prev => ({
+        ...prev,
+        targetColumn: targetColumn,
+        taskType: (taskType as any) || prev.taskType,
+        excludedColumns: [targetColumn],
       }));
     }
-  }, [selectedFeatures]);
+  }, [selectedFeatures, targetColumn, taskType]);
 const handleConfigChange = useCallback((config: FeatureSelectionConfig) => {
     setFeatureConfig(config);
   }, []);
@@ -76,8 +95,11 @@ const handleConfigChange = useCallback((config: FeatureSelectionConfig) => {
 
   const handleContinue = () => {
     if (validation?.isValid) {
-      // Save selected features to Redux store
+      // Save selected features and config to Redux store
       dispatch(setSelectedFeatures(featureConfig.inputFeatures));
+      dispatch(setTargetColumn(featureConfig.targetColumn));
+      dispatch(setTaskType(featureConfig.taskType));
+      
       setShowSuccess(true);
       
       // Navigate to modeling page after a brief delay to show success

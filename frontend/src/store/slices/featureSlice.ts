@@ -16,6 +16,8 @@ interface CorrelationMatrix {
 
 interface FeatureState {
   selectedFeatures: string[];
+  targetColumn: string | null;
+  taskType: string | null;
   availableFeatures: string[];
   featureImportance: FeatureImportance[];
   correlationMatrix: CorrelationMatrix | null;
@@ -25,6 +27,8 @@ interface FeatureState {
 
 const initialState: FeatureState = {
   selectedFeatures: [],
+  targetColumn: null,
+  taskType: null,
   availableFeatures: [],
   featureImportance: [],
   correlationMatrix: null,
@@ -82,6 +86,12 @@ const featureSlice = createSlice({
   reducers: {
     setSelectedFeatures: (state, action: PayloadAction<string[]>) => {
       state.selectedFeatures = action.payload;
+    },
+    setTargetColumn: (state, action: PayloadAction<string | null>) => {
+      state.targetColumn = action.payload;
+    },
+    setTaskType: (state, action: PayloadAction<string | null>) => {
+      state.taskType = action.payload;
     },
     addFeature: (state, action: PayloadAction<string>) => {
       if (!state.selectedFeatures.includes(action.payload)) {
@@ -142,6 +152,8 @@ const featureSlice = createSlice({
 
 export const {
   setSelectedFeatures,
+  setTargetColumn,
+  setTaskType,
   addFeature,
   removeFeature,
   setAvailableFeatures,
