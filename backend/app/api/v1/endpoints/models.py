@@ -64,6 +64,56 @@ def get_db():
         db.close()
 
 
+@router.get("/")
+async def list_models(
+    skip: int = 0,
+    limit: int = 100,
+    dataset_id: Optional[str] = None,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    List trained models (model runs).
+
+    Query parameters:
+        skip: Number of records to skip
+        limit: Max number of records to return
+        dataset_id: Filter by dataset ID
+
+    Returns:
+        List of model runs with their status and metrics
+    """
+    query = db.query(ModelRun).filter(ModelRun.user_id == user_id)
+    
+    if dataset_id:
+        query = query.filter(ModelRun.dataset_id == dataset_id)
+    
+    models = query.order_by(ModelRun.created_at.desc()).offset(skip).limit(limit).all()
+    
+    result = []
+    for model in models:
+        # Extract accuracy from metrics if available
+        accuracy = None
+        if model.metrics and "accuracy" in model.metrics:
+            accuracy = model.metrics["accuracy"]
+        elif model.metrics and "r2_score" in model.metrics:
+            accuracy = model.metrics["r2_score"]  # Use R2 for regression as "accuracy" proxy
+            
+        result.append({
+            "id": str(model.id),
+            "name": f"{model.model_type} ({model.created_at.strftime('%Y-%m-%d %H:%M')})",
+            "type": model.model_type,
+            "status": model.status,
+            "accuracy": accuracy,
+            "createdAt": model.created_at.isoformat(),
+            "updatedAt": model.updated_at.isoformat() if model.updated_at else model.created_at.isoformat(),
+            "hyperparameters": model.hyperparameters or {},
+            "metrics": model.metrics or {}
+        })
+        
+    return result
+
+
 @router.get("/available")
 async def get_available_models(
     task_type: Optional[str] = None,
