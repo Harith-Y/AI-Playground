@@ -313,16 +313,15 @@ def run_training_logic(
         Dictionary with training results and metrics
     """
     # Setup logging with context
-    logger = get_logger(
-        task_id=self.request.id,
-        user_id=user_id,
-        dataset_id=dataset_id
-    )
+    logger = get_logger("app.tasks.training_tasks")
 
     logger.info(
         f"Starting model training",
         extra={
             'event': 'training_start',
+            'task_id': self.request.id,
+            'user_id': user_id,
+            'dataset_id': dataset_id,
             'model_type': model_type,
             'experiment_id': experiment_id,
             'test_size': test_size,
