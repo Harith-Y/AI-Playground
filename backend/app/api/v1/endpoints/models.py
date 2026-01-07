@@ -14,7 +14,7 @@ import uuid
 
 from app.ml_engine.model_registry import model_registry, TaskType, ModelCategory, ModelRegistry
 from app.models.model_run import ModelRun
-from app.models.experiment import Experiment
+from app.models.experiment import Experiment, ExperimentStatus
 from app.models.dataset import Dataset
 from app.schemas.model import (
     ModelTrainingRequest,
@@ -379,10 +379,30 @@ async def train_model_endpoint(
         HTTPException 403: If user doesn't have permission
     """
     try:
+        # Handle playground/dummy experiment ID (00000000-0000-0000-0000-000000000000)
+        # Check if the UUID is nil/zero
+        experiment_id = request.experiment_id
+        if str(experiment_id) == "00000000-0000-0000-0000-000000000000":
+            # Check if there is an existing "Playground" experiment for this dataset/user or create new
+            # For simplicity, we create a new experiment for this run
+            new_experiment_id = uuid4()
+            logger.info(f"Creating new playground experiment: {new_experiment_id}")
+            
+            new_experiment = Experiment(
+                id=new_experiment_id,
+                user_id=user_id,
+                dataset_id=request.dataset_id,
+                name=f"Playground Experiment {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                status=ExperimentStatus.RUNNING
+            )
+            db.add(new_experiment)
+            db.commit()
+            experiment_id = new_experiment_id
+            
         # Validate training configuration using validation service
         validator = get_training_validator(db)
         experiment, dataset, model_info = validator.validate_training_config(
-            experiment_id=request.experiment_id,
+            experiment_id=experiment_id,
             dataset_id=request.dataset_id,
             model_type=request.model_type,
             user_id=user_id,
