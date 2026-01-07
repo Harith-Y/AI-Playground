@@ -29,7 +29,7 @@ from app.schemas.model import (
     ModelRankingRequest,
     ModelRankingResponse
 )
-from app.tasks.training_tasks import train_model
+from app.tasks.training_tasks import train_model, run_training_logic
 from app.celery_app import celery_app
 from app.db.session import SessionLocal, get_db
 from app.services.training_validation_service import get_training_validator, ValidationError
@@ -427,7 +427,7 @@ def run_training_in_background(
     """Wrapper to run training task in FastAPI background tasks."""
     dummy_self = DummyTaskContext(task_id)
     try:
-        train_model.run(
+        run_training_logic(
             dummy_self,
             model_run_id=model_run_id,
             experiment_id=experiment_id,

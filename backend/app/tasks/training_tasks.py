@@ -280,12 +280,7 @@ def update_training_progress(
 # ============================================================================
 
 
-@celery_app.task(
-    base=TrainingTask,
-    bind=True,
-    name="app.tasks.training_tasks.train_model"
-)
-def train_model(
+def run_training_logic(
     self,
     model_run_id: str,
     experiment_id: str,
@@ -968,3 +963,40 @@ def train_model(
 
     finally:
         db.close()
+
+
+@celery_app.task(
+    base=TrainingTask,
+    bind=True,
+    name="app.tasks.training_tasks.train_model"
+)
+def train_model(
+    self,
+    model_run_id: str,
+    experiment_id: str,
+    dataset_id: str,
+    model_type: str,
+    hyperparameters: Optional[Dict[str, Any]] = None,
+    target_column: Optional[str] = None,
+    feature_columns: Optional[list] = None,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    user_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Celery task wrapper for model training. 
+    Delegates to run_training_logic to allow reuse in BackgroundTasks.
+    """
+    return run_training_logic(
+        self,
+        model_run_id=model_run_id,
+        experiment_id=experiment_id,
+        dataset_id=dataset_id,
+        model_type=model_type,
+        hyperparameters=hyperparameters,
+        target_column=target_column,
+        feature_columns=feature_columns,
+        test_size=test_size,
+        random_state=random_state,
+        user_id=user_id
+    )
