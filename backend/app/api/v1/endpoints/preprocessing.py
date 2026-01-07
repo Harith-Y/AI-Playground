@@ -10,7 +10,7 @@ import io
 import os
 import time
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -385,7 +385,9 @@ async def delete_preprocessing_step(
         )
 
     db.delete(db_step)
+    db.flush()  # Ensure delete is executed
     db.commit()
+    db.expire_all()  # Clear any cached objects
 
     return None
 
@@ -427,23 +429,33 @@ async def delete_preprocessing_step(
 )
 async def reorder_preprocessing_steps(
     request: Request,
-    dataset_id: str = Query(..., description="Dataset ID"),
-    step_ids: List[str] = Query(..., description="Ordered list of step IDs"),
+    reorder_data: Dict[str, Any] = Body(..., example={"dataset_id": "789e4567...", "step_ids": ["456e4567...", "123e4567..."]}),
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Reorder preprocessing steps for a dataset.
 
-    Provide the step IDs in the desired execution order.
+    Provide the step IDs in the desired execution order in the request body.
 
-    **Example:**
-    ```
-    POST /preprocessing/reorder?dataset_id=789e4567...&step_ids=456e4567...&step_ids=123e4567...
+    **Request Body:**
+    ```json
+    {
+      "dataset_id": "789e4567-e89b-12d3-a456-426614174000",
+      "step_ids": ["456e4567-e89b-12d3-a456-426614174000", "123e4567-e89b-12d3-a456-426614174000"]
+    }
     ```
 
     This will set the first step's order to 0, the second to 1, etc.
     """
+    dataset_id = reorder_data.get("dataset_id")
+    step_ids = reorder_data.get("step_ids", [])
+    
+    if not dataset_id or not step_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both dataset_id and step_ids are required"
+        )
     # Verify dataset exists and belongs to user
     dataset = db.query(Dataset).filter(
         and_(Dataset.id == dataset_id, Dataset.user_id == user_id)

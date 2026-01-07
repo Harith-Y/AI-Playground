@@ -155,24 +155,42 @@ async def list_models(
             except Exception:
                 pass
         
-        # Extract accuracy from metrics if available
+        # Normalize metrics based on task type for frontend compatibility
+        metrics = model.metrics or {}
         accuracy = None
-        if model.metrics and "accuracy" in model.metrics:
-            accuracy = model.metrics["accuracy"]
-        elif model.metrics and "r2_score" in model.metrics:
-            accuracy = model.metrics["r2_score"]  # Use R2 for regression as "accuracy" proxy
+        
+        if task_type == "regression":
+            # For regression, provide r2_score as the primary metric
+            # Ensure all expected fields exist with safe defaults
+            if "r2_score" in metrics:
+                accuracy = metrics["r2_score"]
+            metrics.setdefault("r2_score", 0.0)
+            metrics.setdefault("mae", 0.0)
+            metrics.setdefault("mse", 0.0)
+            metrics.setdefault("rmse", 0.0)
+        elif task_type == "classification":
+            # For classification, use accuracy
+            if "accuracy" in metrics:
+                accuracy = metrics["accuracy"]
+            metrics.setdefault("accuracy", 0.0)
+            metrics.setdefault("precision", 0.0)
+            metrics.setdefault("recall", 0.0)
+            metrics.setdefault("f1_score", 0.0)
+        else:
+            # Clustering or unknown - try to get any available metric
+            accuracy = metrics.get("accuracy") or metrics.get("r2_score")
             
         result.append({
             "id": str(model.id),
             "name": f"{model.model_type} ({model.created_at.strftime('%Y-%m-%d %H:%M')})",
             "type": model.model_type,
-            "task_type": task_type,  # Add task_type to response
+            "task_type": task_type,
             "status": model.status,
             "accuracy": accuracy,
             "createdAt": model.created_at.isoformat(),
             "updatedAt": model.created_at.isoformat(),
             "hyperparameters": model.hyperparameters or {},
-            "metrics": model.metrics or {}
+            "metrics": metrics
         })
         
     return result
