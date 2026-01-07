@@ -155,7 +155,7 @@ async def list_models(
             "status": model.status,
             "accuracy": accuracy,
             "createdAt": model.created_at.isoformat(),
-            "updatedAt": model.updated_at.isoformat() if model.updated_at else model.created_at.isoformat(),
+            "updatedAt": model.created_at.isoformat(),
             "hyperparameters": model.hyperparameters or {},
             "metrics": model.metrics or {}
         })
