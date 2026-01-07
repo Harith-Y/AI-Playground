@@ -125,6 +125,19 @@ class ModelFactory:
                 f"Available models: {available_models}"
             )
 
+        # Remove deprecated parameters for specific models
+        deprecated_params = {
+            'linear_regression': ['normalize'],  # Removed in sklearn 1.2+
+            'ridge_regression': ['normalize'],   # Removed in sklearn 1.2+
+            'lasso_regression': ['normalize'],   # Removed in sklearn 1.2+
+        }
+        
+        # Filter out deprecated parameters
+        if model_id in deprecated_params:
+            for param in deprecated_params[model_id]:
+                if param in hyperparameters:
+                    del hyperparameters[param]
+
         # Create config if not provided
         if config is None:
             config = ModelConfig(

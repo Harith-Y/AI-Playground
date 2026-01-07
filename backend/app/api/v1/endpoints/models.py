@@ -141,6 +141,20 @@ async def list_models(
     
     result = []
     for model in models:
+        # Get task_type from metadata if available, otherwise infer from model_type
+        task_type = None
+        if model.run_metadata and 'task_type' in model.run_metadata:
+            task_type = model.run_metadata['task_type']
+        else:
+            # Fallback: Try to determine from model registry
+            try:
+                from app.ml_engine.model_registry import model_registry
+                model_info = model_registry.get_model(model.model_type)
+                if model_info:
+                    task_type = model_info.task_type.value
+            except Exception:
+                pass
+        
         # Extract accuracy from metrics if available
         accuracy = None
         if model.metrics and "accuracy" in model.metrics:
@@ -152,6 +166,7 @@ async def list_models(
             "id": str(model.id),
             "name": f"{model.model_type} ({model.created_at.strftime('%Y-%m-%d %H:%M')})",
             "type": model.model_type,
+            "task_type": task_type,  # Add task_type to response
             "status": model.status,
             "accuracy": accuracy,
             "createdAt": model.created_at.isoformat(),

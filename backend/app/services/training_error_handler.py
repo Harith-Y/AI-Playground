@@ -175,15 +175,10 @@ class TrainingErrorHandler:
                 
                 # Invalidate related caches
                 try:
-                    asyncio.create_task(invalidate_model_cache(self.model_run_id))
-                    asyncio.create_task(invalidate_comparison_cache())
-                except RuntimeError:
-                    # If no event loop is running, run synchronously
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    loop.run_until_complete(invalidate_model_cache(self.model_run_id))
-                    loop.run_until_complete(invalidate_comparison_cache())
-                    loop.close()
+                    invalidate_model_cache(self.model_run_id)
+                    invalidate_comparison_cache()
+                except Exception as e:
+                    self.logger.error(f"Failed to invalidate cache: {e}")
                 
                 self.logger.info(
                     f"Updated model run with error details",

@@ -843,10 +843,15 @@ def run_training_logic(
         model_run.model_artifact_path = str(model_path)
         model_run.status = "completed"
 
+        # Initialize run_metadata if needed
+        if not model_run.run_metadata:
+            model_run.run_metadata = {}
+        
+        # Store task type for frontend display
+        model_run.run_metadata['task_type'] = task_type.value
+        
         # Store feature importance if available
         if feature_importance is not None:
-            if not model_run.run_metadata:
-                model_run.run_metadata = {}
             model_run.run_metadata['feature_importance'] = feature_importance
 
         db.commit()
