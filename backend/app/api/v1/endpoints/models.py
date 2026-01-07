@@ -118,7 +118,7 @@ async def list_models(
     skip: int = 0,
     limit: int = 100,
     dataset_id: Optional[str] = None,
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_user_or_guest),  # Changed from get_current_user_id to support guests
     db: Session = Depends(get_db)
 ) -> List[Dict[str, Any]]:
     """
@@ -132,10 +132,10 @@ async def list_models(
     Returns:
         List of model runs with their status and metrics
     """
-    query = db.query(ModelRun).filter(ModelRun.user_id == user_id)
+    query = db.query(ModelRun).join(Experiment).filter(Experiment.user_id == user_id)
     
     if dataset_id:
-        query = query.filter(ModelRun.dataset_id == dataset_id)
+        query = query.filter(Experiment.dataset_id == dataset_id)
     
     models = query.order_by(ModelRun.created_at.desc()).offset(skip).limit(limit).all()
     
