@@ -387,16 +387,24 @@ async def delete_preprocessing_step(
 
     dataset_id = db_step.dataset_id
     
-    # Delete the step
-    db.delete(db_step)
-    
-    # Commit and clear session to ensure delete is persisted
+    # Use raw SQL for more reliable deletion
     try:
+        # Delete using raw SQL to bypass any ORM caching issues
+        from sqlalchemy import text
+        db.execute(
+            text("DELETE FROM preprocessing_steps WHERE id = :step_id"),
+            {"step_id": step_id}
+        )
         db.commit()
-        # Force session to clear all cached objects
-        db.expunge_all()
+        
+        # Verify deletion
+        check = db.query(PreprocessingStep).filter(PreprocessingStep.id == step_id).first()
+        if check:
+            raise Exception("Step still exists after delete")
+            
     except Exception as e:
         db.rollback()
+        logger.error(f"Failed to delete preprocessing step {step_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete preprocessing step: {str(e)}"
@@ -442,63 +450,67 @@ async def delete_preprocessing_step(
 )
 async def reorder_preprocessing_steps(
     request: Request,
-    reorder_data: ReorderRequest,
+    reorder_data: Optional[ReorderRequest] = None,
+    dataset_id: Optional[str] = Query(None, description="Dataset ID (can be in body or query)"),
+    step_ids: Optional[List[str]] = Query(None, description="Step IDs (can be in body or query)"),
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Reorder preprocessing steps for a dataset.
 
-    Provide the step IDs in the desired execution order in the request body.
-
-    **Request Body:**
-    ```json
-    {
-      "dataset_id": "789e4567-e89b-12d3-a456-426614174000",
-      "step_ids": ["456e4567-e89b-12d3-a456-426614174000", "123e4567-e89b-12d3-a456-426614174000"]
-    }
-    ```
+    Supports two formats:
+    1. JSON body: {"dataset_id": "...", "step_ids": [...]}
+    2. Query params: ?dataset_id=...&step_ids=...&step_ids=...
 
     This will set the first step's order to 0, the second to 1, etc.
     """
-    dataset_id = str(reorder_data.dataset_id)
-    step_ids = reorder_data.step_ids
+    # Try to get from body first, then fall back to query params
+    if reorder_data:
+        final_dataset_id = str(reorder_data.dataset_id)
+        final_step_ids = reorder_data.step_ids
+    elif dataset_id and step_ids:
+        final_dataset_id = dataset_id
+        final_step_ids = step_ids
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must provide dataset_id and step_ids either in request body or as query parameters"
+        )
     # Verify dataset exists and belongs to user
     dataset = db.query(Dataset).filter(
-        and_(Dataset.id == dataset_id, Dataset.user_id == user_id)
+        and_(Dataset.id == final_dataset_id, Dataset.user_id == user_id)
     ).first()
 
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset {dataset_id} not found or access denied"
+            detail=f"Dataset {final_dataset_id} not found or access denied"
         )
 
     # Get all steps for the dataset
     steps = db.query(PreprocessingStep).filter(
-        PreprocessingStep.dataset_id == dataset_id
+        PreprocessingStep.dataset_id == final_dataset_id
     ).all()
 
     # Verify all step IDs exist
     step_dict = {str(step.id): step for step in steps}
-    for step_id in step_ids:
+    for step_id in final_step_ids:
         if step_id not in step_dict:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Step {step_id} not found in dataset {dataset_id}"
+                detail=f"Step {step_id} not found in dataset {final_dataset_id}"
             )
 
     # Update order
-    for new_order, step_id in enumerate(step_ids):
+    for new_order, step_id in enumerate(final_step_ids):
         step_dict[step_id].order = new_order
 
     db.commit()
 
     # Return reordered steps
     updated_steps = db.query(PreprocessingStep).filter(
-        PreprocessingStep.dataset_id == dataset_id
-    ).order_by(PreprocessingStep.order).all()
-
+        PreprocessingStep.dataset_id == final_dataset_id
     return updated_steps
 
 

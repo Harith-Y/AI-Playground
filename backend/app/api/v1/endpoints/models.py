@@ -164,43 +164,44 @@ async def list_models(
                 return False
             try:
                 import math
-                return not (math.isnan(float(val)) or math.isinf(float(val)))
+                float_val = float(val)
+                return not (math.isnan(float_val) or math.isinf(float_val))
             except (ValueError, TypeError):
                 return False
+        
+        # Helper to get safe metric value (return None if invalid)
+        def safe_metric(val):
+            return float(val) if is_valid_metric(val) else None
         
         # Create clean metrics dict with only valid values
         metrics = {}
         accuracy = None
         
         if task_type == "regression":
-            # Extract and validate regression metrics
-            if is_valid_metric(raw_metrics.get("r2_score")):
-                metrics["r2_score"] = raw_metrics["r2_score"]
-                accuracy = metrics["r2_score"]
-            if is_valid_metric(raw_metrics.get("mae")):
-                metrics["mae"] = raw_metrics["mae"]
-            if is_valid_metric(raw_metrics.get("mse")):
-                metrics["mse"] = raw_metrics["mse"]
-            if is_valid_metric(raw_metrics.get("rmse")):
-                metrics["rmse"] = raw_metrics["rmse"]
-            if is_valid_metric(raw_metrics.get("explained_variance")):
-                metrics["explained_variance"] = raw_metrics["explained_variance"]
+            # Extract and validate regression metrics - provide None for invalid values
+            metrics["r2_score"] = safe_metric(raw_metrics.get("r2_score"))
+            metrics["mae"] = safe_metric(raw_metrics.get("mae"))
+            metrics["mse"] = safe_metric(raw_metrics.get("mse"))
+            metrics["rmse"] = safe_metric(raw_metrics.get("rmse"))
+            metrics["explained_variance"] = safe_metric(raw_metrics.get("explained_variance"))
+            
+            # Use r2_score as primary accuracy metric for regression
+            accuracy = metrics.get("r2_score")
+            
         elif task_type == "classification":
             # Extract and validate classification metrics
-            if is_valid_metric(raw_metrics.get("accuracy")):
-                metrics["accuracy"] = raw_metrics["accuracy"]
-                accuracy = metrics["accuracy"]
-            if is_valid_metric(raw_metrics.get("precision")):
-                metrics["precision"] = raw_metrics["precision"]
-            if is_valid_metric(raw_metrics.get("recall")):
-                metrics["recall"] = raw_metrics["recall"]
-            if is_valid_metric(raw_metrics.get("f1_score")):
-                metrics["f1_score"] = raw_metrics["f1_score"]
+            metrics["accuracy"] = safe_metric(raw_metrics.get("accuracy"))
+            metrics["precision"] = safe_metric(raw_metrics.get("precision"))
+            metrics["recall"] = safe_metric(raw_metrics.get("recall"))
+            metrics["f1_score"] = safe_metric(raw_metrics.get("f1_score"))
+            
+            # Use accuracy as primary metric
+            accuracy = metrics.get("accuracy")
+            
         else:
             # For clustering or unknown, copy all valid metrics
             for key, val in raw_metrics.items():
-                if is_valid_metric(val):
-                    metrics[key] = val
+                metrics[key] = safe_metric(val)
             # Try to find any valid metric for accuracy
             accuracy = metrics.get("silhouette_score") or metrics.get("r2_score") or metrics.get("accuracy")
             
