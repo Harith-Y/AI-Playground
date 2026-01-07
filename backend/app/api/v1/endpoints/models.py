@@ -483,7 +483,7 @@ async def train_model_endpoint(
     # Create ModelRun record
     model_run = ModelRun(
         id=uuid4(),
-        experiment_id=request.experiment_id,
+        experiment_id=experiment_id,
         model_type=request.model_type,
         hyperparameters=request.hyperparameters or {},
         status="pending",
@@ -502,7 +502,7 @@ async def train_model_endpoint(
     # Trigger Celery task
     task = train_model.delay(
         model_run_id=str(model_run.id),
-        experiment_id=str(request.experiment_id),
+        experiment_id=str(experiment_id),
         dataset_id=str(request.dataset_id),
         model_type=request.model_type,
         hyperparameters=request.hyperparameters,
