@@ -30,6 +30,7 @@ from app.schemas.preprocessing import (
     PreprocessingStepCreate,
     PreprocessingStepUpdate,
     PreprocessingStepRead,
+    ReorderRequest,
     PreprocessingApplyRequest,
     PreprocessingApplyResponse,
     PreprocessingAsyncResponse,
@@ -384,10 +385,22 @@ async def delete_preprocessing_step(
             detail=f"Preprocessing step {step_id} not found or access denied"
         )
 
+    dataset_id = db_step.dataset_id
+    
+    # Delete the step
     db.delete(db_step)
-    db.flush()  # Ensure delete is executed
-    db.commit()
-    db.expire_all()  # Clear any cached objects
+    
+    # Commit and clear session to ensure delete is persisted
+    try:
+        db.commit()
+        # Force session to clear all cached objects
+        db.expunge_all()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete preprocessing step: {str(e)}"
+        )
 
     return None
 
@@ -429,7 +442,7 @@ async def delete_preprocessing_step(
 )
 async def reorder_preprocessing_steps(
     request: Request,
-    reorder_data: Dict[str, Any] = Body(..., example={"dataset_id": "789e4567...", "step_ids": ["456e4567...", "123e4567..."]}),
+    reorder_data: ReorderRequest,
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
@@ -448,14 +461,8 @@ async def reorder_preprocessing_steps(
 
     This will set the first step's order to 0, the second to 1, etc.
     """
-    dataset_id = reorder_data.get("dataset_id")
-    step_ids = reorder_data.get("step_ids", [])
-    
-    if not dataset_id or not step_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Both dataset_id and step_ids are required"
-        )
+    dataset_id = str(reorder_data.dataset_id)
+    step_ids = reorder_data.step_ids
     # Verify dataset exists and belongs to user
     dataset = db.query(Dataset).filter(
         and_(Dataset.id == dataset_id, Dataset.user_id == user_id)

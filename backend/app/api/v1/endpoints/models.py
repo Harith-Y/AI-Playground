@@ -155,30 +155,54 @@ async def list_models(
             except Exception:
                 pass
         
-        # Normalize metrics based on task type for frontend compatibility
-        metrics = model.metrics or {}
+        # Get metrics, handling None and ensuring valid values
+        raw_metrics = model.metrics if model.metrics is not None else {}
+        
+        # Helper to check if value is valid (not None, not NaN, not inf)
+        def is_valid_metric(val):
+            if val is None:
+                return False
+            try:
+                import math
+                return not (math.isnan(float(val)) or math.isinf(float(val)))
+            except (ValueError, TypeError):
+                return False
+        
+        # Create clean metrics dict with only valid values
+        metrics = {}
         accuracy = None
         
         if task_type == "regression":
-            # For regression, provide r2_score as the primary metric
-            # Ensure all expected fields exist with safe defaults
-            if "r2_score" in metrics:
+            # Extract and validate regression metrics
+            if is_valid_metric(raw_metrics.get("r2_score")):
+                metrics["r2_score"] = raw_metrics["r2_score"]
                 accuracy = metrics["r2_score"]
-            metrics.setdefault("r2_score", 0.0)
-            metrics.setdefault("mae", 0.0)
-            metrics.setdefault("mse", 0.0)
-            metrics.setdefault("rmse", 0.0)
+            if is_valid_metric(raw_metrics.get("mae")):
+                metrics["mae"] = raw_metrics["mae"]
+            if is_valid_metric(raw_metrics.get("mse")):
+                metrics["mse"] = raw_metrics["mse"]
+            if is_valid_metric(raw_metrics.get("rmse")):
+                metrics["rmse"] = raw_metrics["rmse"]
+            if is_valid_metric(raw_metrics.get("explained_variance")):
+                metrics["explained_variance"] = raw_metrics["explained_variance"]
         elif task_type == "classification":
-            # For classification, use accuracy
-            if "accuracy" in metrics:
+            # Extract and validate classification metrics
+            if is_valid_metric(raw_metrics.get("accuracy")):
+                metrics["accuracy"] = raw_metrics["accuracy"]
                 accuracy = metrics["accuracy"]
-            metrics.setdefault("accuracy", 0.0)
-            metrics.setdefault("precision", 0.0)
-            metrics.setdefault("recall", 0.0)
-            metrics.setdefault("f1_score", 0.0)
+            if is_valid_metric(raw_metrics.get("precision")):
+                metrics["precision"] = raw_metrics["precision"]
+            if is_valid_metric(raw_metrics.get("recall")):
+                metrics["recall"] = raw_metrics["recall"]
+            if is_valid_metric(raw_metrics.get("f1_score")):
+                metrics["f1_score"] = raw_metrics["f1_score"]
         else:
-            # Clustering or unknown - try to get any available metric
-            accuracy = metrics.get("accuracy") or metrics.get("r2_score")
+            # For clustering or unknown, copy all valid metrics
+            for key, val in raw_metrics.items():
+                if is_valid_metric(val):
+                    metrics[key] = val
+            # Try to find any valid metric for accuracy
+            accuracy = metrics.get("silhouette_score") or metrics.get("r2_score") or metrics.get("accuracy")
             
         result.append({
             "id": str(model.id),

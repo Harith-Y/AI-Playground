@@ -748,29 +748,35 @@ def run_training_logic(
             y_pred = model.predict(X_test)
             y_pred_proba = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
 
-            metrics = calculate_classification_metrics(
+            metrics_obj = calculate_classification_metrics(
                 y_true=y_test,
                 y_pred=y_pred,
                 y_pred_proba=y_pred_proba,
                 labels=sorted(y_test.unique())
             )
+            # Convert to dict if it's a dataclass
+            metrics = metrics_obj.to_dict() if hasattr(metrics_obj, 'to_dict') else metrics_obj
 
         elif task_type.value == 'regression':
             y_pred = model.predict(X_test)
 
-            metrics = calculate_regression_metrics(
+            metrics_obj = calculate_regression_metrics(
                 y_true=y_test,
                 y_pred=y_pred
             )
+            # Convert to dict if it's a dataclass
+            metrics = metrics_obj.to_dict() if hasattr(metrics_obj, 'to_dict') else metrics_obj
 
         else:  # clustering
             labels = model.get_labels()
 
-            metrics = calculate_clustering_metrics(
+            metrics_obj = calculate_clustering_metrics(
                 X=X_train,
                 labels=labels,
                 n_clusters=len(np.unique(labels))
             )
+            # Convert to dict if it's a dataclass
+            metrics = metrics_obj.to_dict() if hasattr(metrics_obj, 'to_dict') else metrics_obj
 
         # 9. Get feature importance if available
         feature_importance = None

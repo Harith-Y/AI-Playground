@@ -30,6 +30,12 @@ class PreprocessingStepRead(PreprocessingStepBase):
 		from_attributes = True
 
 
+class ReorderRequest(BaseModel):
+	"""Request to reorder preprocessing steps"""
+	dataset_id: UUID
+	step_ids: List[str]
+
+
 # Apply preprocessing pipeline schemas
 class PreprocessingApplyRequest(BaseModel):
 	"""Request to apply preprocessing pipeline to a dataset"""
