@@ -31,7 +31,7 @@ from app.schemas.model import (
 )
 from app.tasks.training_tasks import train_model
 from app.celery_app import celery_app
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, get_db
 from app.services.training_validation_service import get_training_validator, ValidationError
 from app.utils.cache import cache_service, CacheKeys, CacheTTL, invalidate_model_cache, invalidate_comparison_cache
 from app.services.storage_service import get_model_serialization_service
