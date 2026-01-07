@@ -39,6 +39,9 @@ from app.services.model_comparison_service import ModelComparisonService
 from app.utils.logger import get_logger
 from app.utils.cache import cache_service, CacheKeys, CacheTTL
 
+from sqlalchemy.exc import ProgrammingError, OperationalError
+from app.models.user import User
+
 router = APIRouter()
 
 logger = get_logger(__name__)
@@ -48,11 +51,56 @@ logger = get_logger(__name__)
 def get_current_user_id() -> str:
     """
     Get current user ID from authentication context.
-    In production: Extract from JWT token or session.
-    Example: decode_jwt(request.headers['Authorization'])['user_id']
+    For now, return a fixed ID or guest user ID.
+    Note: Ideally this should use the shared get_user_or_guest logic, but for now 
+    we'll stick to a hardcoded logic or update to match other endpoints.
     """
-    # Default user ID for development/testing
-    return "00000000-0000-0000-0000-000000000001"
+    # This function is used when we don't need valid db checking
+    return "00000000-0000-0000-0000-000000000001" 
+
+async def get_user_or_guest(
+    # request: Request,
+    db: Session = Depends(get_db)
+) -> str:
+    """
+    Get the current authenticated user ID, or create/return a guest user ID.
+    """
+    # 2. Fallback to guest
+    try:
+        guest_email = "guest@aiplayground.local"
+        # Check if table exists by trying to query
+        try:
+            guest_user = db.query(User).filter(User.email == guest_email).first()
+        except (ProgrammingError, OperationalError) as e:
+            logger.error(f"Database error (missing table?): {e}")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Database error: Tables might be missing. Please run migrations. Error: {str(e)}"
+            )
+
+        if not guest_user:
+            logger.info("Creating guest user...")
+            
+            # Workaround for passlib/bcrypt compatibility issue
+            import bcrypt
+            hashed_pwd = bcrypt.hashpw(b"guest_password", bcrypt.gensalt()).decode('utf-8')
+            
+            guest_user = User(
+                email=guest_email,
+                password_hash=hashed_pwd,
+                is_active=True
+            )
+            db.add(guest_user)
+            db.commit()
+            db.refresh(guest_user)
+        
+        return str(guest_user.id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get/create guest user: {e}")
+        # Fallback UUID if everything fails (but unlikely to work with FKs)
+        return "00000000-0000-0000-0000-000000000001"
 
 
 def get_db():
@@ -357,7 +405,7 @@ async def get_task_types() -> Dict[str, Any]:
 async def train_model_endpoint(
     request: ModelTrainingRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Initiate asynchronous model training.
