@@ -383,7 +383,7 @@ def warm_cache(func: Callable, *args, **kwargs) -> bool:
         return False
 
 
-async def invalidate_model_cache(model_run_id: str) -> None:
+def invalidate_model_cache(model_run_id: str) -> None:
     """
     Invalidate all cache entries related to a specific model run.
     
@@ -417,7 +417,7 @@ async def invalidate_model_cache(model_run_id: str) -> None:
         )
 
 
-async def invalidate_comparison_cache() -> None:
+def invalidate_comparison_cache() -> None:
     """
     Invalidate all model comparison cache entries.
     

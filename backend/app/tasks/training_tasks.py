@@ -700,26 +700,17 @@ def run_training_logic(
         )
 
         # 6. Create and configure model
-        from app.ml_engine.models.classification import ClassificationModel
-        from app.ml_engine.models.regression import RegressionModel
-        from app.ml_engine.models.clustering import ClusteringModel
+        from app.ml_engine.models.registry import ModelFactory
 
-        # Create model instance based on task type
-        if task_type.value == 'classification':
-            model = ClassificationModel(
-                model_type=model_type,
-                config=hyperparameters or {}
+        # Create model instance using factory
+        try:
+            model = ModelFactory.create_model(
+                model_id=model_type,
+                **(hyperparameters or {})
             )
-        elif task_type.value == 'regression':
-            model = RegressionModel(
-                model_type=model_type,
-                config=hyperparameters or {}
-            )
-        else:  # clustering
-            model = ClusteringModel(
-                model_type=model_type,
-                config=hyperparameters or {}
-            )
+        except Exception as e:
+            raise ModelTrainingError(f"Failed to create model '{model_type}': {e}")
+
 
         # 7. Train the model with memory profiling
         training_start = time.time()
@@ -864,17 +855,11 @@ def run_training_logic(
         logger.info(f"ModelRun updated with results")
         
         # Invalidate related caches
-        import asyncio
         try:
-            asyncio.create_task(invalidate_model_cache(model_run_id))
-            asyncio.create_task(invalidate_comparison_cache())
-        except RuntimeError:
-            # If no event loop is running, run synchronously
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(invalidate_model_cache(model_run_id))
-            loop.run_until_complete(invalidate_comparison_cache())
-            loop.close()
+            invalidate_model_cache(model_run_id)
+            invalidate_comparison_cache()
+        except Exception as e:
+            logger.error(f"Failed to invalidate cache: {e}")
 
         # 12. Update experiment status if needed
         if experiment.status == "running":
