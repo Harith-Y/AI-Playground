@@ -49,7 +49,7 @@ class TrainingErrorHandler:
         """
         self.db = db
         self.model_run_id = model_run_id
-        self.logger = get_logger(model_run_id=model_run_id)
+        self.logger = get_logger("app.services.training_error_handler")
     
     def handle_error(
         self,

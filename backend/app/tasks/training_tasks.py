@@ -63,11 +63,12 @@ class TrainingTask(Task):
 
     def on_success(self, retval, task_id, args, kwargs):
         """Called when task completes successfully"""
-        logger = get_logger(task_id=task_id)
+        logger = get_logger("app.tasks.training_tasks")
         logger.info(
             f"Training task completed successfully",
             extra={
                 'event': 'task_success',
+                'task_id': task_id,
                 'duration_seconds': retval.get('training_time', 0),
                 'model_type': retval.get('model_type', 'unknown'),
                 'task_type': retval.get('task_type', 'unknown'),
@@ -76,11 +77,12 @@ class TrainingTask(Task):
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """Called when task fails"""
-        logger = get_logger(task_id=task_id)
+        logger = get_logger("app.tasks.training_tasks")
         logger.error(
             f"Training task failed: {exc}",
             extra={
                 'event': 'task_failure',
+                'task_id': task_id,
                 'error_type': type(exc).__name__,
                 'error_message': str(exc),
                 'traceback': str(einfo)
