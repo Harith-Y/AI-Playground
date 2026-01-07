@@ -10,6 +10,7 @@ Provides database-specific error recovery patterns including:
 
 from typing import Callable, Any, Optional, TypeVar, Type
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from sqlalchemy.exc import (
     OperationalError,
     IntegrityError,
@@ -428,7 +429,7 @@ def ensure_connection(func: Callable) -> Callable:
         
         # Test connection
         try:
-            session.execute("SELECT 1")
+            session.execute(text("SELECT 1"))
         except (OperationalError, DisconnectionError) as e:
             logger.warning(f"Connection lost: {e}. Attempting to reconnect...")
             try:

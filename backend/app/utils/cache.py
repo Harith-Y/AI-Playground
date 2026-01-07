@@ -404,7 +404,7 @@ async def invalidate_model_cache(model_run_id: str) -> None:
         ]
         
         for pattern in patterns_to_delete:
-            deleted_count = await cache_service.delete_pattern(pattern)
+            deleted_count = cache_service.delete_pattern(pattern)
             if deleted_count > 0:
                 logger.info(
                     f"Invalidated {deleted_count} cache entries for pattern: {pattern}",
@@ -426,7 +426,7 @@ async def invalidate_comparison_cache() -> None:
     - Bulk operations are performed
     """
     try:
-        deleted_count = await cache_service.delete_pattern("model:comparison:*")
+        deleted_count = cache_service.delete_pattern("model:comparison:*")
         if deleted_count > 0:
             logger.info(
                 f"Invalidated {deleted_count} comparison cache entries",
