@@ -5,7 +5,7 @@ Provides REST API for machine learning model operations including
 listing available models, training, evaluation, and prediction.
 """
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from uuid import uuid4, UUID
@@ -401,9 +401,52 @@ async def get_task_types() -> Dict[str, Any]:
     }
 
 
+
+class DummyTaskContext:
+    """Mock Celery task context for running tasks synchronously without Redis."""
+    def __init__(self, task_id):
+        self.request = type('Request', (), {'id': task_id})()
+    
+    def update_state(self, state, meta=None, **kwargs):
+        pass
+
+def run_training_in_background(
+    task_id: str,
+    model_run_id: str,
+    experiment_id: str,
+    dataset_id: str,
+    model_type: str,
+    hyperparameters: Optional[Dict[str, Any]],
+    target_column: Optional[str],
+    feature_columns: Optional[list],
+    test_size: float,
+    random_state: int,
+    user_id: str
+):
+    """Wrapper to run training task in FastAPI background tasks."""
+    dummy_self = DummyTaskContext(task_id)
+    try:
+        train_model.run(
+            dummy_self,
+            model_run_id=model_run_id,
+            experiment_id=experiment_id,
+            dataset_id=dataset_id,
+            model_type=model_type,
+            hyperparameters=hyperparameters,
+            target_column=target_column,
+            feature_columns=feature_columns,
+            test_size=test_size,
+            random_state=random_state,
+            user_id=user_id
+        )
+    except Exception as e:
+        logger.error(f"Background training failed: {e}")
+
+
 @router.post("/train", response_model=ModelTrainingResponse, status_code=status.HTTP_202_ACCEPTED)
 async def train_model_endpoint(
     request: ModelTrainingRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_user_or_guest)
 ):
@@ -499,8 +542,11 @@ async def train_model_endpoint(
         experiment.status = "running"
         db.commit()
 
-    # Trigger Celery task
-    task = train_model.delay(
+    # Trigger training in background (bypass Celery/Redis for free tier compatibility)
+    task_id = str(uuid4())
+    background_tasks.add_task(
+        run_training_in_background,
+        task_id=task_id,
         model_run_id=str(model_run.id),
         experiment_id=str(experiment_id),
         dataset_id=str(request.dataset_id),
@@ -516,12 +562,12 @@ async def train_model_endpoint(
     # Store task_id in model_run run_metadata
     if not model_run.run_metadata:
         model_run.run_metadata = {}
-    model_run.run_metadata['task_id'] = task.id
+    model_run.run_metadata['task_id'] = task_id
     db.commit()
 
     return ModelTrainingResponse(
         model_run_id=model_run.id,
-        task_id=task.id,
+        task_id=task_id,
         status="PENDING",
         message="Model training initiated successfully",
         created_at=model_run.created_at
