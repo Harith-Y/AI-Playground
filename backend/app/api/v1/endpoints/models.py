@@ -38,6 +38,7 @@ from app.services.storage_service import get_model_serialization_service
 from app.services.model_comparison_service import ModelComparisonService
 from app.utils.logger import get_logger
 from app.utils.cache import cache_service, CacheKeys, CacheTTL
+from app.core.config import settings
 
 from sqlalchemy.exc import ProgrammingError, OperationalError
 from app.models.user import User
@@ -542,22 +543,42 @@ async def train_model_endpoint(
         experiment.status = "running"
         db.commit()
 
-    # Trigger training in background (bypass Celery/Redis for free tier compatibility)
+    # Trigger training task
+    # Use FastAPI BackgroundTasks if configured (e.g. Render Free Tier) or fallback if Celery is disabled
+    # Otherwise use Celery for robust queuing
     task_id = str(uuid4())
-    background_tasks.add_task(
-        run_training_in_background,
-        task_id=task_id,
-        model_run_id=str(model_run.id),
-        experiment_id=str(experiment_id),
-        dataset_id=str(request.dataset_id),
-        model_type=request.model_type,
-        hyperparameters=request.hyperparameters,
-        target_column=request.target_column,
-        feature_columns=request.feature_columns,
-        test_size=request.test_size,
-        random_state=request.random_state,
-        user_id=user_id
-    )
+    
+    if settings.USE_BACKGROUND_TASKS:
+        logger.info("Triggering training using FastAPI BackgroundTasks")
+        background_tasks.add_task(
+            run_training_in_background,
+            task_id=task_id,
+            model_run_id=str(model_run.id),
+            experiment_id=str(experiment_id),
+            dataset_id=str(request.dataset_id),
+            model_type=request.model_type,
+            hyperparameters=request.hyperparameters,
+            target_column=request.target_column,
+            feature_columns=request.feature_columns,
+            test_size=request.test_size,
+            random_state=request.random_state,
+            user_id=user_id
+        )
+    else:
+        logger.info("Triggering training using Celery")
+        task = train_model.delay(
+            model_run_id=str(model_run.id),
+            experiment_id=str(experiment_id),
+            dataset_id=str(request.dataset_id),
+            model_type=request.model_type,
+            hyperparameters=request.hyperparameters,
+            target_column=request.target_column,
+            feature_columns=request.feature_columns,
+            test_size=request.test_size,
+            random_state=request.random_state,
+            user_id=user_id
+        )
+        task_id = task.id
 
     # Store task_id in model_run run_metadata
     if not model_run.run_metadata:
