@@ -670,7 +670,7 @@ async def train_model_endpoint(
 async def get_training_status(
     model_run_id: str,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Get the status of a training task.
@@ -781,7 +781,7 @@ async def get_training_status(
 async def get_training_result(
     model_run_id: str,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Get the full results of a completed training task.
@@ -845,7 +845,7 @@ async def get_training_result(
 async def delete_model_run(
     model_run_id: str,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Delete a model run and its associated artifacts.
@@ -1044,7 +1044,7 @@ async def get_model_metrics(
     model_run_id: str,
     use_cache: bool = True,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Get detailed metrics for a completed model run.
@@ -1244,7 +1244,7 @@ async def get_feature_importance(
     top_n: Optional[int] = None,
     use_cache: bool = True,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Get feature importance for a completed model run.
@@ -1449,7 +1449,7 @@ async def compare_models(
     request: CompareModelsRequest,
     use_cache: bool = True,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Compare multiple model runs across various metrics.
@@ -1531,7 +1531,7 @@ async def compare_models(
 async def rank_models(
     request: ModelRankingRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Rank models using custom weighted criteria.
@@ -1607,7 +1607,7 @@ async def list_model_runs(
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     List model runs with optional filtering.
@@ -1690,7 +1690,7 @@ async def list_model_runs(
 
 @router.get("/cache/stats", status_code=status.HTTP_200_OK)
 async def get_cache_stats(
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Get cache statistics and health information.
@@ -1771,7 +1771,7 @@ async def get_cache_stats(
 @router.delete("/cache/clear", status_code=status.HTTP_200_OK)
 async def clear_cache(
     pattern: Optional[str] = None,
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Clear cache entries (admin operation).
