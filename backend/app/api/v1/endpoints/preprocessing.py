@@ -511,6 +511,8 @@ async def reorder_preprocessing_steps(
     # Return reordered steps
     updated_steps = db.query(PreprocessingStep).filter(
         PreprocessingStep.dataset_id == final_dataset_id
+    ).order_by(PreprocessingStep.order).all()
+    
     return updated_steps
 
 
