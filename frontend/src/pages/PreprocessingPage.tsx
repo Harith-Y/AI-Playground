@@ -60,6 +60,7 @@ const PreprocessingPage: React.FC = () => {
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<PreprocessingStep | null>(null);
   const [showResultDialog, setShowResultDialog] = useState(false);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -78,15 +79,23 @@ const PreprocessingPage: React.FC = () => {
         dispatch(fetchDatasetStats(currentDataset.id));
       }
     }
-  }, [currentDataset?.id, dispatch, columns?.length]);
+  }, [currentDataset?.id, dispatch, columns, refetchTrigger]);
 
-  // Additional effect to refetch when navigating back to this page
+  // Trigger refetch when component becomes visible (user navigates back to this page)
   useEffect(() => {
-    // Refetch on component mount
-    if (currentDataset?.id) {
-      dispatch(fetchPreprocessingSteps(currentDataset.id));
-    }
-  }, []); // Empty dependency array means this runs only on mount
+    const handleFocus = () => {
+      setRefetchTrigger(prev => prev + 1);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    
+    // Also trigger on mount to ensure fresh data
+    setRefetchTrigger(prev => prev + 1);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
