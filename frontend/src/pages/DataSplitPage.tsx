@@ -332,7 +332,7 @@ const DataSplitPage: React.FC = () => {
 
       {/* Debug Info (Development only) */}
       {import.meta.env.DEV && (
-        <Card sx={{ mt: 4, bgcolor: 'grey.100' }}>
+        <Card sx={{ mt: 4, bgcolor: 'action.hover' }}>
           <CardContent>
             <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
               Debug: Current Configuration
@@ -343,7 +343,7 @@ const DataSplitPage: React.FC = () => {
                 fontSize: '0.75rem',
                 overflow: 'auto',
                 maxHeight: 300,
-                bgcolor: 'grey.900',
+                bgcolor: 'background.paper',
                 color: 'grey.100',
                 p: 2,
                 borderRadius: 1,

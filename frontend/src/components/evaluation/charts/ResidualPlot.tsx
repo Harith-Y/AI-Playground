@@ -275,8 +275,8 @@ const ResidualPlot: React.FC<ResidualPlotProps> = ({
         bordercolor: '#e0e0e0',
         borderwidth: 1,
       },
-      plot_bgcolor: '#fafafa',
-      paper_bgcolor: '#ffffff',
+      plot_bgcolor: 'transparent',
+      paper_bgcolor: 'transparent',
     }),
     [title, height]
   );

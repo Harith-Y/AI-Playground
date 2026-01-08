@@ -840,7 +840,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
 
       {/* Debug Info (Development only) */}
       {import.meta.env.DEV && runs.length > 0 && (
-        <Paper sx={{ mt: 4, p: 3, bgcolor: 'grey.100' }}>
+        <Paper sx={{ mt: 4, p: 3, bgcolor: 'action.hover' }}>
           <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
             Debug: Model Runs State
           </Typography>

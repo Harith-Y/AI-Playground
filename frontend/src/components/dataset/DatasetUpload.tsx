@@ -133,7 +133,7 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
           cursor: 'pointer',
           transition: 'all 0.3s ease',
           '&:hover': {
-            borderColor: '#2563eb',
+            borderColor: 'primary.main',
             background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
           },
         }}

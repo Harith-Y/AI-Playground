@@ -200,7 +200,7 @@ const ModelSelectionPage: React.FC = () => {
                 component="pre"
                 sx={{
                   fontSize: '0.75rem',
-                  bgcolor: 'grey.100',
+                  bgcolor: 'action.hover',
                   p: 1.5,
                   borderRadius: 1,
                   overflow: 'auto',
@@ -232,7 +232,7 @@ const ModelSelectionPage: React.FC = () => {
 
       {/* Debug Info (Development only) */}
       {import.meta.env.DEV && modelSelection && (
-        <Paper sx={{ mt: 4, p: 3, bgcolor: 'grey.100' }}>
+        <Paper sx={{ mt: 4, p: 3, bgcolor: 'action.hover' }}>
           <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
             Debug: Model Selection State
           </Typography>

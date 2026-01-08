@@ -222,7 +222,7 @@ const FeatureSelectionPage: React.FC = () => {
 
       {/* Debug Info (remove in production) */}
       {import.meta.env.DEV && config && (
-        <Card sx={{ mt: 4, bgcolor: 'grey.100' }}>
+        <Card sx={{ mt: 4, bgcolor: 'action.hover' }}>
           <CardContent>
             <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
               Debug: Current Configuration

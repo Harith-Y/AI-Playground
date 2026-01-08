@@ -225,8 +225,8 @@ const ErrorDistributionPlot: React.FC<ErrorDistributionPlotProps> = ({
         bordercolor: '#e0e0e0',
         borderwidth: 1,
       },
-      plot_bgcolor: '#fafafa',
-      paper_bgcolor: '#ffffff',
+      plot_bgcolor: 'transparent',
+      paper_bgcolor: 'transparent',
     };
 
     if (viewMode === 'histogram') {

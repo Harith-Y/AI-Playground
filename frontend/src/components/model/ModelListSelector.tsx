@@ -258,7 +258,7 @@ const ModelListSelector: React.FC<ModelListSelectorProps> = ({
 
         {/* Filters */}
         <Collapse in={showFilters}>
-          <Paper elevation={0} sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
+          <Paper elevation={0} sx={{ p: 2, mb: 2, bgcolor: 'action.hover' }}>
             <Box
               sx={{
                 display: 'grid',

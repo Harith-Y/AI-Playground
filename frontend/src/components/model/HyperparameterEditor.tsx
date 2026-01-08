@@ -260,7 +260,7 @@ const HyperparameterEditor: React.FC<HyperparameterEditorProps> = ({
               component="pre"
               sx={{
                 fontSize: '0.75rem',
-                bgcolor: 'grey.100',
+                bgcolor: 'action.hover',
                 p: 1.5,
                 borderRadius: 1,
                 overflow: 'auto',

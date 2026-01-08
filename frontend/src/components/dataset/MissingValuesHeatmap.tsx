@@ -138,7 +138,7 @@ const MissingValuesHeatmap: React.FC<MissingValuesHeatmapProps> = ({
               sx={{
                 height: chartHeight,
                 position: 'relative',
-                borderLeft: '2px solid #e2e8f0',
+                borderLeft: '2px solid', borderLeftColor: 'divider',
                 borderBottom: '2px solid #e2e8f0',
                 mb: 1,
               }}
@@ -152,7 +152,7 @@ const MissingValuesHeatmap: React.FC<MissingValuesHeatmapProps> = ({
                     left: 0,
                     right: 0,
                     bottom: `${tick}%`,
-                    borderTop: '1px dashed #e2e8f0',
+                    borderTop: '1px dashed', borderTopColor: 'divider',
                     display: 'flex',
                     alignItems: 'center',
                   }}

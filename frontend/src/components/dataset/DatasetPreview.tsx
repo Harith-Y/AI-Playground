@@ -130,7 +130,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: '1px solid', borderBottomColor: 'divider',
           cursor: 'pointer',
         }}
         onClick={() => setIsExpanded(!isExpanded)}
@@ -177,7 +177,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
                 }
                 size="small"
                 variant="outlined"
-                sx={{ borderColor: '#e2e8f0' }}
+                sx={{ borderColor: 'divider' }}
               />
             ))}
           </Box>
@@ -219,7 +219,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
                       bgcolor: 'background.default',
                       fontWeight: 700,
                       color: '#475569',
-                      borderBottom: '2px solid #cbd5e1',
+                      borderBottom: '2px solid', borderBottomColor: 'divider',
                       width: 60,
                     }}
                   >
@@ -232,7 +232,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
                         bgcolor: 'background.default',
                         fontWeight: 700,
                         color: '#475569',
-                        borderBottom: '2px solid #cbd5e1',
+                        borderBottom: '2px solid', borderBottomColor: 'divider',
                         minWidth: 150,
                         maxWidth: 300,
                       }}
@@ -274,7 +274,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
                       sx={{
                         fontWeight: 600,
                         color: '#64748b',
-                        borderRight: '1px solid #e2e8f0',
+                        borderRight: '1px solid', borderRightColor: 'divider',
                       }}
                     >
                       {rowIdx + 1}

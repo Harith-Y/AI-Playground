@@ -114,7 +114,7 @@ const SilhouetteScorePlot: React.FC<SilhouetteScorePlotProps> = ({
           sx={{
             mt: 3,
             p: 2,
-            bgcolor: '#f8fafc',
+            bgcolor: 'background.default',
             borderRadius: 1,
             border: '1px solid', borderColor: 'divider',
           }}

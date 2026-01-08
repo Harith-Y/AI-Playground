@@ -254,7 +254,7 @@ const DatasetStats: React.FC<DatasetStatsProps> = ({
                     size="small"
                     variant="outlined"
                     sx={{
-                      borderColor: '#e2e8f0',
+                      borderColor: 'divider',
                       '&:hover': {
                         borderColor: chipColor,
                         background: `${chipColor}10`,

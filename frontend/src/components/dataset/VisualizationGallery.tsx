@@ -177,7 +177,7 @@ const VizCard: React.FC<VizCardProps> = ({ visualization, onExpand, onDownload }
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: 1,
-            background: '#f8fafc',
+            bgcolor: 'background.default',
             overflow: 'hidden',
           }}
         >

@@ -459,10 +459,10 @@ const PreprocessingPage: React.FC = () => {
                           border: '1px solid',
                           borderColor: 'divider',
                           borderRadius: 2,
-                          bgcolor: 'grey.50',
+                          bgcolor: 'action.hover',
                           transition: 'all 0.2s',
                           '&:hover': {
-                            bgcolor: 'grey.100',
+                            bgcolor: 'action.selected',
                             borderColor: 'primary.light',
                             transform: 'translateY(-2px)',
                             boxShadow: 2,
@@ -545,7 +545,7 @@ const PreprocessingPage: React.FC = () => {
               </Alert>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="caption" color="text.secondary" gutterBottom>
                     Steps Applied
                   </Typography>
@@ -553,7 +553,7 @@ const PreprocessingPage: React.FC = () => {
                     {pipelineResult.steps_applied}
                   </Typography>
                 </Paper>
-                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="caption" color="text.secondary" gutterBottom>
                     Rows Changed
                   </Typography>
@@ -561,7 +561,7 @@ const PreprocessingPage: React.FC = () => {
                     {pipelineResult.original_shape[0]} → {pipelineResult.transformed_shape[0]}
                   </Typography>
                 </Paper>
-                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="caption" color="text.secondary" gutterBottom>
                     Columns Changed
                   </Typography>
@@ -569,7 +569,7 @@ const PreprocessingPage: React.FC = () => {
                     {pipelineResult.original_shape[1]} → {pipelineResult.transformed_shape[1]}
                   </Typography>
                 </Paper>
-                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="caption" color="text.secondary" gutterBottom>
                     Output Dataset
                   </Typography>
@@ -584,7 +584,7 @@ const PreprocessingPage: React.FC = () => {
                   <Typography variant="subtitle2" gutterBottom fontWeight={600}>
                     Statistics:
                   </Typography>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
                     {Object.entries(pipelineResult.statistics).map(([key, value]) => (
                       <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
                         <Typography variant="body2" color="text.secondary">
@@ -605,7 +605,7 @@ const PreprocessingPage: React.FC = () => {
                     Preview (first {pipelineResult.preview.length} rows):
                   </Typography>
                   <Box sx={{ overflowX: 'auto' }}>
-                    <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
                       <pre style={{ fontSize: '12px', margin: 0 }}>
                         {JSON.stringify(pipelineResult.preview, null, 2)}
                       </pre>

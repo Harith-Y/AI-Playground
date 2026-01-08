@@ -237,7 +237,7 @@ const ClusteringMetrics: React.FC<ClusteringMetricsProps> = ({
 
       {/* Metrics Summary */}
       {!compact && (
-        <Paper elevation={1} sx={{ p: 2, bgcolor: 'grey.50' }}>
+        <Paper elevation={1} sx={{ p: 2, bgcolor: 'action.hover' }}>
           <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
             Metrics Summary
           </Typography>

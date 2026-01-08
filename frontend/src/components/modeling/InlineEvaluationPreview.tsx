@@ -304,7 +304,7 @@ const InlineEvaluationPreview: React.FC<InlineEvaluationPreviewProps> = ({
                 key={index}
                 sx={{
                   p: 1.5,
-                  bgcolor: 'grey.50',
+                  bgcolor: 'action.hover',
                   borderRadius: 1,
                   textAlign: 'center',
                 }}

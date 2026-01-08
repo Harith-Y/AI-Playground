@@ -172,7 +172,7 @@ const ConfusionMatrixHeatmap: React.FC<ConfusionMatrixHeatmapProps> = ({
               <TableCell
                 sx={{
                   fontWeight: 'bold',
-                  bgcolor: 'grey.100',
+                  bgcolor: 'action.hover',
                   border: '2px solid',
                   borderColor: 'grey.300',
                 }}
@@ -192,7 +192,7 @@ const ConfusionMatrixHeatmap: React.FC<ConfusionMatrixHeatmapProps> = ({
                   align="center"
                   sx={{
                     fontWeight: 'bold',
-                    bgcolor: 'grey.100',
+                    bgcolor: 'action.hover',
                     border: '2px solid',
                     borderColor: 'grey.300',
                     minWidth: 100,
@@ -230,7 +230,7 @@ const ConfusionMatrixHeatmap: React.FC<ConfusionMatrixHeatmapProps> = ({
                     scope="row"
                     sx={{
                       fontWeight: 'bold',
-                      bgcolor: 'grey.100',
+                      bgcolor: 'action.hover',
                       border: '2px solid',
                       borderColor: 'grey.300',
                       position: 'sticky',
@@ -322,7 +322,7 @@ const ConfusionMatrixHeatmap: React.FC<ConfusionMatrixHeatmapProps> = ({
                     align="center"
                     sx={{
                       fontWeight: 'bold',
-                      bgcolor: 'grey.50',
+                      bgcolor: 'action.hover',
                       border: '2px solid',
                       borderColor: 'grey.300',
                     }}
@@ -357,7 +357,7 @@ const ConfusionMatrixHeatmap: React.FC<ConfusionMatrixHeatmapProps> = ({
                     align="center"
                     sx={{
                       fontWeight: 'bold',
-                      bgcolor: 'grey.50',
+                      bgcolor: 'action.hover',
                       border: '2px solid',
                       borderColor: 'grey.300',
                     }}

@@ -109,7 +109,7 @@ const StepHistory: React.FC<StepHistoryProps> = ({
           p: 2,
           borderBottom: '1px solid',
           borderColor: 'divider',
-          bgcolor: 'grey.50',
+          bgcolor: 'action.hover',
         }}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

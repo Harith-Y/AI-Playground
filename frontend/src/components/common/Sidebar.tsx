@@ -226,7 +226,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'permanent' 
           width: DRAWER_WIDTH,
           boxSizing: 'border-box',
           backgroundColor: 'background.paper',
-          borderRight: '1px solid #334155',
+          borderRight: '1px solid', borderRightColor: 'divider',
         },
       }}
     >

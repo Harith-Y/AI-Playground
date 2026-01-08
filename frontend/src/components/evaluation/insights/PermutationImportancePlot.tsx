@@ -217,8 +217,8 @@ const PermutationImportancePlot: React.FC<PermutationImportancePlotProps> = ({
         margin: { l: 150, r: 40, t: 60, b: 60 },
         hovermode: 'closest',
         showlegend: false,
-        plot_bgcolor: '#fafafa',
-        paper_bgcolor: '#ffffff',
+        plot_bgcolor: 'transparent',
+        paper_bgcolor: 'transparent',
       };
     } else {
       return {
@@ -242,8 +242,8 @@ const PermutationImportancePlot: React.FC<PermutationImportancePlotProps> = ({
         margin: { l: 60, r: 40, t: 60, b: 150 },
         hovermode: 'closest',
         showlegend: false,
-        plot_bgcolor: '#fafafa',
-        paper_bgcolor: '#ffffff',
+        plot_bgcolor: 'transparent',
+        paper_bgcolor: 'transparent',
       };
     }
   }, [title, height, viewMode, metric]);

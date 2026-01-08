@@ -371,7 +371,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
             {/* Additional Metrics */}
             {trainingRun.metrics.precision !== undefined && (
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
+                <Paper elevation={0} sx={{ p: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="body2" color="text.secondary">Precision</Typography>
                   <Typography variant="h5">
                     {(trainingRun.metrics.precision * 100).toFixed(2)}%
@@ -382,7 +382,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
 
             {trainingRun.metrics.recall !== undefined && (
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
+                <Paper elevation={0} sx={{ p: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="body2" color="text.secondary">Recall</Typography>
                   <Typography variant="h5">
                     {(trainingRun.metrics.recall * 100).toFixed(2)}%
@@ -393,7 +393,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
 
             {trainingRun.metrics.f1Score !== undefined && (
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
+                <Paper elevation={0} sx={{ p: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="body2" color="text.secondary">F1 Score</Typography>
                   <Typography variant="h5">
                     {(trainingRun.metrics.f1Score * 100).toFixed(2)}%
@@ -404,7 +404,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
 
             {trainingRun.metrics.rmse !== undefined && (
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
+                <Paper elevation={0} sx={{ p: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="body2" color="text.secondary">RMSE</Typography>
                   <Typography variant="h5">
                     {trainingRun.metrics.rmse.toFixed(4)}
@@ -415,7 +415,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
 
             {trainingRun.metrics.mae !== undefined && (
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
+                <Paper elevation={0} sx={{ p: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="body2" color="text.secondary">MAE</Typography>
                   <Typography variant="h5">
                     {trainingRun.metrics.mae.toFixed(4)}
@@ -426,7 +426,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
 
             {trainingRun.metrics.r2Score !== undefined && (
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.100' }}>
+                <Paper elevation={0} sx={{ p: 2, bgcolor: 'action.hover' }}>
                   <Typography variant="body2" color="text.secondary">R² Score</Typography>
                   <Typography variant="h5">
                     {trainingRun.metrics.r2Score.toFixed(4)}

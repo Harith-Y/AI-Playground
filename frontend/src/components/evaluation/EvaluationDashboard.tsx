@@ -143,7 +143,7 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
         {isClassification && (
           <>
             <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '200px' }}>
-              <Card sx={{ bgcolor: '#e3f2fd', height: '100%' }}>
+              <Card sx={{ bgcolor: 'primary.lighter', height: '100%' }}>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">
                     Accuracy
@@ -155,7 +155,7 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
               </Card>
             </Box>
             <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '200px' }}>
-              <Card sx={{ bgcolor: '#f3e5f5', height: '100%' }}>
+              <Card sx={{ bgcolor: 'secondary.lighter', height: '100%' }}>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">
                     Precision
@@ -167,7 +167,7 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
               </Card>
             </Box>
             <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '200px' }}>
-              <Card sx={{ bgcolor: '#e8f5e9', height: '100%' }}>
+              <Card sx={{ bgcolor: 'success.lighter', height: '100%' }}>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">
                     Recall
@@ -179,7 +179,7 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
               </Card>
             </Box>
             <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '200px' }}>
-              <Card sx={{ bgcolor: '#fff3e0', height: '100%' }}>
+              <Card sx={{ bgcolor: 'warning.lighter', height: '100%' }}>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">
                     F1 Score
@@ -196,7 +196,7 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
         {isRegression && (
           <>
             <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '200px' }}>
-              <Card sx={{ bgcolor: '#e3f2fd', height: '100%' }}>
+              <Card sx={{ bgcolor: 'primary.lighter', height: '100%' }}>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">
                     R² Score
@@ -208,7 +208,7 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
               </Card>
             </Box>
             <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '200px' }}>
-              <Card sx={{ bgcolor: '#f3e5f5', height: '100%' }}>
+              <Card sx={{ bgcolor: 'secondary.lighter', height: '100%' }}>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">
                     RMSE
@@ -220,7 +220,7 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
               </Card>
             </Box>
             <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '200px' }}>
-              <Card sx={{ bgcolor: '#e8f5e9', height: '100%' }}>
+              <Card sx={{ bgcolor: 'success.lighter', height: '100%' }}>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">
                     MAE
@@ -232,7 +232,7 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
               </Card>
             </Box>
             <Box sx={{ flex: '1 1 calc(25% - 16px)', minWidth: '200px' }}>
-              <Card sx={{ bgcolor: '#fff3e0', height: '100%' }}>
+              <Card sx={{ bgcolor: 'warning.lighter', height: '100%' }}>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">
                     MSE

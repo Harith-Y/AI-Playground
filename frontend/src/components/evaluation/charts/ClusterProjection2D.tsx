@@ -177,7 +177,7 @@ const ClusterProjection2D: React.FC<ClusterProjection2DProps> = ({
           sx={{
             mt: 2,
             p: 2,
-            bgcolor: '#f8fafc',
+            bgcolor: 'background.default',
             borderRadius: 1,
             border: '1px solid', borderColor: 'divider',
           }}
