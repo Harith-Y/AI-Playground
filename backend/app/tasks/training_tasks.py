@@ -787,6 +787,23 @@ def run_training_logic(
         except Exception as e:
             logger.warning(f"Could not calculate feature importance: {e}")
 
+        # Save metrics to DB NOW (before model serialization) so they persist even if save fails
+        model_run.metrics = metrics
+        model_run.training_time = training_duration
+        
+        # Initialize run_metadata if needed
+        if not model_run.run_metadata:
+            model_run.run_metadata = {}
+        
+        # Store task type for frontend display
+        model_run.run_metadata['task_type'] = task_type.value
+        
+        # Commit metrics immediately
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(model_run, 'run_metadata')
+        db.commit()
+        logger.info("Metrics saved to database before model serialization")
+
         # Update progress: Saving model (90%)
         update_training_progress(db, model_run_id, 90, "Saving model artifact...")
         self.update_state(
@@ -843,18 +860,9 @@ def run_training_logic(
             }
         )
 
-        # 11. Update ModelRun with results
-        model_run.metrics = metrics
-        model_run.training_time = training_duration
+        # 11. Update ModelRun with model path and completion status
         model_run.model_artifact_path = str(model_path)
         model_run.status = "completed"
-
-        # Initialize run_metadata if needed
-        if not model_run.run_metadata:
-            model_run.run_metadata = {}
-        
-        # Store task type for frontend display
-        model_run.run_metadata['task_type'] = task_type.value
         
         # Store feature importance if available
         if feature_importance is not None:

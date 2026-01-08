@@ -32,7 +32,7 @@ class PreprocessingStepRead(PreprocessingStepBase):
 
 class ReorderRequest(BaseModel):
 	"""Request to reorder preprocessing steps"""
-	dataset_id: UUID
+	dataset_id: Optional[UUID] = None  # Optional - will be inferred from step_ids if not provided
 	step_ids: List[str]
 
 

@@ -466,17 +466,35 @@ async def reorder_preprocessing_steps(
     This will set the first step's order to 0, the second to 1, etc.
     """
     # Try to get from body first, then fall back to query params
+    final_dataset_id = None
+    final_step_ids = None
+    
     if reorder_data:
-        final_dataset_id = str(reorder_data.dataset_id)
+        final_dataset_id = str(reorder_data.dataset_id) if reorder_data.dataset_id else None
         final_step_ids = reorder_data.step_ids
     elif dataset_id and step_ids:
         final_dataset_id = dataset_id
         final_step_ids = step_ids
-    else:
+    
+    if not final_step_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Must provide dataset_id and step_ids either in request body or as query parameters"
+            detail="Must provide step_ids"
         )
+    
+    # If dataset_id not provided, infer it from the first step
+    if not final_dataset_id:
+        first_step = db.query(PreprocessingStep).filter(
+            PreprocessingStep.id == final_step_ids[0]
+        ).first()
+        if first_step:
+            final_dataset_id = str(first_step.dataset_id)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Step {final_step_ids[0]} not found"
+            )
+    
     # Verify dataset exists and belongs to user
     dataset = db.query(Dataset).filter(
         and_(Dataset.id == final_dataset_id, Dataset.user_id == user_id)
