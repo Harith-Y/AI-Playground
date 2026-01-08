@@ -63,11 +63,12 @@ class TrainingTask(Task):
 
     def on_success(self, retval, task_id, args, kwargs):
         """Called when task completes successfully"""
-        logger = get_logger(task_id=task_id)
+        logger = get_logger("app.tasks.training_tasks")
         logger.info(
             f"Training task completed successfully",
             extra={
                 'event': 'task_success',
+                'task_id': task_id,
                 'duration_seconds': retval.get('training_time', 0),
                 'model_type': retval.get('model_type', 'unknown'),
                 'task_type': retval.get('task_type', 'unknown'),
@@ -76,11 +77,12 @@ class TrainingTask(Task):
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """Called when task fails"""
-        logger = get_logger(task_id=task_id)
+        logger = get_logger("app.tasks.training_tasks")
         logger.error(
             f"Training task failed: {exc}",
             extra={
                 'event': 'task_failure',
+                'task_id': task_id,
                 'error_type': type(exc).__name__,
                 'error_message': str(exc),
                 'traceback': str(einfo)
@@ -280,12 +282,7 @@ def update_training_progress(
 # ============================================================================
 
 
-@celery_app.task(
-    base=TrainingTask,
-    bind=True,
-    name="app.tasks.training_tasks.train_model"
-)
-def train_model(
+def run_training_logic(
     self,
     model_run_id: str,
     experiment_id: str,
@@ -318,16 +315,15 @@ def train_model(
         Dictionary with training results and metrics
     """
     # Setup logging with context
-    logger = get_logger(
-        task_id=self.request.id,
-        user_id=user_id,
-        dataset_id=dataset_id
-    )
+    logger = get_logger("app.tasks.training_tasks")
 
     logger.info(
         f"Starting model training",
         extra={
             'event': 'training_start',
+            'task_id': self.request.id,
+            'user_id': user_id,
+            'dataset_id': dataset_id,
             'model_type': model_type,
             'experiment_id': experiment_id,
             'test_size': test_size,
@@ -340,7 +336,16 @@ def train_model(
     # Initialize memory monitoring for this training task
     memory_monitor = get_memory_monitor()
     memory_monitor.set_baseline()
-    logger.info(f"Training task started - baseline memory: {memory_monitor.get_current_snapshot().rss_mb:.2f}MB")
+    
+    # Log baseline memory (with safe handling)
+    try:
+        baseline_snapshot = memory_monitor.get_current_snapshot()
+        if baseline_snapshot:
+            logger.info(f"Training task started - baseline memory: {baseline_snapshot.rss_mb:.2f}MB")
+        else:
+            logger.info("Training task started - memory monitoring unavailable")
+    except Exception:
+        logger.info("Training task started")
 
     try:
         # Initialize progress tracking in database
@@ -704,26 +709,17 @@ def train_model(
         )
 
         # 6. Create and configure model
-        from app.ml_engine.models.classification import ClassificationModel
-        from app.ml_engine.models.regression import RegressionModel
-        from app.ml_engine.models.clustering import ClusteringModel
+        from app.ml_engine.models.registry import ModelFactory
 
-        # Create model instance based on task type
-        if task_type.value == 'classification':
-            model = ClassificationModel(
-                model_type=model_type,
-                config=hyperparameters or {}
+        # Create model instance using factory
+        try:
+            model = ModelFactory.create_model(
+                model_id=model_type,
+                **(hyperparameters or {})
             )
-        elif task_type.value == 'regression':
-            model = RegressionModel(
-                model_type=model_type,
-                config=hyperparameters or {}
-            )
-        else:  # clustering
-            model = ClusteringModel(
-                model_type=model_type,
-                config=hyperparameters or {}
-            )
+        except Exception as e:
+            raise ModelTrainingError(f"Failed to create model '{model_type}': {e}")
+
 
         # 7. Train the model with memory profiling
         training_start = time.time()
@@ -761,29 +757,35 @@ def train_model(
             y_pred = model.predict(X_test)
             y_pred_proba = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
 
-            metrics = calculate_classification_metrics(
+            metrics_obj = calculate_classification_metrics(
                 y_true=y_test,
                 y_pred=y_pred,
                 y_pred_proba=y_pred_proba,
                 labels=sorted(y_test.unique())
             )
+            # Convert to dict if it's a dataclass
+            metrics = metrics_obj.to_dict() if hasattr(metrics_obj, 'to_dict') else metrics_obj
 
         elif task_type.value == 'regression':
             y_pred = model.predict(X_test)
 
-            metrics = calculate_regression_metrics(
+            metrics_obj = calculate_regression_metrics(
                 y_true=y_test,
                 y_pred=y_pred
             )
+            # Convert to dict if it's a dataclass
+            metrics = metrics_obj.to_dict() if hasattr(metrics_obj, 'to_dict') else metrics_obj
 
         else:  # clustering
             labels = model.get_labels()
 
-            metrics = calculate_clustering_metrics(
+            metrics_obj = calculate_clustering_metrics(
                 X=X_train,
                 labels=labels,
                 n_clusters=len(np.unique(labels))
             )
+            # Convert to dict if it's a dataclass
+            metrics = metrics_obj.to_dict() if hasattr(metrics_obj, 'to_dict') else metrics_obj
 
         # 9. Get feature importance if available
         feature_importance = None
@@ -793,6 +795,23 @@ def train_model(
                 logger.info(f"Feature importance calculated: {len(feature_importance)} features")
         except Exception as e:
             logger.warning(f"Could not calculate feature importance: {e}")
+
+        # Save metrics to DB NOW (before model serialization) so they persist even if save fails
+        model_run.metrics = metrics
+        model_run.training_time = training_duration
+        
+        # Initialize run_metadata if needed
+        if not model_run.run_metadata:
+            model_run.run_metadata = {}
+        
+        # Store task type for frontend display
+        model_run.run_metadata['task_type'] = task_type.value
+        
+        # Commit metrics immediately
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(model_run, 'run_metadata')
+        db.commit()
+        logger.info("Metrics saved to database before model serialization")
 
         # Update progress: Saving model (90%)
         update_training_progress(db, model_run_id, 90, "Saving model artifact...")
@@ -850,16 +869,12 @@ def train_model(
             }
         )
 
-        # 11. Update ModelRun with results
-        model_run.metrics = metrics
-        model_run.training_time = training_duration
+        # 11. Update ModelRun with model path and completion status
         model_run.model_artifact_path = str(model_path)
         model_run.status = "completed"
-
+        
         # Store feature importance if available
         if feature_importance is not None:
-            if not model_run.run_metadata:
-                model_run.run_metadata = {}
             model_run.run_metadata['feature_importance'] = feature_importance
 
         db.commit()
@@ -868,17 +883,11 @@ def train_model(
         logger.info(f"ModelRun updated with results")
         
         # Invalidate related caches
-        import asyncio
         try:
-            asyncio.create_task(invalidate_model_cache(model_run_id))
-            asyncio.create_task(invalidate_comparison_cache())
-        except RuntimeError:
-            # If no event loop is running, run synchronously
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(invalidate_model_cache(model_run_id))
-            loop.run_until_complete(invalidate_comparison_cache())
-            loop.close()
+            invalidate_model_cache(model_run_id)
+            invalidate_comparison_cache()
+        except Exception as e:
+            logger.error(f"Failed to invalidate cache: {e}")
 
         # 12. Update experiment status if needed
         if experiment.status == "running":
@@ -891,13 +900,19 @@ def train_model(
         # Calculate total execution time
         total_execution_time = time.time() - task_start_time
 
-        # Log final memory usage
-        final_memory = memory_monitor.get_current_snapshot()
-        memory_delta = memory_monitor.get_memory_delta()
-        logger.info(
-            f"Training completed - Final memory: {final_memory.rss_mb:.2f}MB, "
-            f"Delta: {memory_delta:+.2f}MB, Peak: {memory_monitor.get_peak_memory():.2f}MB"
-        )
+        # Log final memory usage (with safe handling if monitoring unavailable)
+        try:
+            final_memory = memory_monitor.get_current_snapshot()
+            memory_delta = memory_monitor.get_memory_delta()
+            if final_memory is not None:
+                logger.info(
+                    f"Training completed - Final memory: {final_memory.rss_mb:.2f}MB, "
+                    f"Delta: {memory_delta:+.2f}MB, Peak: {memory_monitor.get_peak_memory():.2f}MB"
+                )
+            else:
+                logger.info("Training completed - Memory monitoring unavailable")
+        except Exception as e:
+            logger.warning(f"Failed to log memory stats: {e}")
 
         # Update progress: Complete (100%)
         update_training_progress(db, model_run_id, 100, "Training completed successfully!")
@@ -968,3 +983,40 @@ def train_model(
 
     finally:
         db.close()
+
+
+@celery_app.task(
+    base=TrainingTask,
+    bind=True,
+    name="app.tasks.training_tasks.train_model"
+)
+def train_model(
+    self,
+    model_run_id: str,
+    experiment_id: str,
+    dataset_id: str,
+    model_type: str,
+    hyperparameters: Optional[Dict[str, Any]] = None,
+    target_column: Optional[str] = None,
+    feature_columns: Optional[list] = None,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    user_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Celery task wrapper for model training. 
+    Delegates to run_training_logic to allow reuse in BackgroundTasks.
+    """
+    return run_training_logic(
+        self,
+        model_run_id=model_run_id,
+        experiment_id=experiment_id,
+        dataset_id=dataset_id,
+        model_type=model_type,
+        hyperparameters=hyperparameters,
+        target_column=target_column,
+        feature_columns=feature_columns,
+        test_size=test_size,
+        random_state=random_state,
+        user_id=user_id
+    )

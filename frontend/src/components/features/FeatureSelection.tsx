@@ -43,6 +43,28 @@ const FeatureSelection: React.FC<FeatureSelectionProps> = ({
     excludedColumns: initialConfig?.excludedColumns || [],
   });
 
+  // Update local config when initialConfig changes (e.g. restoration from Redux)
+  useEffect(() => {
+    if (initialConfig) {
+      setConfig(prev => {
+        // Only update if actually different to avoid infinite loops if onConfigChange updates parent state that feeds back here
+        if (
+          JSON.stringify(prev.inputFeatures) !== JSON.stringify(initialConfig.inputFeatures) ||
+          prev.targetColumn !== initialConfig.targetColumn ||
+          prev.taskType !== initialConfig.taskType
+        ) {
+          return {
+            inputFeatures: initialConfig.inputFeatures || [],
+            targetColumn: initialConfig.targetColumn || null,
+            taskType: initialConfig.taskType || null,
+            excludedColumns: initialConfig.excludedColumns || [],
+          };
+        }
+        return prev;
+      });
+    }
+  }, [initialConfig]);
+
   // Validation state
   const validation = useMemo(() => {
     return validateFeatureSelection(config);

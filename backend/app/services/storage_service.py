@@ -69,8 +69,21 @@ class ModelSerializationService:
                      Defaults to settings.UPLOAD_DIR/models
         """
         self.base_dir = Path(base_dir) if base_dir else Path(settings.UPLOAD_DIR) / "models"
-        self.base_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"ModelSerializationService initialized with base_dir: {self.base_dir}")
+        
+        # Try to create directory, fallback to /tmp if permission denied (e.g., on Render)
+        try:
+            self.base_dir.mkdir(parents=True, exist_ok=True)
+            # Test write permission
+            test_file = self.base_dir / ".test_write"
+            test_file.touch()
+            test_file.unlink()
+            logger.info(f"ModelSerializationService initialized with base_dir: {self.base_dir}")
+        except (PermissionError, OSError) as e:
+            logger.warning(f"Failed to initialize storage at {self.base_dir}: {e}")
+            logger.warning("Falling back to /tmp/models")
+            self.base_dir = Path("/tmp/models")
+            self.base_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"ModelSerializationService initialized with base_dir: {self.base_dir}")
     
     def save_model(
         self,

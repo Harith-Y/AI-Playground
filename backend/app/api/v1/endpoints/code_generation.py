@@ -85,7 +85,7 @@ class CodeGenerationRequest(BaseModel):
     model_path: str = Field(default="model.pkl", description="Model save path")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "experiment_name": "Customer Churn Prediction",
                 "model_type": "random_forest_classifier",
@@ -134,7 +134,7 @@ class CodeGenerationResponse(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Generation metadata")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "code": "# Auto-generated Python code\nimport pandas as pd\n...",
                 "code_type": "complete_pipeline",

@@ -40,6 +40,8 @@ class DatasetUpdate(BaseModel):
 class DatasetRead(DatasetBase):
 	id: UUID
 	uploaded_at: Optional[datetime] = None
+	rows: Optional[int] = None
+	cols: Optional[int] = None
 
 	class Config:
 		from_attributes = True

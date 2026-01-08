@@ -61,7 +61,20 @@ const StepBuilder: React.FC<StepBuilderProps> = ({ open, onClose, onSave, editSt
 
   const handleStepTypeChange = (type: StepType) => {
     setStepType(type);
-    setParameters({});
+    
+    // Set default parameters for the selected step type
+    const config = STEP_TYPE_CONFIGS[type];
+    const defaultParams: Record<string, any> = {};
+    
+    if (config && config.parameterSchema) {
+      config.parameterSchema.forEach((field: ParameterField) => {
+        if (field.defaultValue !== undefined) {
+          defaultParams[field.name] = field.defaultValue;
+        }
+      });
+    }
+    
+    setParameters(defaultParams);
     setSelectedColumn('');
     setErrors({});
   };

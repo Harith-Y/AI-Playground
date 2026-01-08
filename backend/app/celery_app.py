@@ -26,4 +26,20 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=3600,  # 1 hour
     task_soft_time_limit=3000,  # 50 minutes
+    worker_send_task_events=True,
+    task_send_sent_event=True,
+    # Redis backend settings for stability
+    broker_connection_retry_on_startup=True,
+    broker_transport_options={
+        "visibility_timeout": 3600,
+        "health_check_interval": 10,
+        "socket_keepalive": True,
+    },
+    result_backend_transport_options={
+        "health_check_interval": 10,
+        "socket_keepalive": True,
+        "retry_policy": {
+            "timeout": 5.0
+        }
+    }
 )

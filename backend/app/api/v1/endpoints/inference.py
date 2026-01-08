@@ -32,7 +32,7 @@ class PredictionRequest(BaseModel):
     batch_size: Optional[int] = Field(default=None, description="Batch size for processing (optional)")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "model_path": "/uploads/models/exp-123/run-456.joblib",
                 "features": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
@@ -52,7 +52,7 @@ class PredictionResponse(BaseModel):
     throughput_samples_per_sec: float = Field(..., description="Inference throughput")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "predictions": [1, 0, 1],
                 "n_samples": 3,
@@ -74,7 +74,7 @@ class BatchPredictionRequest(BaseModel):
     use_cache: bool = Field(default=True, description="Use cached model if available")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "model_path": "/uploads/models/exp-123/run-456.joblib",
                 "data_path": "/uploads/data/test_data.csv",
@@ -95,7 +95,7 @@ class BatchPredictionResponse(BaseModel):
     preview: Optional[List[Dict[str, Any]]] = Field(None, description="Preview of first 5 predictions")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "n_samples": 10000,
                 "output_path": "/uploads/predictions/results.csv",
@@ -111,7 +111,7 @@ class ModelWarmupRequest(BaseModel):
     model_path: str = Field(..., description="Path to the model to warmup")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "model_path": "/uploads/models/exp-123/run-456.joblib"
             }

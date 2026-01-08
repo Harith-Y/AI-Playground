@@ -416,7 +416,69 @@ async def get_dataset(
     # Verify ownership (allows admins to access any dataset)
     verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
-    return dataset
+    # Get actual file size
+    import os
+    import logging
+    from pathlib import Path
+    
+    logger = logging.getLogger(__name__)
+    file_size = 0
+    
+    if dataset.file_path:
+        try:
+            # Check if it's a URL (R2 storage) or local path
+            if dataset.file_path.startswith('http://') or dataset.file_path.startswith('https://'):
+                # For R2/remote storage, try to get size from storage service
+                storage_service = get_storage_service()
+                if hasattr(storage_service, 'get_file_size'):
+                    file_size = storage_service.get_file_size(dataset.file_path)
+                    logger.info(f"Got file size from R2: {file_size}")
+                else:
+                    # If no method available, estimate from rows * cols
+                    file_size = (dataset.rows or 0) * (dataset.cols or 0) * 8
+                    logger.info(f"Estimated file size: {file_size}")
+            else:
+                # Local file path - check if it exists
+                file_path = Path(dataset.file_path)
+                if file_path.exists():
+                    file_size = file_path.stat().st_size
+                    logger.info(f"Found local file at {file_path}, size: {file_size}")
+                else:
+                    # Try with UPLOAD_DIR prefix
+                    full_path = Path(settings.UPLOAD_DIR) / dataset.file_path
+                    if full_path.exists():
+                        file_size = full_path.stat().st_size
+                        logger.info(f"Found file at {full_path}, size: {file_size}")
+                    else:
+                        logger.warning(f"File not found at {dataset.file_path} or {full_path}")
+                        # Estimate as fallback
+                        file_size = (dataset.rows or 0) * (dataset.cols or 0) * 8
+        except Exception as e:
+            logger.error(f"Error getting file size for {dataset.file_path}: {str(e)}")
+            # Estimate as fallback
+            file_size = (dataset.rows or 0) * (dataset.cols or 0) * 8
+
+    # Return dataset with computed fields for frontend compatibility
+    return {
+        "id": dataset.id,
+        "user_id": dataset.user_id,
+        "name": dataset.name,
+        "file_path": dataset.file_path,
+        "shape": {"rows": dataset.rows or 0, "cols": dataset.cols or 0} if dataset.rows or dataset.cols else None,
+        "dtypes": dataset.dtypes,
+        "missing_values": dataset.missing_values,
+        "uploaded_at": dataset.uploaded_at,
+        "rows": dataset.rows,
+        "cols": dataset.cols,
+        # Computed fields for frontend
+        "rowCount": dataset.rows or 0,
+        "columnCount": dataset.cols or 0,
+        "size": file_size,  # actual file size in bytes
+        "filename": dataset.file_path.split('/')[-1] if dataset.file_path else "",
+        "createdAt": dataset.uploaded_at.isoformat() if dataset.uploaded_at else None,
+        "updatedAt": dataset.uploaded_at.isoformat() if dataset.uploaded_at else None,
+        "status": "ready"
+    }
 
 
 @router.delete(

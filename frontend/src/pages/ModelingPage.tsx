@@ -25,10 +25,14 @@ import {
   Timeline,
 } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
+import { MODEL_REGISTRY } from '../types/modelSelection';
+import { ModelSelector, HyperparameterEditor } from '../components/model';
 import {
   fetchModels,
   clearModelError,
   setSelectedModel,
+  setHyperparameters,
+  trainModel,
 } from '../store/slices/modelingSlice';
 import LoadingState from '../components/common/LoadingState';
 import ErrorState from '../components/common/ErrorState';
@@ -48,6 +52,7 @@ const ModelingPage: React.FC = () => {
   const {
     models,
     selectedModel,
+    hyperparameters,
     isLoading,
     isTraining,
     error,
@@ -56,10 +61,22 @@ const ModelingPage: React.FC = () => {
     logs,
   } = useAppSelector((state) => state.modeling);
   const { currentDataset } = useAppSelector((state) => state.dataset);
+  const { taskType, targetColumn, selectedFeatures } = useAppSelector((state) => state.feature);
 
   const [activeStep, setActiveStep] = useState(0);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
-  const [_hyperparameters, _setHyperparameters] = useState<Record<string, any>>({});
+
+  const handleStartTraining = () => {
+    if (selectedModel && selectedDatasetId) {
+      dispatch(trainModel({
+        datasetId: selectedDatasetId,
+        modelType: selectedModel,
+        hyperparameters: hyperparameters,
+        targetColumn: targetColumn || undefined,
+        selectedFeatures: selectedFeatures || undefined,
+      }));
+    }
+  };
 
   useEffect(() => {
     dispatch(fetchModels());
@@ -105,6 +122,11 @@ const ModelingPage: React.FC = () => {
     }
   };
 
+  const handleModelSelect = (selection: any) => {
+    dispatch(setSelectedModel(selection.modelId));
+    dispatch(setHyperparameters(selection.hyperparameters));
+  };
+  
   if (isLoading && models.length === 0) {
     return <LoadingState message="Loading model configurations..." />;
   }
@@ -223,22 +245,17 @@ const ModelingPage: React.FC = () => {
                   )}
                 </Box>
                 <Divider sx={{ mb: 2 }} />
-                {models.length === 0 ? (
-                  <EmptyState
-                    title="No Models Available"
-                    message="Model configurations will appear here once loaded"
-                    icon={<Psychology sx={{ fontSize: 48 }} />}
-                  />
-                ) : (
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Choose a machine learning algorithm
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Model selection interface will be implemented in the next phase
-                    </Typography>
-                  </Box>
-                )}
+                
+                <ModelSelector
+                  taskType={(taskType as any) || 'classification'}
+                  selectedModel={selectedModel ? { 
+                    modelId: selectedModel, 
+                    taskType: (taskType as any) || 'classification', 
+                    hyperparameters: {} 
+                  } : null}
+                  onModelSelect={handleModelSelect}
+                  disabled={!currentDataset} // Always enable model selection if we have a dataset
+                />
               </CardContent>
             </Card>
 
@@ -258,14 +275,17 @@ const ModelingPage: React.FC = () => {
                 </Box>
                 <Divider sx={{ mb: 2 }} />
                 {selectedModel ? (
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Configure model hyperparameters
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Hyperparameter configuration interface will be implemented in the next phase
-                    </Typography>
-                  </Box>
+                  MODEL_REGISTRY[selectedModel] ? (
+                    <HyperparameterEditor
+                      model={MODEL_REGISTRY[selectedModel]}
+                      values={hyperparameters}
+                      onChange={(values) => dispatch(setHyperparameters(values))}
+                    />
+                  ) : (
+                    <Alert severity="warning">
+                      Model definition not found for {selectedModel}
+                    </Alert>
+                  )
                 ) : (
                   <EmptyState
                     title="No Model Selected"
@@ -301,6 +321,7 @@ const ModelingPage: React.FC = () => {
                     variant="contained"
                     startIcon={<PlayArrow />}
                     disabled={!selectedModel || isTraining || !selectedDatasetId}
+                    onClick={handleStartTraining}
                   >
                     Start Training
                   </Button>

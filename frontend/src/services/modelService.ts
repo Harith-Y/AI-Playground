@@ -29,12 +29,22 @@ class ModelService {
   async trainModel(
     datasetId: string,
     modelType: string,
-    hyperparameters: Hyperparameters
+    hyperparameters: Hyperparameters,
+    targetColumn?: string,
+    selectedFeatures?: string[],
+    experimentId?: string
   ): Promise<Model> {
+    // Generate a temporary experiment ID if not provided (should handle this properly in real app)
+    // using a valid UUID format
+    const fallbackExperimentId = '00000000-0000-0000-0000-000000000000';
+    
     return api.post<Model>('/api/v1/models/train', {
-      datasetId,
-      modelType,
+      dataset_id: datasetId,
+      model_type: modelType,
       hyperparameters,
+      target_column: targetColumn,
+      feature_columns: selectedFeatures,
+      experiment_id: experimentId || fallbackExperimentId,
     });
   }
 

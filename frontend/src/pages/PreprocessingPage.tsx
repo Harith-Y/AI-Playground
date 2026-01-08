@@ -29,8 +29,7 @@ import {
   updatePreprocessingStep,
   deletePreprocessingStep,
   reorderPreprocessingSteps,
-  applyPreprocessingPipelineAsync,
-  getPreprocessingTaskStatus,
+  applyPreprocessingPipeline,
   clearError,
   clearPipelineResult,
   undo,
@@ -39,7 +38,7 @@ import {
   moveStepDown,
   removeStepLocal,
 } from '../store/slices/preprocessingSlice';
-import { fetchDatasetStats } from '../store/slices/datasetSlice';
+import { fetchDatasetStats, setCurrentDataset, fetchDataset, fetchDatasetPreview } from '../store/slices/datasetSlice';
 import type { PreprocessingStep, PreprocessingStepCreate } from '../types/preprocessing';
 import { validateDatasetForPreprocessing, getErrorMessage } from '../utils/preprocessingValidation';
 import PreviewPanel from '../components/preprocessing/PreviewPanel';
@@ -53,8 +52,6 @@ const PreprocessingPage: React.FC = () => {
     isExecuting,
     error,
     pipelineResult,
-    currentTaskId,
-    taskStatus,
     history,
     historyIndex,
   } = useAppSelector((state) => state.preprocessing);
@@ -62,7 +59,6 @@ const PreprocessingPage: React.FC = () => {
 
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<PreprocessingStep | null>(null);
-  const [showProgressDialog, setShowProgressDialog] = useState(false);
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -70,19 +66,17 @@ const PreprocessingPage: React.FC = () => {
     severity: 'success',
   });
 
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
   useEffect(() => {
     if (currentDataset?.id) {
       // Fetch preprocessing steps for the current dataset
       dispatch(fetchPreprocessingSteps(currentDataset.id));
 
       // Fetch dataset stats if not already loaded
-      if (columns.length === 0) {
+      if (!columns || columns.length === 0) {
         dispatch(fetchDatasetStats(currentDataset.id));
       }
     }
-  }, [currentDataset?.id, dispatch, columns.length]);
+  }, [currentDataset?.id, dispatch, columns?.length]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -195,65 +189,55 @@ const PreprocessingPage: React.FC = () => {
     }
 
     try {
-      // Start async preprocessing task
-      await dispatch(applyPreprocessingPipelineAsync({
+      // Execute preprocessing synchronously
+      const result = await dispatch(applyPreprocessingPipeline({
         dataset_id: currentDataset!.id,
         save_output: true,
         output_name: `${currentDataset!.name}_preprocessed`,
       })).unwrap();
 
-      setShowProgressDialog(true);
-      showSnackbar('Preprocessing pipeline started', 'success');
+      showSnackbar('Preprocessing pipeline completed successfully', 'success');
     } catch (error: any) {
       const errorMessage = getErrorMessage(error);
       showSnackbar(errorMessage, 'error');
     }
   };
 
-  // Poll for task status
+  // Show result dialog when pipeline completes
   useEffect(() => {
-    if (currentTaskId && isExecuting) {
-      // Start polling every 2 seconds
-      pollingIntervalRef.current = setInterval(() => {
-        dispatch(getPreprocessingTaskStatus(currentTaskId));
-      }, 2000);
-
-      return () => {
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-      };
+    if (pipelineResult) {
+      setShowResultDialog(true);
     }
-  }, [currentTaskId, isExecuting, dispatch]);
-
-  // Handle task completion
-  useEffect(() => {
-    if (taskStatus) {
-      if (taskStatus.state === 'SUCCESS' && pipelineResult) {
-        // Stop polling
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-        setShowProgressDialog(false);
-        setShowResultDialog(true);
-      } else if (taskStatus.state === 'FAILURE') {
-        // Stop polling on failure
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-        setShowProgressDialog(false);
-        const errorMessage = getErrorMessage(taskStatus.error || 'Pipeline execution failed');
-        showSnackbar(errorMessage, 'error');
-      }
-    }
-  }, [taskStatus, pipelineResult]);
+  }, [pipelineResult]);
 
   const handleCloseResultDialog = () => {
     setShowResultDialog(false);
     dispatch(clearPipelineResult());
+  };
+
+  const handleLoadPreprocessedDataset = async () => {
+    if (pipelineResult?.output_dataset_id) {
+      try {
+        // Clear the pipeline result first to prevent dialog from reopening
+        dispatch(clearPipelineResult());
+        setShowResultDialog(false);
+        
+        // Fetch dataset details
+        const dataset = await dispatch(fetchDataset(pipelineResult.output_dataset_id)).unwrap();
+        dispatch(setCurrentDataset(dataset));
+        
+        // Fetch all dataset information in parallel (including steps for new dataset)
+        await Promise.all([
+          dispatch(fetchDatasetStats(pipelineResult.output_dataset_id)),
+          dispatch(fetchDatasetPreview(pipelineResult.output_dataset_id)),
+          dispatch(fetchPreprocessingSteps(pipelineResult.output_dataset_id)),
+        ]);
+        
+        showSnackbar('Preprocessed dataset loaded successfully', 'success');
+      } catch (error: any) {
+        showSnackbar('Failed to load preprocessed dataset: ' + (error.message || 'Unknown error'), 'error');
+      }
+    }
   };
 
   const handleRefreshSteps = () => {
@@ -375,7 +359,7 @@ const PreprocessingPage: React.FC = () => {
               variant="contained"
               startIcon={<Add />}
               onClick={handleAddStep}
-              disabled={isProcessing || columns.length === 0}
+              disabled={isProcessing || !columns || columns.length === 0}
             >
               Add Step
             </Button>
@@ -388,7 +372,7 @@ const PreprocessingPage: React.FC = () => {
           </Alert>
         )}
 
-        {columns.length === 0 && (
+        {(!columns || columns.length === 0) && (
           <Alert severity="warning" sx={{ mb: 2 }}>
             Loading dataset information...
           </Alert>
@@ -431,8 +415,10 @@ const PreprocessingPage: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
+                // Use center alignment only when empty, otherwise top
+                justifyContent: steps.length === 0 ? 'center' : 'flex-start',
                 bgcolor: 'background.paper',
+                overflowY: 'auto', // Enable scrolling
               }}
             >
               {steps.length === 0 ? (
@@ -441,35 +427,58 @@ const PreprocessingPage: React.FC = () => {
                   message="Click 'Add Step' to start building your data preprocessing pipeline. You can add multiple steps and drag to reorder them."
                 />
               ) : (
-                <Box sx={{ textAlign: 'center', maxWidth: 600 }}>
-                  <Typography variant="h6" gutterBottom fontWeight={600}>
+                <Box sx={{ textAlign: 'center', maxWidth: 600, width: '100%' }}>
+                  <Typography variant="h6" gutterBottom fontWeight={600} sx={{ mt: 2 }}>
                     Pipeline Preview
                   </Typography>
                   <Typography variant="body2" color="text.secondary" paragraph>
                     Your preprocessing pipeline has <strong>{steps.length}</strong> step{steps.length !== 1 ? 's' : ''}.
                     Steps will be executed in the order shown in the sidebar.
                   </Typography>
-                  <Box sx={{ mt: 4, textAlign: 'left' }}>
+                  <Box sx={{ mt: 4, textAlign: 'left', width: '100%' }}>
                     <Typography variant="subtitle2" gutterBottom fontWeight={600}>
                       Pipeline Steps:
                     </Typography>
                     {steps.map((step, index) => (
-                      <Box
+                      <Paper
                         key={step.id}
+                        elevation={0}
                         sx={{
                           p: 2,
-                          mb: 1,
+                          mb: 2,
                           border: '1px solid',
                           borderColor: 'divider',
-                          borderRadius: 1,
+                          borderRadius: 2,
                           bgcolor: 'grey.50',
+                          transition: 'all 0.2s',
+                          '&:hover': {
+                            bgcolor: 'grey.100',
+                            borderColor: 'primary.light',
+                            transform: 'translateY(-2px)',
+                            boxShadow: 2,
+                          }
                         }}
                       >
-                        <Typography variant="body2">
-                          <strong>{index + 1}.</strong> {step.step_type}
-                          {step.column_name && ` on column "${step.column_name}"`}
-                        </Typography>
-                      </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Chip 
+                            label={index + 1} 
+                            size="small" 
+                            color="primary" 
+                            variant="outlined" 
+                            sx={{ fontWeight: 'bold' }} 
+                          />
+                          <Box>
+                            <Typography variant="body1" fontWeight={500}>
+                              {step.step_type}
+                            </Typography>
+                            {step.column_name && (
+                              <Typography variant="body2" color="text.secondary">
+                                on column "<strong>{step.column_name}</strong>"
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      </Paper>
                     ))}
                   </Box>
                 </Box>
@@ -502,55 +511,8 @@ const PreprocessingPage: React.FC = () => {
         </Alert>
       </Snackbar>
 
-      {/* Progress Dialog */}
-      <Dialog
-        open={showProgressDialog}
-        maxWidth="sm"
-        fullWidth
-        disableEscapeKeyDown
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Transform />
-            <Typography variant="h6">Executing Preprocessing Pipeline</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ py: 2 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              {taskStatus?.status || 'Starting preprocessing...'}
-            </Typography>
-
-            <Box sx={{ mt: 2, mb: 1 }}>
-              <LinearProgress
-                variant="determinate"
-                value={taskStatus?.progress || 0}
-                sx={{ height: 8, borderRadius: 4 }}
-              />
-            </Box>
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="caption" color="text.secondary">
-                {taskStatus?.progress || 0}% complete
-              </Typography>
-              {taskStatus?.current_step && (
-                <Chip
-                  label={taskStatus.current_step}
-                  size="small"
-                  color="primary"
-                  variant="outlined"
-                />
-              )}
-            </Box>
-
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="caption" color="text.secondary">
-                Task ID: {currentTaskId}
-              </Typography>
-            </Box>
-          </Box>
-        </DialogContent>
-      </Dialog>
+      {/* Progress Dialog - removed for synchronous execution */}
+      {/* Synchronous execution shows loading state in button and completes immediately */}
 
       {/* Result Dialog */}
       <Dialog
@@ -645,7 +607,16 @@ const PreprocessingPage: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseResultDialog} variant="contained">
+          {pipelineResult?.output_dataset_id && (
+            <Button 
+              onClick={handleLoadPreprocessedDataset} 
+              variant="contained"
+              color="primary"
+            >
+              Load Preprocessed Data
+            </Button>
+          )}
+          <Button onClick={handleCloseResultDialog} variant="outlined">
             Close
           </Button>
         </DialogActions>

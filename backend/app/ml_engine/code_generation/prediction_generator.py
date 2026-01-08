@@ -685,7 +685,7 @@ class PredictionRequest(BaseModel):
     return_probabilities: bool = Field(default=True, description="Return class probabilities")
     
     class Config:
-        schema_extra = {{
+        json_schema_extra = {{
             "example": {{
                 "features": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
                 "return_probabilities": True

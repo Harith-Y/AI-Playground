@@ -6,25 +6,31 @@ Users can create, read, update, delete, and reorder preprocessing steps for thei
 """
 
 import uuid
+import io
 import os
 import time
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pathlib import Path
 import pandas as pd
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from sqlalchemy.exc import ProgrammingError, OperationalError
 
 from app.db.session import get_db
 from app.models.preprocessing_step import PreprocessingStep
 from app.models.dataset import Dataset
 from app.models.preprocessing_history import PreprocessingHistory
+from app.models.user import User
+from app.services.r2_storage_service import get_storage_service
+from app.core.security import decode_token, verify_resource_ownership
 from app.schemas.preprocessing import (
     PreprocessingStepCreate,
     PreprocessingStepUpdate,
     PreprocessingStepRead,
+    ReorderRequest,
     PreprocessingApplyRequest,
     PreprocessingApplyResponse,
     PreprocessingAsyncResponse,
@@ -45,10 +51,71 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# Mock authentication - replace with actual auth later
-def get_current_user_id() -> str:
-    """Mock function to get current user ID. Replace with actual auth."""
-    return "00000000-0000-0000-0000-000000000001"
+async def get_user_or_guest(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> uuid.UUID:
+    """
+    Get the current authenticated user ID, or create/return a guest user ID.
+    This allows the playground to work without forcing login, while still supporting auth.
+    """
+    logger.info("Attempting to resolve user (auth or guest)...")
+
+    # 1. Try to extract token
+    authorization: str = request.headers.get("Authorization")
+    if authorization:
+        scheme, _, param = authorization.partition(" ")
+        if scheme.lower() == "bearer":
+            try:
+                payload = decode_token(param)
+                user_id = payload.get("sub")
+                if user_id:
+                    logger.info(f"Authenticated user found: {user_id}")
+                    return uuid.UUID(user_id)
+            except Exception as e:
+                logger.warning(f"Token validation failed: {e}")
+                pass # Token invalid, fall back to guest
+
+    # 2. Fallback to guest
+    try:
+        guest_email = "guest@aiplayground.local"
+        # Check if table exists by trying to query
+        try:
+            guest_user = db.query(User).filter(User.email == guest_email).first()
+        except (ProgrammingError, OperationalError) as e:
+            logger.error(f"Database error (missing table?): {e}")
+            # Try to provide a helpful error message
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Database error: Tables might be missing. Please run migrations. Error: {str(e)}"
+            )
+
+        if not guest_user:
+            logger.info("Creating guest user...")
+            
+            # Workaround for passlib/bcrypt compatibility issue
+            import bcrypt
+            hashed_pwd = bcrypt.hashpw(b"guest_password", bcrypt.gensalt()).decode('utf-8')
+            
+            guest_user = User(
+                email=guest_email,
+                password_hash=hashed_pwd,
+                is_active=True
+            )
+            db.add(guest_user)
+            db.commit()
+            db.refresh(guest_user)
+        
+        logger.info(f"Using guest user: {guest_user.id}")
+        return guest_user.id
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to initialize guest user: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initialize guest user: {str(e)}"
+        )
 
 
 @router.post(
@@ -79,8 +146,9 @@ def get_current_user_id() -> str:
 )
 async def create_preprocessing_step(
     step: PreprocessingStepCreate,
+    request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Create a new preprocessing step.
@@ -99,16 +167,21 @@ async def create_preprocessing_step(
     - Encoding: `{"method": "onehot"}` or `{"method": "label"}`
     - Outlier: `{"method": "iqr", "threshold": 1.5}` or `{"method": "zscore", "threshold": 3}`
     """
-    # Verify dataset exists and belongs to user
-    dataset = db.query(Dataset).filter(
-        and_(Dataset.id == step.dataset_id, Dataset.user_id == user_id)
-    ).first()
+    # Verify dataset exists
+    dataset = db.query(Dataset).filter(Dataset.id == step.dataset_id).first()
 
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset {step.dataset_id} not found or access denied"
+            detail=f"Dataset {step.dataset_id} not found"
         )
+    
+    # For guest users (guest@aiplayground.local), skip ownership check
+    # For authenticated users, verify ownership
+    guest_user = db.query(User).filter(User.email == "guest@aiplayground.local").first()
+    if guest_user and user_id != guest_user.id:
+        # Not a guest user, verify ownership
+        verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
     # If order not specified, add to end
     if step.order is None:
@@ -168,9 +241,10 @@ async def create_preprocessing_step(
     }
 )
 async def list_preprocessing_steps(
+    request: Request,
     dataset_id: Optional[str] = Query(None, description="Filter by dataset ID"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     List all preprocessing steps.
@@ -200,8 +274,9 @@ async def list_preprocessing_steps(
 )
 async def get_preprocessing_step(
     step_id: str,
+    request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """Get a specific preprocessing step by ID."""
     step = db.query(PreprocessingStep).join(Dataset).filter(
@@ -234,8 +309,9 @@ async def get_preprocessing_step(
 async def update_preprocessing_step(
     step_id: str,
     step_update: PreprocessingStepUpdate,
+    request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Update a preprocessing step.
@@ -285,8 +361,9 @@ async def update_preprocessing_step(
 )
 async def delete_preprocessing_step(
     step_id: str,
+    request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Delete a preprocessing step.
@@ -308,8 +385,30 @@ async def delete_preprocessing_step(
             detail=f"Preprocessing step {step_id} not found or access denied"
         )
 
-    db.delete(db_step)
-    db.commit()
+    dataset_id = db_step.dataset_id
+    
+    # Use raw SQL for more reliable deletion
+    try:
+        # Delete using raw SQL to bypass any ORM caching issues
+        from sqlalchemy import text
+        db.execute(
+            text("DELETE FROM preprocessing_steps WHERE id = :step_id"),
+            {"step_id": step_id}
+        )
+        db.commit()
+        
+        # Verify deletion
+        check = db.query(PreprocessingStep).filter(PreprocessingStep.id == step_id).first()
+        if check:
+            raise Exception("Step still exists after delete")
+            
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to delete preprocessing step {step_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete preprocessing step: {str(e)}"
+        )
 
     return None
 
@@ -350,59 +449,88 @@ async def delete_preprocessing_step(
     }
 )
 async def reorder_preprocessing_steps(
-    dataset_id: str = Query(..., description="Dataset ID"),
-    step_ids: List[str] = Query(..., description="Ordered list of step IDs"),
+    request: Request,
+    reorder_data: Optional[ReorderRequest] = None,
+    dataset_id: Optional[str] = Query(None, description="Dataset ID (can be in body or query)"),
+    step_ids: Optional[List[str]] = Query(None, description="Step IDs (can be in body or query)"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Reorder preprocessing steps for a dataset.
 
-    Provide the step IDs in the desired execution order.
-
-    **Example:**
-    ```
-    POST /preprocessing/reorder?dataset_id=789e4567...&step_ids=456e4567...&step_ids=123e4567...
-    ```
+    Supports two formats:
+    1. JSON body: {"dataset_id": "...", "step_ids": [...]}
+    2. Query params: ?dataset_id=...&step_ids=...&step_ids=...
 
     This will set the first step's order to 0, the second to 1, etc.
     """
+    # Try to get from body first, then fall back to query params
+    final_dataset_id = None
+    final_step_ids = None
+    
+    if reorder_data:
+        final_dataset_id = str(reorder_data.dataset_id) if reorder_data.dataset_id else None
+        final_step_ids = reorder_data.step_ids
+    elif dataset_id and step_ids:
+        final_dataset_id = dataset_id
+        final_step_ids = step_ids
+    
+    if not final_step_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must provide step_ids"
+        )
+    
+    # If dataset_id not provided, infer it from the first step
+    if not final_dataset_id:
+        first_step = db.query(PreprocessingStep).filter(
+            PreprocessingStep.id == final_step_ids[0]
+        ).first()
+        if first_step:
+            final_dataset_id = str(first_step.dataset_id)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Step {final_step_ids[0]} not found"
+            )
+    
     # Verify dataset exists and belongs to user
     dataset = db.query(Dataset).filter(
-        and_(Dataset.id == dataset_id, Dataset.user_id == user_id)
+        and_(Dataset.id == final_dataset_id, Dataset.user_id == user_id)
     ).first()
 
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset {dataset_id} not found or access denied"
+            detail=f"Dataset {final_dataset_id} not found or access denied"
         )
 
     # Get all steps for the dataset
     steps = db.query(PreprocessingStep).filter(
-        PreprocessingStep.dataset_id == dataset_id
+        PreprocessingStep.dataset_id == final_dataset_id
     ).all()
 
     # Verify all step IDs exist
     step_dict = {str(step.id): step for step in steps}
-    for step_id in step_ids:
+    for step_id in final_step_ids:
         if step_id not in step_dict:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Step {step_id} not found in dataset {dataset_id}"
+                detail=f"Step {step_id} not found in dataset {final_dataset_id}"
             )
 
     # Update order
-    for new_order, step_id in enumerate(step_ids):
+    for new_order, step_id in enumerate(final_step_ids):
         step_dict[step_id].order = new_order
 
     db.commit()
 
     # Return reordered steps
     updated_steps = db.query(PreprocessingStep).filter(
-        PreprocessingStep.dataset_id == dataset_id
+        PreprocessingStep.dataset_id == final_dataset_id
     ).order_by(PreprocessingStep.order).all()
-
+    
     return updated_steps
 
 
@@ -444,9 +572,10 @@ async def reorder_preprocessing_steps(
     }
 )
 async def apply_preprocessing_pipeline(
-    request: PreprocessingApplyRequest = Body(...),
+    request: Request,
+    req_body: PreprocessingApplyRequest = Body(...),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Apply the complete preprocessing pipeline to a dataset.
@@ -472,18 +601,18 @@ async def apply_preprocessing_pipeline(
     """
     # Verify dataset exists and belongs to user
     dataset = db.query(Dataset).filter(
-        and_(Dataset.id == request.dataset_id, Dataset.user_id == user_id)
+        and_(Dataset.id == req_body.dataset_id, Dataset.user_id == user_id)
     ).first()
 
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset {request.dataset_id} not found or access denied"
+            detail=f"Dataset {req_body.dataset_id} not found or access denied"
         )
 
     # Get all preprocessing steps for the dataset
     steps = db.query(PreprocessingStep).filter(
-        PreprocessingStep.dataset_id == request.dataset_id
+        PreprocessingStep.dataset_id == req_body.dataset_id
     ).order_by(PreprocessingStep.order).all()
 
     if not steps:
@@ -525,9 +654,9 @@ async def apply_preprocessing_pipeline(
 
         # Save transformed dataset if requested
         output_dataset_id = None
-        if request.save_output:
-            output_name = request.output_name or f"{dataset.name}_preprocessed"
-            output_path = _save_transformed_dataset(df, output_name, dataset.file_path)
+        if req_body.save_output:
+            output_name = req_body.output_name or f"{dataset.name}_preprocessed"
+            output_path = _save_transformed_dataset(df, output_name, user_id, dataset.id)
 
             # Create new dataset record
             new_dataset = Dataset(
@@ -551,7 +680,7 @@ async def apply_preprocessing_pipeline(
         # Record history
         history_record = PreprocessingHistory(
             id=uuid.uuid4(),
-            dataset_id=request.dataset_id,
+            dataset_id=req_body.dataset_id,
             user_id=user_id,
             operation_type='apply',
             steps_applied=[
@@ -594,7 +723,7 @@ async def apply_preprocessing_pipeline(
         # Record failed operation in history
         history_record = PreprocessingHistory(
             id=uuid.uuid4(),
-            dataset_id=request.dataset_id,
+            dataset_id=req_body.dataset_id,
             user_id=user_id,
             operation_type='apply',
             steps_applied=[
@@ -753,24 +882,42 @@ def _apply_single_step(df: pd.DataFrame, step: PreprocessingStep) -> tuple[pd.Da
     return df, stats
 
 
-def _save_transformed_dataset(df: pd.DataFrame, name: str, original_path: str) -> str:
+def _save_transformed_dataset(df: pd.DataFrame, name: str, user_id: uuid.UUID, dataset_id: uuid.UUID) -> str:
     """
-    Save the transformed dataset to disk.
+    Save the transformed dataset to storage (R2).
 
     Returns:
-        Path to the saved file
+        URL/Path to the saved file
     """
-    # Create output directory if it doesn't exist
-    output_dir = Path(original_path).parent / "preprocessed"
-    output_dir.mkdir(exist_ok=True)
-
-    # Generate output filename
-    output_path = output_dir / f"{name}.csv"
-
-    # Save the dataset
-    df.to_csv(output_path, index=False)
-
-    return str(output_path)
+    storage_service = get_storage_service()
+    
+    # Create valid filename
+    filename = f"{name}.csv" if not name.endswith('.csv') else name
+    
+    # Path structure: user_id/dataset_id/preprocessed/filename
+    file_path = f"{str(user_id)}/{str(dataset_id)}/preprocessed/{filename}"
+    
+    # Convert DataFrame to CSV in memory
+    buffer = io.BytesIO()
+    df.to_csv(buffer, index=False)
+    content = buffer.getvalue()
+    
+    # Upload
+    try:
+        url = storage_service.upload_file(
+            file_content=content,
+            file_path=file_path,
+            content_type="text/csv"
+        )
+        return url
+    except Exception as e:
+        # Fallback to local storage if R2 fails (or for development)
+        # This mirrors the old behavior but with specific error handling
+        # For now, just re-raise properly structured error
+        raise HTTPException(
+             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+             detail=f"Failed to save transformed dataset: {str(e)}"
+        )
 
 
 # ============================================================================
@@ -801,9 +948,10 @@ def _save_transformed_dataset(df: pd.DataFrame, name: str, original_path: str) -
     }
 )
 async def apply_preprocessing_pipeline_async(
-    request: PreprocessingApplyRequest = Body(...),
+    request: Request,
+    req_body: PreprocessingApplyRequest = Body(...),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Apply preprocessing pipeline asynchronously using Celery.
@@ -831,16 +979,16 @@ async def apply_preprocessing_pipeline_async(
         f"Async preprocessing request received",
         extra={
             'event': 'api_async_request',
-            'dataset_id': str(request.dataset_id),
+            'dataset_id': str(req_body.dataset_id),
             'user_id': user_id,
-            'save_output': request.save_output,
-            'output_name': request.output_name
+            'save_output': req_body.save_output,
+            'output_name': req_body.output_name
         }
     )
 
     # Verify dataset exists and belongs to user
     dataset = db.query(Dataset).filter(
-        and_(Dataset.id == request.dataset_id, Dataset.user_id == user_id)
+        and_(Dataset.id == req_body.dataset_id, Dataset.user_id == user_id)
     ).first()
 
     if not dataset:
@@ -848,18 +996,18 @@ async def apply_preprocessing_pipeline_async(
             f"Dataset not found or access denied",
             extra={
                 'event': 'dataset_not_found',
-                'dataset_id': str(request.dataset_id),
+                'dataset_id': str(req_body.dataset_id),
                 'user_id': user_id
             }
         )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset {request.dataset_id} not found or access denied"
+            detail=f"Dataset {req_body.dataset_id} not found or access denied"
         )
 
     # Verify preprocessing steps exist
     steps_count = db.query(PreprocessingStep).filter(
-        PreprocessingStep.dataset_id == request.dataset_id
+        PreprocessingStep.dataset_id == req_body.dataset_id
     ).count()
 
     if steps_count == 0:
@@ -867,7 +1015,7 @@ async def apply_preprocessing_pipeline_async(
             f"No preprocessing steps configured",
             extra={
                 'event': 'no_steps_configured',
-                'dataset_id': str(request.dataset_id)
+                'dataset_id': str(req_body.dataset_id)
             }
         )
         raise HTTPException(
@@ -880,17 +1028,17 @@ async def apply_preprocessing_pipeline_async(
         f"Starting Celery task for dataset {dataset.name}",
         extra={
             'event': 'celery_task_start',
-            'dataset_id': str(request.dataset_id),
+            'dataset_id': str(req_body.dataset_id),
             'dataset_name': dataset.name,
             'steps_count': steps_count
         }
     )
 
     task = apply_preprocessing_task.delay(
-        dataset_id=str(request.dataset_id),
+        dataset_id=str(req_body.dataset_id),
         user_id=user_id,
-        save_output=request.save_output,
-        output_name=request.output_name
+        save_output=req_body.save_output,
+        output_name=req_body.output_name
     )
 
     logger.info(
@@ -898,7 +1046,7 @@ async def apply_preprocessing_pipeline_async(
         extra={
             'event': 'celery_task_created',
             'task_id': task.id,
-            'dataset_id': str(request.dataset_id)
+            'dataset_id': str(req_body.dataset_id)
         }
     )
 
@@ -1117,10 +1265,11 @@ def _create_data_preview(df: pd.DataFrame, sample_size: int = 10) -> DataPreview
     }
 )
 async def preview_preprocessing_transformations(
-    request: PreprocessingApplyRequest = Body(...),
+    request: Request,
+    req_body: PreprocessingApplyRequest = Body(...),
     sample_size: int = Query(10, ge=1, le=100, description="Number of rows to preview"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Preview preprocessing transformations with before/after comparison.
@@ -1152,18 +1301,18 @@ async def preview_preprocessing_transformations(
     """
     # Verify dataset exists and belongs to user
     dataset = db.query(Dataset).filter(
-        and_(Dataset.id == request.dataset_id, Dataset.user_id == user_id)
+        and_(Dataset.id == req_body.dataset_id, Dataset.user_id == user_id)
     ).first()
 
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset {request.dataset_id} not found or access denied"
+            detail=f"Dataset {req_body.dataset_id} not found or access denied"
         )
 
     # Get all preprocessing steps for the dataset
     steps = db.query(PreprocessingStep).filter(
-        PreprocessingStep.dataset_id == request.dataset_id
+        PreprocessingStep.dataset_id == req_body.dataset_id
     ).order_by(PreprocessingStep.order).all()
 
     if not steps:
@@ -1237,12 +1386,13 @@ async def preview_preprocessing_transformations(
 )
 async def get_preprocessing_history(
     dataset_id: uuid.UUID,
+    request: Request,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     operation_type: Optional[str] = Query(None, description="Filter by operation type"),
     status_filter: Optional[str] = Query(None, description="Filter by status (success/failure)"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Get preprocessing history for a dataset with pagination and filtering.
@@ -1304,8 +1454,9 @@ async def get_preprocessing_history(
 )
 async def get_preprocessing_history_record(
     history_id: uuid.UUID,
+    request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Get a specific preprocessing history record.
@@ -1338,8 +1489,9 @@ async def get_preprocessing_history_record(
 )
 async def delete_preprocessing_history(
     history_id: uuid.UUID,
+    request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: uuid.UUID = Depends(get_user_or_guest)
 ):
     """
     Delete a preprocessing history record.

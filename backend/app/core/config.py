@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     R2_PUBLIC_URL: Optional[str] = None
     USE_R2_STORAGE: bool = False  # Set to True to use R2 instead of local filesystem
     
+    # Task Processing
+    USE_BACKGROUND_TASKS: bool = False  # Set to True to use FastAPI BackgroundTasks instead of Celery
+
     class Config:
         env_file = str(ENV_FILE)
         env_file_encoding = "utf-8"

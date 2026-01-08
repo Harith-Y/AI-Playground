@@ -84,7 +84,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
 
   // Get common columns between before and after
   const commonColumns = useMemo(() => {
-    if (!previewData) return [];
+    if (!previewData || !previewData.before || !previewData.after) return [];
+    if (!previewData.before.columns || !previewData.after.columns) return [];
     return previewData.before.columns.filter((col) =>
       previewData.after.columns.includes(col)
     );
@@ -191,7 +192,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
   }
 
   // Empty data state (no rows)
-  if (previewData && previewData.before.shape[0] === 0) {
+  if (previewData && previewData.before && previewData.before.shape && previewData.before.shape[0] === 0) {
     return (
       <Paper sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{ textAlign: 'center' }}>
@@ -208,7 +209,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
   }
 
   // Empty columns state
-  if (previewData && previewData.before.shape[1] === 0) {
+  if (previewData && previewData.before && previewData.before.shape && previewData.before.shape[1] === 0) {
     return (
       <Paper sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{ textAlign: 'center' }}>
@@ -241,8 +242,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
     );
   }
 
-  const beforeStats = selectedColumn ? getNumericStats(previewData.before.data, selectedColumn) : null;
-  const afterStats = selectedColumn ? getNumericStats(previewData.after.data, selectedColumn) : null;
+  const beforeStats = selectedColumn && previewData.before?.data ? getNumericStats(previewData.before.data, selectedColumn) : null;
+  const afterStats = selectedColumn && previewData.after?.data ? getNumericStats(previewData.after.data, selectedColumn) : null;
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -306,7 +307,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                 Before
               </Typography>
               <Typography variant="h6" fontWeight={600}>
-                {previewData.before.shape[0]} × {previewData.before.shape[1]}
+                {previewData.before?.shape ? `${previewData.before.shape[0]} × ${previewData.before.shape[1]}` : 'N/A'}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 rows × columns
@@ -321,7 +322,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                 After
               </Typography>
               <Typography variant="h6" fontWeight={600}>
-                {previewData.after.shape[0]} × {previewData.after.shape[1]}
+                {previewData.after?.shape ? `${previewData.after.shape[0]} × ${previewData.after.shape[1]}` : 'N/A'}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 rows × columns
@@ -332,7 +333,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
       </Grid>
 
       {/* Column Changes Alert */}
-      {previewData.before.columns.length !== previewData.after.columns.length && (
+      {previewData.before?.columns && previewData.after?.columns && 
+       previewData.before.columns.length !== previewData.after.columns.length && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Columns changed: {previewData.before.columns.length} → {previewData.after.columns.length}
           {previewData.after.columns.length > previewData.before.columns.length && (
@@ -371,7 +373,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      {previewData.before.columns.slice(0, 6).map((col) => (
+                      {previewData.before?.columns?.slice(0, 6).map((col) => (
                         <TableCell key={col}>
                           <Box>
                             <Typography variant="caption" fontWeight={600}>
@@ -396,9 +398,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {previewData.before.data.slice(0, 10).map((row, idx) => (
+                    {previewData.before?.data?.slice(0, 10).map((row, idx) => (
                       <TableRow key={idx} hover>
-                        {previewData.before.columns.slice(0, 6).map((col) => (
+                        {previewData.before?.columns?.slice(0, 6).map((col) => (
                           <TableCell key={col}>
                             {row[col] == null ? (
                               <Typography variant="caption" color="text.secondary" fontStyle="italic">
@@ -418,7 +420,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                   </TableBody>
                 </Table>
               </TableContainer>
-              {previewData.before.columns.length > 6 && (
+              {previewData.before?.columns && previewData.before.columns.length > 6 && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                   Showing 6 of {previewData.before.columns.length} columns
                 </Typography>
@@ -434,7 +436,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      {previewData.after.columns.slice(0, 6).map((col) => (
+                      {previewData.after?.columns?.slice(0, 6).map((col) => (
                         <TableCell key={col}>
                           <Box>
                             <Typography variant="caption" fontWeight={600}>
@@ -459,9 +461,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {previewData.after.data.slice(0, 10).map((row, idx) => (
+                    {previewData.after?.data?.slice(0, 10).map((row, idx) => (
                       <TableRow key={idx} hover>
-                        {previewData.after.columns.slice(0, 6).map((col) => (
+                        {previewData.after?.columns?.slice(0, 6).map((col) => (
                           <TableCell key={col}>
                             {row[col] == null ? (
                               <Typography variant="caption" color="text.secondary" fontStyle="italic">
@@ -481,7 +483,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                   </TableBody>
                 </Table>
               </TableContainer>
-              {previewData.after.columns.length > 6 && (
+              {previewData.after?.columns && previewData.after.columns.length > 6 && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                   Showing 6 of {previewData.after.columns.length} columns
                 </Typography>
@@ -604,7 +606,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                       </Typography>
                       <ResponsiveContainer width="100%" height={300}>
                         {isNumericColumn(selectedColumn) ? (
-                          <BarChart data={getHistogramData(previewData.before.data, selectedColumn)}>
+                          <BarChart data={getHistogramData(previewData.before?.data || [], selectedColumn)}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="range" angle={-45} textAnchor="end" height={80} />
                             <YAxis />
@@ -615,7 +617,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                         ) : (
                           <PieChart>
                             <Pie
-                              data={getValueDistribution(previewData.before.data, selectedColumn)}
+                              data={getValueDistribution(previewData.before?.data || [], selectedColumn)}
                               dataKey="value"
                               nameKey="name"
                               cx="50%"
@@ -623,7 +625,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                               outerRadius={80}
                               label
                             >
-                              {getValueDistribution(previewData.before.data, selectedColumn).map((_, index) => (
+                              {getValueDistribution(previewData.before?.data || [], selectedColumn).map((_, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                             </Pie>
@@ -643,7 +645,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                       </Typography>
                       <ResponsiveContainer width="100%" height={300}>
                         {isNumericColumn(selectedColumn) ? (
-                          <BarChart data={getHistogramData(previewData.after.data, selectedColumn)}>
+                          <BarChart data={getHistogramData(previewData.after?.data || [], selectedColumn)}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="range" angle={-45} textAnchor="end" height={80} />
                             <YAxis />
@@ -654,7 +656,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                         ) : (
                           <PieChart>
                             <Pie
-                              data={getValueDistribution(previewData.after.data, selectedColumn)}
+                              data={getValueDistribution(previewData.after?.data || [], selectedColumn)}
                               dataKey="value"
                               nameKey="name"
                               cx="50%"
@@ -662,7 +664,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ previewData, isLoading = fa
                               outerRadius={80}
                               label
                             >
-                              {getValueDistribution(previewData.after.data, selectedColumn).map((_, index) => (
+                              {getValueDistribution(previewData.after?.data || [], selectedColumn).map((_, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                             </Pie>

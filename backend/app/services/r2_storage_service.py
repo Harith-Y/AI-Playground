@@ -233,6 +233,61 @@ class R2StorageService:
             logger.error(f"Failed to delete file locally: {e}")
             return False
     
+    def get_file_size(self, file_path: str) -> int:
+        """
+        Get file size in bytes
+        
+        Args:
+            file_path: Either relative path (for local storage) or full URL (for R2)
+        
+        Returns:
+            int: File size in bytes, or 0 if not found
+        """
+        if self.use_r2:
+            # For R2, extract the key from the URL if needed
+            if file_path.startswith('http://') or file_path.startswith('https://'):
+                # Extract key from URL: https://account.r2.cloudflarestorage.com/bucket/path/to/file
+                # or: https://custom-domain.com/path/to/file
+                try:
+                    if settings.R2_PUBLIC_URL and file_path.startswith(settings.R2_PUBLIC_URL):
+                        # Custom domain URL
+                        key = file_path[len(settings.R2_PUBLIC_URL):].lstrip('/')
+                    else:
+                        # Standard R2 URL
+                        parts = file_path.split('/', 4)  # Split by first 4 slashes
+                        key = parts[4] if len(parts) > 4 else file_path
+                    return self._get_file_size_from_r2(key)
+                except Exception as e:
+                    logger.error(f"Failed to parse R2 URL: {file_path}, error: {e}")
+                    return 0
+            else:
+                return self._get_file_size_from_r2(file_path)
+        else:
+            return self._get_file_size_locally(file_path)
+    
+    def _get_file_size_from_r2(self, file_path: str) -> int:
+        """Get file size from R2 bucket"""
+        try:
+            response = self.s3_client.head_object(
+                Bucket=self.bucket_name,
+                Key=file_path
+            )
+            return response.get('ContentLength', 0)
+        except ClientError as e:
+            logger.error(f"Failed to get file size from R2: {e}")
+            return 0
+    
+    def _get_file_size_locally(self, file_path: str) -> int:
+        """Get file size from local filesystem"""
+        try:
+            full_path = self.local_storage_path / file_path
+            if full_path.exists():
+                return full_path.stat().st_size
+            return 0
+        except Exception as e:
+            logger.error(f"Failed to get local file size: {e}")
+            return 0
+    
     def file_exists(self, file_path: str) -> bool:
         """
         Check if file exists in R2 or local storage

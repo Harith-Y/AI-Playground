@@ -51,11 +51,12 @@ class TuningTask(Task):
 
     def on_success(self, retval, task_id, args, kwargs):
         """Called when task completes successfully"""
-        logger = get_logger(task_id=task_id)
+        logger = get_logger("app.tasks.tuning_tasks")
         logger.info(
             f"Tuning task completed successfully",
             extra={
                 'event': 'tuning_success',
+                'task_id': task_id,
                 'duration_seconds': retval.get('tuning_time', 0),
                 'best_score': retval.get('best_score', 0),
             }
@@ -63,11 +64,12 @@ class TuningTask(Task):
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """Called when task fails"""
-        logger = get_logger(task_id=task_id)
+        logger = get_logger("app.tasks.tuning_tasks")
         logger.error(
             f"Tuning task failed: {exc}",
             extra={
                 'event': 'tuning_failure',
+                'task_id': task_id,
                 'error_type': type(exc).__name__,
                 'error_message': str(exc),
             },
@@ -470,12 +472,14 @@ def validate_model_cv(
     Returns:
         Dictionary with cross-validation results
     """
-    logger = get_logger(task_id=self.request.id, user_id=user_id)
+    logger = get_logger("app.tasks.tuning_tasks")
     
     logger.info(
         f"Starting model cross-validation",
         extra={
             'event': 'cv_validation_start',
+            'task_id': self.request.id,
+            'user_id': user_id,
             'model_run_id': model_run_id,
             'cv_folds': cv_folds
         }

@@ -5,7 +5,7 @@ Provides REST API for machine learning model operations including
 listing available models, training, evaluation, and prediction.
 """
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from uuid import uuid4, UUID
@@ -14,7 +14,7 @@ import uuid
 
 from app.ml_engine.model_registry import model_registry, TaskType, ModelCategory, ModelRegistry
 from app.models.model_run import ModelRun
-from app.models.experiment import Experiment
+from app.models.experiment import Experiment, ExperimentStatus
 from app.models.dataset import Dataset
 from app.schemas.model import (
     ModelTrainingRequest,
@@ -29,15 +29,19 @@ from app.schemas.model import (
     ModelRankingRequest,
     ModelRankingResponse
 )
-from app.tasks.training_tasks import train_model
+from app.tasks.training_tasks import train_model, run_training_logic
 from app.celery_app import celery_app
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, get_db
 from app.services.training_validation_service import get_training_validator, ValidationError
 from app.utils.cache import cache_service, CacheKeys, CacheTTL, invalidate_model_cache, invalidate_comparison_cache
 from app.services.storage_service import get_model_serialization_service
 from app.services.model_comparison_service import ModelComparisonService
 from app.utils.logger import get_logger
 from app.utils.cache import cache_service, CacheKeys, CacheTTL
+from app.core.config import settings
+
+from sqlalchemy.exc import ProgrammingError, OperationalError
+from app.models.user import User
 
 router = APIRouter()
 
@@ -48,11 +52,56 @@ logger = get_logger(__name__)
 def get_current_user_id() -> str:
     """
     Get current user ID from authentication context.
-    In production: Extract from JWT token or session.
-    Example: decode_jwt(request.headers['Authorization'])['user_id']
+    For now, return a fixed ID or guest user ID.
+    Note: Ideally this should use the shared get_user_or_guest logic, but for now 
+    we'll stick to a hardcoded logic or update to match other endpoints.
     """
-    # Default user ID for development/testing
-    return "00000000-0000-0000-0000-000000000001"
+    # This function is used when we don't need valid db checking
+    return "00000000-0000-0000-0000-000000000001" 
+
+async def get_user_or_guest(
+    # request: Request,
+    db: Session = Depends(get_db)
+) -> str:
+    """
+    Get the current authenticated user ID, or create/return a guest user ID.
+    """
+    # 2. Fallback to guest
+    try:
+        guest_email = "guest@aiplayground.local"
+        # Check if table exists by trying to query
+        try:
+            guest_user = db.query(User).filter(User.email == guest_email).first()
+        except (ProgrammingError, OperationalError) as e:
+            logger.error(f"Database error (missing table?): {e}")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Database error: Tables might be missing. Please run migrations. Error: {str(e)}"
+            )
+
+        if not guest_user:
+            logger.info("Creating guest user...")
+            
+            # Workaround for passlib/bcrypt compatibility issue
+            import bcrypt
+            hashed_pwd = bcrypt.hashpw(b"guest_password", bcrypt.gensalt()).decode('utf-8')
+            
+            guest_user = User(
+                email=guest_email,
+                password_hash=hashed_pwd,
+                is_active=True
+            )
+            db.add(guest_user)
+            db.commit()
+            db.refresh(guest_user)
+        
+        return str(guest_user.id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get/create guest user: {e}")
+        # Fallback UUID if everything fails (but unlikely to work with FKs)
+        return "00000000-0000-0000-0000-000000000001"
 
 
 def get_db():
@@ -62,6 +111,119 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+@router.get("/")
+async def list_models(
+    skip: int = 0,
+    limit: int = 100,
+    dataset_id: Optional[str] = None,
+    user_id: str = Depends(get_user_or_guest),  # Changed from get_current_user_id to support guests
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    List trained models (model runs).
+
+    Query parameters:
+        skip: Number of records to skip
+        limit: Max number of records to return
+        dataset_id: Filter by dataset ID
+
+    Returns:
+        List of model runs with their status and metrics
+    """
+    query = db.query(ModelRun).join(Experiment).filter(Experiment.user_id == user_id)
+    
+    if dataset_id:
+        query = query.filter(Experiment.dataset_id == dataset_id)
+    
+    # Filter out failed models to show only successful ones with metrics
+    query = query.filter(ModelRun.status == "completed")
+    
+    models = query.order_by(ModelRun.created_at.desc()).offset(skip).limit(limit).all()
+    
+    result = []
+    for model in models:
+        # Get task_type from metadata if available, otherwise infer from model_type
+        task_type = None
+        if model.run_metadata and 'task_type' in model.run_metadata:
+            task_type = model.run_metadata['task_type']
+        else:
+            # Fallback: Try to determine from model registry
+            try:
+                from app.ml_engine.model_registry import model_registry
+                model_info = model_registry.get_model(model.model_type)
+                if model_info:
+                    task_type = model_info.task_type.value
+            except Exception:
+                pass
+        
+        # Get metrics, handling None and ensuring valid values
+        raw_metrics = model.metrics if model.metrics is not None else {}
+        
+        # Helper to check if value is valid (not None, not NaN, not inf)
+        def is_valid_metric(val):
+            if val is None:
+                return False
+            try:
+                import math
+                float_val = float(val)
+                return not (math.isnan(float_val) or math.isinf(float_val))
+            except (ValueError, TypeError):
+                return False
+        
+        # Helper to get safe metric value (return 0.0 if invalid for failed models)
+        def safe_metric(val):
+            return float(val) if is_valid_metric(val) else 0.0
+        
+        # Create clean metrics dict with valid values (0.0 for missing/invalid)
+        metrics = {}
+        accuracy = None
+        
+        if task_type == "regression":
+            # Extract and validate regression metrics - provide 0.0 for invalid values
+            # Handle both 'r2' (from dataclass) and 'r2_score' (legacy) key names
+            r2_value = safe_metric(raw_metrics.get("r2") or raw_metrics.get("r2_score"))
+            metrics["r2_score"] = r2_value
+            metrics["mae"] = safe_metric(raw_metrics.get("mae"))
+            metrics["mse"] = safe_metric(raw_metrics.get("mse"))
+            metrics["rmse"] = safe_metric(raw_metrics.get("rmse"))
+            metrics["explained_variance"] = safe_metric(raw_metrics.get("explained_variance"))
+            
+            # Use r2_score as primary accuracy metric for regression
+            accuracy = r2_value if r2_value != 0.0 else None
+            
+        elif task_type == "classification":
+            # Extract and validate classification metrics
+            metrics["accuracy"] = safe_metric(raw_metrics.get("accuracy"))
+            metrics["precision"] = safe_metric(raw_metrics.get("precision"))
+            metrics["recall"] = safe_metric(raw_metrics.get("recall"))
+            metrics["f1_score"] = safe_metric(raw_metrics.get("f1_score"))
+            
+            # Use accuracy as primary metric
+            accuracy = metrics.get("accuracy") if metrics.get("accuracy") != 0.0 else None
+            
+        else:
+            # For clustering or unknown, copy all valid metrics
+            for key, val in raw_metrics.items():
+                metrics[key] = safe_metric(val)
+            # Try to find any valid metric for accuracy
+            accuracy = metrics.get("silhouette_score") or metrics.get("r2_score") or metrics.get("accuracy")
+            
+        result.append({
+            "id": str(model.id),
+            "name": f"{model.model_type} ({model.created_at.strftime('%Y-%m-%d %H:%M')})",
+            "type": model.model_type,
+            "task_type": task_type,
+            "status": model.status,
+            "accuracy": accuracy,
+            "createdAt": model.created_at.isoformat(),
+            "updatedAt": model.created_at.isoformat(),
+            "hyperparameters": model.hyperparameters or {},
+            "metrics": metrics
+        })
+        
+    return result
 
 
 @router.get("/available")
@@ -303,11 +465,54 @@ async def get_task_types() -> Dict[str, Any]:
     }
 
 
+
+class DummyTaskContext:
+    """Mock Celery task context for running tasks synchronously without Redis."""
+    def __init__(self, task_id):
+        self.request = type('Request', (), {'id': task_id})()
+    
+    def update_state(self, state, meta=None, **kwargs):
+        pass
+
+def run_training_in_background(
+    task_id: str,
+    model_run_id: str,
+    experiment_id: str,
+    dataset_id: str,
+    model_type: str,
+    hyperparameters: Optional[Dict[str, Any]],
+    target_column: Optional[str],
+    feature_columns: Optional[list],
+    test_size: float,
+    random_state: int,
+    user_id: str
+):
+    """Wrapper to run training task in FastAPI background tasks."""
+    dummy_self = DummyTaskContext(task_id)
+    try:
+        run_training_logic(
+            dummy_self,
+            model_run_id=model_run_id,
+            experiment_id=experiment_id,
+            dataset_id=dataset_id,
+            model_type=model_type,
+            hyperparameters=hyperparameters,
+            target_column=target_column,
+            feature_columns=feature_columns,
+            test_size=test_size,
+            random_state=random_state,
+            user_id=user_id
+        )
+    except Exception as e:
+        logger.error(f"Background training failed: {e}")
+
+
 @router.post("/train", response_model=ModelTrainingResponse, status_code=status.HTTP_202_ACCEPTED)
 async def train_model_endpoint(
     request: ModelTrainingRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_user_or_guest)
 ):
     """
     Initiate asynchronous model training.
@@ -329,10 +534,30 @@ async def train_model_endpoint(
         HTTPException 403: If user doesn't have permission
     """
     try:
+        # Handle playground/dummy experiment ID (00000000-0000-0000-0000-000000000000)
+        # Check if the UUID is nil/zero
+        experiment_id = request.experiment_id
+        if str(experiment_id) == "00000000-0000-0000-0000-000000000000":
+            # Check if there is an existing "Playground" experiment for this dataset/user or create new
+            # For simplicity, we create a new experiment for this run
+            new_experiment_id = uuid4()
+            logger.info(f"Creating new playground experiment: {new_experiment_id}")
+            
+            new_experiment = Experiment(
+                id=new_experiment_id,
+                user_id=user_id,
+                dataset_id=request.dataset_id,
+                name=f"Playground Experiment {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                status=ExperimentStatus.RUNNING
+            )
+            db.add(new_experiment)
+            db.commit()
+            experiment_id = new_experiment_id
+            
         # Validate training configuration using validation service
         validator = get_training_validator(db)
         experiment, dataset, model_info = validator.validate_training_config(
-            experiment_id=request.experiment_id,
+            experiment_id=experiment_id,
             dataset_id=request.dataset_id,
             model_type=request.model_type,
             user_id=user_id,
@@ -365,7 +590,7 @@ async def train_model_endpoint(
     # Create ModelRun record
     model_run = ModelRun(
         id=uuid4(),
-        experiment_id=request.experiment_id,
+        experiment_id=experiment_id,
         model_type=request.model_type,
         hyperparameters=request.hyperparameters or {},
         status="pending",
@@ -381,29 +606,52 @@ async def train_model_endpoint(
         experiment.status = "running"
         db.commit()
 
-    # Trigger Celery task
-    task = train_model.delay(
-        model_run_id=str(model_run.id),
-        experiment_id=str(request.experiment_id),
-        dataset_id=str(request.dataset_id),
-        model_type=request.model_type,
-        hyperparameters=request.hyperparameters,
-        target_column=request.target_column,
-        feature_columns=request.feature_columns,
-        test_size=request.test_size,
-        random_state=request.random_state,
-        user_id=user_id
-    )
+    # Trigger training task
+    # Use FastAPI BackgroundTasks if configured (e.g. Render Free Tier) or fallback if Celery is disabled
+    # Otherwise use Celery for robust queuing
+    task_id = str(uuid4())
+    
+    if settings.USE_BACKGROUND_TASKS:
+        logger.info("Triggering training using FastAPI BackgroundTasks")
+        background_tasks.add_task(
+            run_training_in_background,
+            task_id=task_id,
+            model_run_id=str(model_run.id),
+            experiment_id=str(experiment_id),
+            dataset_id=str(request.dataset_id),
+            model_type=request.model_type,
+            hyperparameters=request.hyperparameters,
+            target_column=request.target_column,
+            feature_columns=request.feature_columns,
+            test_size=request.test_size,
+            random_state=request.random_state,
+            user_id=user_id
+        )
+    else:
+        logger.info("Triggering training using Celery")
+        task = train_model.delay(
+            model_run_id=str(model_run.id),
+            experiment_id=str(experiment_id),
+            dataset_id=str(request.dataset_id),
+            model_type=request.model_type,
+            hyperparameters=request.hyperparameters,
+            target_column=request.target_column,
+            feature_columns=request.feature_columns,
+            test_size=request.test_size,
+            random_state=request.random_state,
+            user_id=user_id
+        )
+        task_id = task.id
 
     # Store task_id in model_run run_metadata
     if not model_run.run_metadata:
         model_run.run_metadata = {}
-    model_run.run_metadata['task_id'] = task.id
+    model_run.run_metadata['task_id'] = task_id
     db.commit()
 
     return ModelTrainingResponse(
         model_run_id=model_run.id,
-        task_id=task.id,
+        task_id=task_id,
         status="PENDING",
         message="Model training initiated successfully",
         created_at=model_run.created_at

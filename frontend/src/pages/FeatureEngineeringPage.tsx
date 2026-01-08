@@ -1,25 +1,116 @@
-import React, { useEffect } from 'react';
-import { Typography, Box, Container, Grid, Card, CardContent } from '@mui/material';
-import { TrendingUp } from '@mui/icons-material';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Typography, Box, Container, Grid, Card, CardContent, Button, Alert } from '@mui/material';
+import { TrendingUp, CheckCircle } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import {
   fetchCorrelationMatrix,
   fetchFeatureImportance,
   clearFeatureError,
+  setSelectedFeatures,
+  setTargetColumn,
+  setTaskType,
+  setAvailableFeatures,
 } from '../store/slices/featureSlice';
 import LoadingState from '../components/common/LoadingState';
 import ErrorState from '../components/common/ErrorState';
 import EmptyState from '../components/common/EmptyState';
 import CorrelationMatrix from '../components/features/CorrelationMatrix';
 import FeatureImportance from '../components/features/FeatureImportance';
+import FeatureSelection from '../components/features/FeatureSelection';
+import type { FeatureSelectionConfig, FeatureSelectionValidation } from '../types/featureSelection';
+import { getColumnDataType } from '../types/featureSelection';
 
 const FeatureEngineeringPage: React.FC = () => {
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { correlationMatrix, featureImportance, isLoading, error } = useAppSelector(
-    (state) => state.feature
-  );
-  const { currentDataset } = useAppSelector((state) => state.dataset);
+  const { 
+    correlationMatrix, 
+    featureImportance, 
+    isLoading, 
+    error, 
+    selectedFeatures,
+    targetColumn,
+    taskType
+  } = useAppSelector((state) => state.feature);
+  const { currentDataset, columns } = useAppSelector((state) => state.dataset);
+  
+  // Convert dataset columns to feature selection format
+  const featureColumns = React.useMemo(() => {
+    if (!columns) return [];
+    return columns.map(col => ({
+      name: col.name,
+      dataType: getColumnDataType(col.dtype),
+      dtype: col.dtype,
+      missing_count: col.nullCount,
+      unique_count: col.uniqueCount,
+      sample_values: col.sampleValues,
+    }));
+  }, [columns]);
+  
+  // Feature selection state
+  const [featureConfig, setFeatureConfig] = useState<FeatureSelectionConfig>({
+    inputFeatures: [],
+    targetColumn: null,
+    taskType: null,
+    excludedColumns: [],
+  });
+  const [validation, setValidation] = useState<FeatureSelectionValidation | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
+  useEffect(() => {
+    // Set available features from dataset columns
+    if (columns && columns.length > 0) {
+      dispatch(setAvailableFeatures(columns.map(col => col.name)));
+    }
+  }, [columns, dispatch]);
+
+  useEffect(() => {
+    // Restore selected features configuration from Redux if it exists
+    if (selectedFeatures && selectedFeatures.length > 0) {
+      setFeatureConfig(prev => ({
+        ...prev,
+        inputFeatures: selectedFeatures,
+        targetColumn: targetColumn || prev.targetColumn,
+        taskType: (taskType as any) || prev.taskType,
+        excludedColumns: targetColumn ? [targetColumn] : prev.excludedColumns,
+      }));
+    } else if (targetColumn) {
+       // Even if no features selected, if there is a target, restore it
+       setFeatureConfig(prev => ({
+        ...prev,
+        targetColumn: targetColumn,
+        taskType: (taskType as any) || prev.taskType,
+        excludedColumns: [targetColumn],
+      }));
+    }
+  }, [selectedFeatures, targetColumn, taskType]);
+const handleConfigChange = useCallback((config: FeatureSelectionConfig) => {
+    setFeatureConfig(config);
+  }, []);
+
+  const handleValidationChange = useCallback((newValidation: FeatureSelectionValidation) => {
+    setValidation(newValidation);
+  }, []);
+
+  const handleContinue = () => {
+    if (validation?.isValid) {
+      // Save selected features and config to Redux store
+      dispatch(setSelectedFeatures(featureConfig.inputFeatures));
+      dispatch(setTargetColumn(featureConfig.targetColumn));
+      dispatch(setTaskType(featureConfig.taskType));
+      
+      setShowSuccess(true);
+      
+      // Navigate to modeling page after a brief delay to show success
+      setTimeout(() => {
+        setShowSuccess(false);
+        navigate('/modeling');
+      }, 1000);
+    }
+  };
+
+  
   useEffect(() => {
     return () => {
       dispatch(clearFeatureError());
@@ -94,6 +185,52 @@ const FeatureEngineeringPage: React.FC = () => {
           variant="alert"
         />
       )}
+
+      {/* Success Alert */}
+      {showSuccess && (
+        <Alert severity="success" icon={<CheckCircle />} sx={{ mb: 3 }}>
+          Feature selection saved! You can now proceed to model training with {featureConfig.inputFeatures.length} selected features.
+        </Alert>
+      )}
+
+      {/* Feature Selection Section */}
+      <Card sx={{ mb: 3, border: '1px solid #e2e8f0' }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom fontWeight={600} color="primary.main">
+            Feature Selection
+          </Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Select input features and target column for model training
+          </Typography>
+          
+          {featureColumns && featureColumns.length > 0 ? (
+            <>
+              <FeatureSelection
+                datasetId={currentDataset!.id}
+                columns={featureColumns}
+                initialConfig={featureConfig}
+                onConfigChange={handleConfigChange}
+                onValidationChange={handleValidationChange}
+              />
+              <Box mt={3} display="flex" justifyContent="flex-end">
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={handleContinue}
+                  disabled={!validation?.isValid}
+                  startIcon={<CheckCircle />}
+                >
+                  Continue to Modeling
+                </Button>
+              </Box>
+            </>
+          ) : (
+            <Alert severity="info">
+              No columns available. Please ensure your dataset is loaded properly.
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
 
       <Grid container spacing={3}>
         {/* Correlation Matrix */}
