@@ -137,6 +137,9 @@ async def list_models(
     if dataset_id:
         query = query.filter(Experiment.dataset_id == dataset_id)
     
+    # Filter out failed models to show only successful ones with metrics
+    query = query.filter(ModelRun.status == "completed")
+    
     models = query.order_by(ModelRun.created_at.desc()).offset(skip).limit(limit).all()
     
     result = []

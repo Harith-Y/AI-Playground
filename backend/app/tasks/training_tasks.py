@@ -336,7 +336,16 @@ def run_training_logic(
     # Initialize memory monitoring for this training task
     memory_monitor = get_memory_monitor()
     memory_monitor.set_baseline()
-    logger.info(f"Training task started - baseline memory: {memory_monitor.get_current_snapshot().rss_mb:.2f}MB")
+    
+    # Log baseline memory (with safe handling)
+    try:
+        baseline_snapshot = memory_monitor.get_current_snapshot()
+        if baseline_snapshot:
+            logger.info(f"Training task started - baseline memory: {baseline_snapshot.rss_mb:.2f}MB")
+        else:
+            logger.info("Training task started - memory monitoring unavailable")
+    except Exception:
+        logger.info("Training task started")
 
     try:
         # Initialize progress tracking in database
@@ -891,13 +900,19 @@ def run_training_logic(
         # Calculate total execution time
         total_execution_time = time.time() - task_start_time
 
-        # Log final memory usage
-        final_memory = memory_monitor.get_current_snapshot()
-        memory_delta = memory_monitor.get_memory_delta()
-        logger.info(
-            f"Training completed - Final memory: {final_memory.rss_mb:.2f}MB, "
-            f"Delta: {memory_delta:+.2f}MB, Peak: {memory_monitor.get_peak_memory():.2f}MB"
-        )
+        # Log final memory usage (with safe handling if monitoring unavailable)
+        try:
+            final_memory = memory_monitor.get_current_snapshot()
+            memory_delta = memory_monitor.get_memory_delta()
+            if final_memory is not None:
+                logger.info(
+                    f"Training completed - Final memory: {final_memory.rss_mb:.2f}MB, "
+                    f"Delta: {memory_delta:+.2f}MB, Peak: {memory_monitor.get_peak_memory():.2f}MB"
+                )
+            else:
+                logger.info("Training completed - Memory monitoring unavailable")
+        except Exception as e:
+            logger.warning(f"Failed to log memory stats: {e}")
 
         # Update progress: Complete (100%)
         update_training_progress(db, model_run_id, 100, "Training completed successfully!")
