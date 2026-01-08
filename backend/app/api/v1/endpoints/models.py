@@ -5,7 +5,7 @@ Provides REST API for machine learning model operations including
 listing available models, training, evaluation, and prediction.
 """
 
-from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks, Query
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from uuid import uuid4, UUID
