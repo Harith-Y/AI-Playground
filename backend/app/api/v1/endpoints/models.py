@@ -179,14 +179,16 @@ async def list_models(
         
         if task_type == "regression":
             # Extract and validate regression metrics - provide 0.0 for invalid values
-            metrics["r2_score"] = safe_metric(raw_metrics.get("r2_score"))
+            # Handle both 'r2' (from dataclass) and 'r2_score' (legacy) key names
+            r2_value = safe_metric(raw_metrics.get("r2") or raw_metrics.get("r2_score"))
+            metrics["r2_score"] = r2_value
             metrics["mae"] = safe_metric(raw_metrics.get("mae"))
             metrics["mse"] = safe_metric(raw_metrics.get("mse"))
             metrics["rmse"] = safe_metric(raw_metrics.get("rmse"))
             metrics["explained_variance"] = safe_metric(raw_metrics.get("explained_variance"))
             
             # Use r2_score as primary accuracy metric for regression
-            accuracy = metrics.get("r2_score") if metrics.get("r2_score") != 0.0 else None
+            accuracy = r2_value if r2_value != 0.0 else None
             
         elif task_type == "classification":
             # Extract and validate classification metrics
