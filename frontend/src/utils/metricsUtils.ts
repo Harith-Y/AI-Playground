@@ -143,7 +143,7 @@ export const regressionMetricsUtils = {
    * Get overall model quality based on R² score
    */
   getModelQuality: (metrics: RegressionMetrics): string => {
-    return getQualityLabel(metrics.r2, {
+    return getQualityLabel(metrics.r2_score, {
       excellent: 0.9,
       good: 0.7,
       fair: 0.5,

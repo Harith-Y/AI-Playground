@@ -925,7 +925,7 @@ const getMockRuns = (): ModelRun[] => {
         mae: 3421.5,
         mse: 15678234.2,
         rmse: 3959.5,
-        r2: 0.82,
+        r2_score: 0.82,
         mape: 12.3,
         // Generate realistic predicted and actual values for housing prices
         predicted: Array.from({ length: 100 }, (_, i) => {

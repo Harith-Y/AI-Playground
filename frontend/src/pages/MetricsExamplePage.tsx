@@ -60,7 +60,7 @@ const MetricsExamplePage: React.FC = () => {
     mae: 3421.5,
     mse: 15678234.2,
     rmse: 3959.5,
-    r2: 0.8245,
+    r2_score: 0.8245,
     mape: 12.34,
   };
 

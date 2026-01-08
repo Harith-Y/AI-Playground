@@ -90,7 +90,7 @@ export interface RegressionMetrics {
   mae: number;
   mse: number;
   rmse: number;
-  r2: number;
+  r2_score: number;
   mape?: number;
   predicted?: number[];
   actual?: number[];

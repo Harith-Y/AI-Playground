@@ -142,10 +142,10 @@ const RegressionMetrics: React.FC<RegressionMetricsProps> = ({
           {/* R² Score */}
           <MetricCard
             label="R² Score"
-            value={metrics.r2}
+            value={metrics.r2_score}
             format="percentage"
             precision={2}
-            variant={getR2Variant(metrics.r2)}
+            variant={getR2Variant(metrics.r2_score)}
             icon={<TrendingUpIcon />}
             tooltip="Coefficient of Determination - proportion of variance explained by the model"
             showProgress
@@ -185,7 +185,7 @@ const RegressionMetrics: React.FC<RegressionMetricsProps> = ({
                 Model Quality:
               </Typography>
               <Typography variant="body2" fontWeight="500">
-                {getModelQuality(metrics.r2)}
+                {getModelQuality(metrics.r2_score)}
               </Typography>
             </Box>
 
@@ -193,8 +193,8 @@ const RegressionMetrics: React.FC<RegressionMetricsProps> = ({
               <Typography variant="body2" color="text.secondary">
                 R² Score:
               </Typography>
-              <Typography variant="body2" fontWeight="500" color={getR2Variant(metrics.r2)}>
-                {(metrics.r2 * 100).toFixed(2)}% variance explained
+              <Typography variant="body2" fontWeight="500" color={getR2Variant(metrics.r2_score)}>
+                {(metrics.r2_score * 100).toFixed(2)}% variance explained
               </Typography>
             </Box>
 
