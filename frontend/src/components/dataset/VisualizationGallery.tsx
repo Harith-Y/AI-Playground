@@ -89,8 +89,8 @@ const VizCard: React.FC<VizCardProps> = ({ visualization, onExpand, onDownload }
     <Card
       sx={{
         height: '100%',
-        border: '1px solid #e2e8f0',
-        background: '#FFFFFF',
+        border: '1px solid', borderColor: 'divider',
+        bgcolor: 'background.paper',
         transition: 'all 0.3s ease',
         display: 'flex',
         flexDirection: 'column',

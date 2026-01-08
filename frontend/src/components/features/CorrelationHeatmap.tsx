@@ -250,7 +250,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
           mt: 2,
           p: 2,
           backgroundColor: '#f8fafc',
-          border: '1px solid #e2e8f0',
+          border: '1px solid', borderColor: 'divider',
           width: '100%',
           maxWidth: actualWidth + labelWidth,
         }}

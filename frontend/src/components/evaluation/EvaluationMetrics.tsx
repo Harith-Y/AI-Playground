@@ -39,7 +39,7 @@ const EvaluationMetrics: React.FC<EvaluationMetricsProps> = ({
       <Grid container spacing={2}>
         {Object.entries(metrics).map(([key, value]) => (
           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={key}>
-            <Card sx={{ border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+            <Card sx={{ border: '1px solid', borderColor: 'divider', background: '#f8fafc' }}>
               <CardContent>
                 <Typography variant="caption" color="text.secondary">
                   {key.replace(/_/g, ' ').toUpperCase()}

@@ -33,7 +33,7 @@ const ClusterDistributionPlot: React.FC<ClusterDistributionPlotProps> = ({
   );
 
   return (
-    <Card sx={{ height: '100%', border: '1px solid #e2e8f0' }}>
+    <Card sx={{ height: '100%', border: '1px solid', borderColor: 'divider' }}>
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

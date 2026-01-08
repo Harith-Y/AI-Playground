@@ -89,7 +89,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
 
   if (isLoading) {
     return (
-      <Paper sx={{ p: 4, border: '1px solid #e2e8f0', background: '#FFFFFF' }}>
+      <Paper sx={{ p: 4, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
         <Typography variant="body1" color="text.secondary">
           Loading preview...
         </Typography>
@@ -99,7 +99,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
 
   if (error) {
     return (
-      <Paper sx={{ p: 4, border: '1px solid #e2e8f0', background: '#FFFFFF' }}>
+      <Paper sx={{ p: 4, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
         <Alert severity="error">{error}</Alert>
       </Paper>
     );
@@ -107,7 +107,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
 
   if (preview.length === 0 || columns.length === 0) {
     return (
-      <Paper sx={{ p: 4, border: '1px solid #e2e8f0', background: '#FFFFFF' }}>
+      <Paper sx={{ p: 4, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
         <Box sx={{ textAlign: 'center', py: 4 }}>
           <TableChart sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" color="text.secondary">
@@ -122,7 +122,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
   }
 
   return (
-    <Paper sx={{ border: '1px solid #e2e8f0', background: '#FFFFFF' }}>
+    <Paper sx={{ border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
       {/* Header */}
       <Box
         sx={{
@@ -143,7 +143,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
           <Chip
             label={`${displayRows.length} of ${preview.length} rows`}
             size="small"
-            sx={{ background: '#EFF6FF', color: '#2563eb', fontWeight: 600 }}
+            sx={{ bgcolor: 'action.hover', color: '#2563eb', fontWeight: 600 }}
           />
         </Box>
         <IconButton size="small">
@@ -193,21 +193,21 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
           <TableContainer
             sx={{
               maxHeight: 600,
-              border: '1px solid #e2e8f0',
+              border: '1px solid', borderColor: 'divider',
               borderRadius: 2,
               '&::-webkit-scrollbar': {
                 width: '8px',
                 height: '8px',
               },
               '&::-webkit-scrollbar-track': {
-                background: '#f1f1f1',
+                bgcolor: 'action.hover',
               },
               '&::-webkit-scrollbar-thumb': {
-                background: '#cbd5e1',
+                bgcolor: 'action.selected',
                 borderRadius: '4px',
               },
               '&::-webkit-scrollbar-thumb:hover': {
-                background: '#94a3b8',
+                bgcolor: 'action.disabled',
               },
             }}
           >
@@ -216,7 +216,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
                 <TableRow>
                   <TableCell
                     sx={{
-                      background: '#F8FAFC',
+                      bgcolor: 'background.default',
                       fontWeight: 700,
                       color: '#475569',
                       borderBottom: '2px solid #cbd5e1',
@@ -229,7 +229,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
                     <TableCell
                       key={idx}
                       sx={{
-                        background: '#F8FAFC',
+                        bgcolor: 'background.default',
                         fontWeight: 700,
                         color: '#475569',
                         borderBottom: '2px solid #cbd5e1',
@@ -263,10 +263,10 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
                     key={rowIdx}
                     sx={{
                       '&:hover': {
-                        background: '#F8FAFC',
+                        bgcolor: 'background.default',
                       },
                       '&:nth-of-type(even)': {
-                        background: '#FAFBFC',
+                        bgcolor: 'background.default',
                       },
                     }}
                   >
@@ -311,7 +311,7 @@ const DatasetPreview: React.FC<DatasetPreviewProps> = ({
             sx={{
               mt: 2,
               p: 2,
-              background: '#F8FAFC',
+              bgcolor: 'background.default',
               borderRadius: 1,
               display: 'flex',
               gap: 3,

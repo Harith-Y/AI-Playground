@@ -107,8 +107,8 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
     <Paper
       sx={{
         p: 4,
-        border: '1px solid #e2e8f0',
-        background: '#FFFFFF',
+        border: '1px solid', borderColor: 'divider',
+        bgcolor: 'background.paper',
       }}
     >
       <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -185,7 +185,7 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
             mt: 3,
             p: 2,
             borderRadius: 2,
-            background: '#F0FDF4',
+            bgcolor: 'success.lighter',
             border: '1px solid #86EFAC',
             display: 'flex',
             alignItems: 'center',

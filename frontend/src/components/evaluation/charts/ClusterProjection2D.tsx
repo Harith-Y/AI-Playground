@@ -65,7 +65,7 @@ const ClusterProjection2D: React.FC<ClusterProjection2DProps> = ({
   // Validate data
   if (!x || !y || !labels || x.length === 0 || y.length === 0) {
     return (
-      <Card sx={{ height: '100%', border: '1px solid #e2e8f0' }}>
+      <Card sx={{ height: '100%', border: '1px solid', borderColor: 'divider' }}>
         <CardContent>
           <Typography variant="body2" color="text.secondary">
             No projection data available
@@ -104,7 +104,7 @@ const ClusterProjection2D: React.FC<ClusterProjection2DProps> = ({
   });
 
   return (
-    <Card sx={{ height: '100%', border: '1px solid #e2e8f0' }}>
+    <Card sx={{ height: '100%', border: '1px solid', borderColor: 'divider' }}>
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -179,7 +179,7 @@ const ClusterProjection2D: React.FC<ClusterProjection2DProps> = ({
             p: 2,
             bgcolor: '#f8fafc',
             borderRadius: 1,
-            border: '1px solid #e2e8f0',
+            border: '1px solid', borderColor: 'divider',
           }}
         >
           <Typography variant="body2" color="text.secondary" gutterBottom>

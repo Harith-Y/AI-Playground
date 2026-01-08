@@ -82,7 +82,7 @@ const MissingValuesHeatmap: React.FC<MissingValuesHeatmapProps> = ({
           mb: 3,
         }}
       >
-        <Paper sx={{ p: 2, border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+        <Paper sx={{ p: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
           <Typography variant="caption" color="text.secondary" display="block">
             Overall Completeness
           </Typography>
@@ -91,7 +91,7 @@ const MissingValuesHeatmap: React.FC<MissingValuesHeatmapProps> = ({
           </Typography>
         </Paper>
 
-        <Paper sx={{ p: 2, border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+        <Paper sx={{ p: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
           <Typography variant="caption" color="text.secondary" display="block">
             Complete Columns
           </Typography>
@@ -100,7 +100,7 @@ const MissingValuesHeatmap: React.FC<MissingValuesHeatmapProps> = ({
           </Typography>
         </Paper>
 
-        <Paper sx={{ p: 2, border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+        <Paper sx={{ p: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
           <Typography variant="caption" color="text.secondary" display="block">
             Total Missing Cells
           </Typography>
@@ -109,7 +109,7 @@ const MissingValuesHeatmap: React.FC<MissingValuesHeatmapProps> = ({
           </Typography>
         </Paper>
 
-        <Paper sx={{ p: 2, border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+        <Paper sx={{ p: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
           <Typography variant="caption" color="text.secondary" display="block">
             Critical Columns (&gt;50%)
           </Typography>
@@ -299,7 +299,7 @@ const MissingValuesHeatmap: React.FC<MissingValuesHeatmapProps> = ({
       </Box>
 
       {/* Legend */}
-      <Paper sx={{ p: 2, border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+      <Paper sx={{ p: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
         <Typography variant="caption" fontWeight={600} display="block" gutterBottom>
           Severity Levels:
         </Typography>
@@ -334,8 +334,9 @@ const MissingValuesHeatmap: React.FC<MissingValuesHeatmapProps> = ({
           sx={{
             mt: 2,
             p: 2,
-            border: '1px solid #fecaca',
-            background: '#fef2f2',
+            border: '1px solid',
+            borderColor: 'error.light',
+            bgcolor: 'error.lighter',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>

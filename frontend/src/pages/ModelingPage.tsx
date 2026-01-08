@@ -164,7 +164,7 @@ const ModelingPage: React.FC = () => {
             <Card
               sx={{
                 border: activeStep === 0 ? '2px solid' : '1px solid #e2e8f0',
-                borderColor: activeStep === 0 ? 'primary.main' : '#e2e8f0',
+                borderColor: activeStep === 0 ? 'primary.main' : 'divider',
               }}
             >
               <CardContent>
@@ -209,7 +209,7 @@ const ModelingPage: React.FC = () => {
             <Card
               sx={{
                 border: activeStep === 1 ? '2px solid' : '1px solid #e2e8f0',
-                borderColor: activeStep === 1 ? 'primary.main' : '#e2e8f0',
+                borderColor: activeStep === 1 ? 'primary.main' : 'divider',
               }}
             >
               <CardContent>
@@ -246,7 +246,7 @@ const ModelingPage: React.FC = () => {
             <Card
               sx={{
                 border: activeStep === 2 ? '2px solid' : '1px solid #e2e8f0',
-                borderColor: activeStep === 2 ? 'primary.main' : '#e2e8f0',
+                borderColor: activeStep === 2 ? 'primary.main' : 'divider',
               }}
             >
               <CardContent>
@@ -320,7 +320,7 @@ const ModelingPage: React.FC = () => {
 
         {/* Right Column: Run Status & Progress */}
         <Grid size={{ xs: 12, lg: 4 }}>
-          <Card sx={{ border: '1px solid #e2e8f0', position: 'sticky', top: 24 }}>
+          <Card sx={{ border: '1px solid', borderColor: 'divider', position: 'sticky', top: 24 }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                 <Timeline color="primary" />

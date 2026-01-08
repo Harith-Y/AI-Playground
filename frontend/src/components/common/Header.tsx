@@ -32,12 +32,10 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
       position="fixed"
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid',
         borderColor: 'divider',
         boxShadow: 'none',
-        color: 'text.primary',
       }}
     >      <Toolbar>
         <IconButton

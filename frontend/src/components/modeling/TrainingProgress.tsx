@@ -62,7 +62,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
 
       {/* Training Metrics */}
       {metrics && (
-        <Card sx={{ mb: 3, border: '1px solid #e2e8f0' }}>
+        <Card sx={{ mb: 3, border: '1px solid', borderColor: 'divider' }}>
           <CardContent>
             <Typography variant="subtitle1" fontWeight={600} gutterBottom>
               Current Metrics
@@ -102,7 +102,7 @@ const TrainingProgress: React.FC<TrainingProgressProps> = ({
               maxHeight: 300,
               overflowY: 'auto',
               backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              border: '1px solid', borderColor: 'divider',
               fontFamily: 'monospace',
             }}
           >

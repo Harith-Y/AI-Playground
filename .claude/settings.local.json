@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(python start.py:*)",
+      "Bash(venvScriptspython.exe start.py)",
+      "Bash(./venv/Scripts/python.exe:*)",
+      "Bash(./venv/Scripts/pip.exe install:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(done)"
+    ]
+  }
+}

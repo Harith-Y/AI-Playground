@@ -210,8 +210,8 @@ const ExplorationPage: React.FC = () => {
                 <Box
                   key={j}
                   sx={{
-                    bgcolor: val > 0.7 ? '#dc2626' : val > 0.3 ? '#f97316' : val < -0.7 ? '#0ea5e9' : val < -0.3 ? '#38bdf8' : '#e5e7eb',
-                    color: Math.abs(val) > 0.3 ? 'white' : 'black',
+                    bgcolor: val > 0.7 ? '#dc2626' : val > 0.3 ? '#f97316' : val < -0.7 ? '#0ea5e9' : val < -0.3 ? '#38bdf8' : 'action.hover',
+                    color: Math.abs(val) > 0.3 ? 'white' : 'text.primary',
                     textAlign: 'center',
                     py: 1,
                     fontSize: '0.75rem',
@@ -306,7 +306,7 @@ const ExplorationPage: React.FC = () => {
       </Box>
 
       {/* Dataset Info */}
-      <Paper sx={{ p: 2, mb: 3, border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ p: 2, mb: 3, border: '1px solid', borderColor: 'divider' }}>
         <Typography variant="h6" gutterBottom>{currentDataset.name}</Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Chip label={`${stats?.rowCount || currentDataset.rowCount} rows`} size="small" />
@@ -317,7 +317,7 @@ const ExplorationPage: React.FC = () => {
       </Paper>
 
       {/* Visualization Controls */}
-      <Paper sx={{ p: 3, mb: 3, border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
         <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2 }}>
           <Tab label="Overview" icon={<GridOn />} iconPosition="start" />
           <Tab label="Histogram" icon={<BarChart />} iconPosition="start" />
@@ -397,7 +397,7 @@ const ExplorationPage: React.FC = () => {
         <Grid container spacing={3}>
           {visualizations.map((viz, idx) => (
             <Grid size={{ xs: 12, md: viz.type === 'correlation' ? 12 : 6 }} key={idx}>
-              <Card sx={{ border: '1px solid #e2e8f0' }}>
+              <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>{viz.title}</Typography>
                   {renderVisualization(viz)}

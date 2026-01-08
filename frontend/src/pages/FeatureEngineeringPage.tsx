@@ -98,7 +98,7 @@ const FeatureEngineeringPage: React.FC = () => {
       <Grid container spacing={3}>
         {/* Correlation Matrix */}
         <Grid size={{ xs: 12, lg: 6 }}>
-          <Card sx={{ border: '1px solid #e2e8f0' }}>
+          <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
             <CardContent>
               <CorrelationMatrix
                 matrix={correlationMatrix}
@@ -111,7 +111,7 @@ const FeatureEngineeringPage: React.FC = () => {
 
         {/* Feature Importance */}
         <Grid size={{ xs: 12, lg: 6 }}>
-          <Card sx={{ border: '1px solid #e2e8f0' }}>
+          <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
             <CardContent>
               <FeatureImportance
                 features={featureImportance}

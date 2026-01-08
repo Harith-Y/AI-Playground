@@ -184,7 +184,6 @@ const DatasetUploadPage: React.FC = () => {
       sx={{
         width: '100%',
         minHeight: 'calc(100vh - 64px)',
-        background: 'linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)',
         p: 4,
       }}
     >
@@ -204,8 +203,8 @@ const DatasetUploadPage: React.FC = () => {
           sx={{
             p: 4,
             mb: 3,
-            border: '1px solid #e2e8f0',
-            background: '#FFFFFF',
+            border: '1px solid',
+            borderColor: 'divider',
           }}
         >
           <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -221,17 +220,16 @@ const DatasetUploadPage: React.FC = () => {
             sx={{
               mt: 2,
               p: 6,
-              border: `2px dashed ${isDragging ? '#2563eb' : '#cbd5e1'}`,
+              border: '2px dashed',
+              borderColor: isDragging ? 'primary.main' : 'divider',
               borderRadius: 2,
-              background: isDragging
-                ? 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)'
-                : '#F8FAFC',
+              bgcolor: isDragging ? 'action.hover' : 'background.default',
               textAlign: 'center',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
               '&:hover': {
-                borderColor: '#2563eb',
-                background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                borderColor: 'primary.main',
+                bgcolor: 'action.hover',
               },
             }}
             onClick={() => document.getElementById('file-input')?.click()}
@@ -271,7 +269,7 @@ const DatasetUploadPage: React.FC = () => {
           {/* Selected File Info */}
           {selectedFile && !validationError && (
             <Box sx={{ mt: 3 }}>
-              <Card variant="outlined" sx={{ background: '#F8FAFC' }}>
+              <Card variant="outlined" sx={{ bgcolor: 'background.default' }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                     <Description sx={{ fontSize: 40, color: 'primary.main' }} />
@@ -325,8 +323,8 @@ const DatasetUploadPage: React.FC = () => {
               sx={{
                 p: 4,
                 mb: 3,
-                border: '1px solid #e2e8f0',
-                background: '#FFFFFF',
+                border: '1px solid', borderColor: 'divider',
+                bgcolor: 'background.paper',
               }}
             >
               <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
@@ -381,8 +379,8 @@ const DatasetUploadPage: React.FC = () => {
               <Paper
                 sx={{
                   mb: 3,
-                  border: '1px solid #e2e8f0',
-                  background: '#FFFFFF',
+                  border: '1px solid', borderColor: 'divider',
+                  bgcolor: 'background.paper',
                   p: 3,
                 }}
               >
@@ -404,8 +402,8 @@ const DatasetUploadPage: React.FC = () => {
               <Paper
                 sx={{
                   mb: 3,
-                  border: '1px solid #e2e8f0',
-                  background: '#FFFFFF',
+                  border: '1px solid', borderColor: 'divider',
+                  bgcolor: 'background.paper',
                 }}
               >
                 <Box
@@ -442,7 +440,7 @@ const DatasetUploadPage: React.FC = () => {
                         gap: 3,
                       }}
                     >
-                      <Card variant="outlined" sx={{ background: '#F8FAFC' }}>
+                      <Card variant="outlined" sx={{ bgcolor: 'background.default' }}>
                         <CardContent>
                           <Typography variant="body2" color="text.secondary">
                             Total Rows
@@ -452,7 +450,7 @@ const DatasetUploadPage: React.FC = () => {
                           </Typography>
                         </CardContent>
                       </Card>
-                      <Card variant="outlined" sx={{ background: '#F8FAFC' }}>
+                      <Card variant="outlined" sx={{ bgcolor: 'background.default' }}>
                         <CardContent>
                           <Typography variant="body2" color="text.secondary">
                             Numeric Columns
@@ -462,7 +460,7 @@ const DatasetUploadPage: React.FC = () => {
                           </Typography>
                         </CardContent>
                       </Card>
-                      <Card variant="outlined" sx={{ background: '#F8FAFC' }}>
+                      <Card variant="outlined" sx={{ bgcolor: 'background.default' }}>
                         <CardContent>
                           <Typography variant="body2" color="text.secondary">
                             Categorical Columns
@@ -472,7 +470,7 @@ const DatasetUploadPage: React.FC = () => {
                           </Typography>
                         </CardContent>
                       </Card>
-                      <Card variant="outlined" sx={{ background: '#F8FAFC' }}>
+                      <Card variant="outlined" sx={{ bgcolor: 'background.default' }}>
                         <CardContent>
                           <Typography variant="body2" color="text.secondary">
                             Missing Values
@@ -482,7 +480,7 @@ const DatasetUploadPage: React.FC = () => {
                           </Typography>
                         </CardContent>
                       </Card>
-                      <Card variant="outlined" sx={{ background: '#F8FAFC' }}>
+                      <Card variant="outlined" sx={{ bgcolor: 'background.default' }}>
                         <CardContent>
                           <Typography variant="body2" color="text.secondary">
                             Duplicate Rows
@@ -492,7 +490,7 @@ const DatasetUploadPage: React.FC = () => {
                           </Typography>
                         </CardContent>
                       </Card>
-                      <Card variant="outlined" sx={{ background: '#F8FAFC' }}>
+                      <Card variant="outlined" sx={{ bgcolor: 'background.default' }}>
                         <CardContent>
                           <Typography variant="body2" color="text.secondary">
                             Memory Usage
@@ -513,8 +511,8 @@ const DatasetUploadPage: React.FC = () => {
               <Paper
                 sx={{
                   mb: 3,
-                  border: '1px solid #e2e8f0',
-                  background: '#FFFFFF',
+                  border: '1px solid', borderColor: 'divider',
+                  bgcolor: 'background.paper',
                 }}
               >
                 <Box
@@ -555,8 +553,8 @@ const DatasetUploadPage: React.FC = () => {
               <Paper
                 sx={{
                   mb: 3,
-                  border: '1px solid #e2e8f0',
-                  background: '#FFFFFF',
+                  border: '1px solid', borderColor: 'divider',
+                  bgcolor: 'background.paper',
                 }}
               >
                 <Box
@@ -590,7 +588,7 @@ const DatasetUploadPage: React.FC = () => {
                               key={col.name}
                               sx={{
                                 fontWeight: 600,
-                                background: '#F8FAFC',
+                                bgcolor: 'background.default',
                               }}
                             >
                               <Box>
@@ -631,8 +629,8 @@ const DatasetUploadPage: React.FC = () => {
           <Paper
             sx={{
               p: 3,
-              border: '1px solid #e2e8f0',
-              background: '#F8FAFC',
+              border: '1px solid', borderColor: 'divider',
+              bgcolor: 'background.default',
             }}
           >
             <Box sx={{ display: 'flex', gap: 2 }}>

@@ -39,8 +39,8 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color, subtext 
     <Card
       sx={{
         height: '100%',
-        border: '1px solid #e2e8f0',
-        background: '#FFFFFF',
+        border: '1px solid', borderColor: 'divider',
+        bgcolor: 'background.paper',
         transition: 'all 0.3s ease',
         '&:hover': {
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
@@ -218,7 +218,7 @@ const DatasetStats: React.FC<DatasetStatsProps> = ({
 
       {/* Column Types Breakdown */}
       {columns.length > 0 && (
-        <Card sx={{ border: '1px solid #e2e8f0', background: '#FFFFFF' }}>
+        <Card sx={{ border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
           <CardContent>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Column Types
@@ -269,7 +269,7 @@ const DatasetStats: React.FC<DatasetStatsProps> = ({
       )}
 
       {/* Data Quality Indicator */}
-      <Card sx={{ mt: 3, border: '1px solid #e2e8f0', background: '#FFFFFF' }}>
+      <Card sx={{ mt: 3, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
         <CardContent>
           <Typography variant="h6" fontWeight={600} gutterBottom>
             Data Quality Score
@@ -319,7 +319,7 @@ const DatasetStats: React.FC<DatasetStatsProps> = ({
                     sx={{
                       height: 8,
                       borderRadius: 1,
-                      background: '#e2e8f0',
+                      bgcolor: 'action.hover',
                       '& .MuiLinearProgress-bar': {
                         background: scoreColor,
                         borderRadius: 1,

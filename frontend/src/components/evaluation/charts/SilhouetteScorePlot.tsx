@@ -49,7 +49,7 @@ const SilhouetteScorePlot: React.FC<SilhouetteScorePlotProps> = ({
   const qualityLabel = getQualityLabel(silhouetteScore);
 
   return (
-    <Card sx={{ height: '100%', border: '1px solid #e2e8f0' }}>
+    <Card sx={{ height: '100%', border: '1px solid', borderColor: 'divider' }}>
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="h6" fontWeight={600}>
@@ -116,7 +116,7 @@ const SilhouetteScorePlot: React.FC<SilhouetteScorePlotProps> = ({
             p: 2,
             bgcolor: '#f8fafc',
             borderRadius: 1,
-            border: '1px solid #e2e8f0',
+            border: '1px solid', borderColor: 'divider',
           }}
         >
           <Typography variant="body2" color="text.secondary" gutterBottom>
