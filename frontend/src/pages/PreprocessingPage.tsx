@@ -66,9 +66,11 @@ const PreprocessingPage: React.FC = () => {
     severity: 'success',
   });
 
+  // Refetch preprocessing steps whenever component mounts or dataset changes
+  // This ensures we always have the latest data from the server
   useEffect(() => {
     if (currentDataset?.id) {
-      // Fetch preprocessing steps for the current dataset
+      // Always fetch preprocessing steps to ensure we have the latest data
       dispatch(fetchPreprocessingSteps(currentDataset.id));
 
       // Fetch dataset stats if not already loaded
@@ -77,6 +79,14 @@ const PreprocessingPage: React.FC = () => {
       }
     }
   }, [currentDataset?.id, dispatch, columns?.length]);
+
+  // Additional effect to refetch when navigating back to this page
+  useEffect(() => {
+    // Refetch on component mount
+    if (currentDataset?.id) {
+      dispatch(fetchPreprocessingSteps(currentDataset.id));
+    }
+  }, []); // Empty dependency array means this runs only on mount
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
