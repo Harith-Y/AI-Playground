@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Typography,
   Box,
@@ -45,6 +46,7 @@ import PreviewPanel from '../components/preprocessing/PreviewPanel';
 
 const PreprocessingPage: React.FC = () => {
   const dispatch = useAppDispatch();
+  const location = useLocation();
   const {
     steps,
     isLoading,
@@ -81,20 +83,19 @@ const PreprocessingPage: React.FC = () => {
     }
   }, [currentDataset?.id, dispatch, columns, refetchTrigger]);
 
-  // Trigger refetch when component becomes visible (user navigates back to this page)
+  // Trigger refetch when returning to this page (detect route changes)
+  const prevLocationRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    const handleFocus = () => {
+    // If we're navigating TO the preprocessing page from another route
+    if (prevLocationRef.current && prevLocationRef.current !== location.pathname && location.pathname.includes('/preprocessing')) {
       setRefetchTrigger(prev => prev + 1);
-    };
+    }
+    prevLocationRef.current = location.pathname;
+  }, [location.pathname]);
 
-    window.addEventListener('focus', handleFocus);
-    
-    // Also trigger on mount to ensure fresh data
+  // Also trigger on initial mount
+  useEffect(() => {
     setRefetchTrigger(prev => prev + 1);
-    
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-    };
   }, []);
 
   // Keyboard shortcuts for undo/redo
