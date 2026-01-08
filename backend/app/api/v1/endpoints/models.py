@@ -118,7 +118,8 @@ async def list_models(
     skip: int = 0,
     limit: int = 100,
     dataset_id: Optional[str] = None,
-    user_id: str = Depends(get_user_or_guest),  # Changed from get_current_user_id to support guests
+    status: Optional[str] = Query(None, description="Filter by status (completed, failed, running)"),
+    user_id: str = Depends(get_user_or_guest),
     db: Session = Depends(get_db)
 ) -> List[Dict[str, Any]]:
     """
@@ -128,6 +129,7 @@ async def list_models(
         skip: Number of records to skip
         limit: Max number of records to return
         dataset_id: Filter by dataset ID
+        status: Filter by model status (default: show only completed)
 
     Returns:
         List of model runs with their status and metrics
@@ -137,8 +139,12 @@ async def list_models(
     if dataset_id:
         query = query.filter(Experiment.dataset_id == dataset_id)
     
-    # Filter out failed models to show only successful ones with metrics
-    query = query.filter(ModelRun.status == "completed")
+    # Filter by status - default to showing only completed models
+    if status is None:
+        # Default: only show completed models with valid metrics
+        query = query.filter(ModelRun.status == "completed")
+    elif status != "all":
+        query = query.filter(ModelRun.status == status)
     
     models = query.order_by(ModelRun.created_at.desc()).offset(skip).limit(limit).all()
     
