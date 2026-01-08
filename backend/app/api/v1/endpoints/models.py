@@ -189,7 +189,9 @@ async def list_models(
         if task_type == "regression":
             # Extract and validate regression metrics - provide 0.0 for invalid values
             # Handle both 'r2' (from dataclass) and 'r2_score' (legacy) key names
-            r2_value = safe_metric(raw_metrics.get("r2") or raw_metrics.get("r2_score"))
+            # Use explicit None check to allow 0.0 values
+            r2_raw = raw_metrics.get("r2") if "r2" in raw_metrics else raw_metrics.get("r2_score")
+            r2_value = safe_metric(r2_raw)
             metrics["r2_score"] = r2_value
             metrics["mae"] = safe_metric(raw_metrics.get("mae"))
             metrics["mse"] = safe_metric(raw_metrics.get("mse"))

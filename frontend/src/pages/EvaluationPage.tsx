@@ -136,9 +136,12 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
       }));
       setRuns(apiRuns);
 
-      // If runId was provided and not in selectedRunId, set it
+      // Auto-select first model if none selected
       if (runId && !selectedRunId) {
         setSelectedRunId(runId);
+      } else if (!selectedRunId && apiRuns.length > 0) {
+        // Auto-select the most recent model (first in list)
+        setSelectedRunId(apiRuns[0].id);
       }
     } catch (err) {
       setError('Failed to load model runs. Please try again.');
