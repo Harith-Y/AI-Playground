@@ -169,16 +169,16 @@ async def list_models(
             except (ValueError, TypeError):
                 return False
         
-        # Helper to get safe metric value (return None if invalid)
+        # Helper to get safe metric value (return 0.0 if invalid for failed models)
         def safe_metric(val):
-            return float(val) if is_valid_metric(val) else None
+            return float(val) if is_valid_metric(val) else 0.0
         
-        # Create clean metrics dict with only valid values
+        # Create clean metrics dict with valid values (0.0 for missing/invalid)
         metrics = {}
         accuracy = None
         
         if task_type == "regression":
-            # Extract and validate regression metrics - provide None for invalid values
+            # Extract and validate regression metrics - provide 0.0 for invalid values
             metrics["r2_score"] = safe_metric(raw_metrics.get("r2_score"))
             metrics["mae"] = safe_metric(raw_metrics.get("mae"))
             metrics["mse"] = safe_metric(raw_metrics.get("mse"))
@@ -186,7 +186,7 @@ async def list_models(
             metrics["explained_variance"] = safe_metric(raw_metrics.get("explained_variance"))
             
             # Use r2_score as primary accuracy metric for regression
-            accuracy = metrics.get("r2_score")
+            accuracy = metrics.get("r2_score") if metrics.get("r2_score") != 0.0 else None
             
         elif task_type == "classification":
             # Extract and validate classification metrics
@@ -196,7 +196,7 @@ async def list_models(
             metrics["f1_score"] = safe_metric(raw_metrics.get("f1_score"))
             
             # Use accuracy as primary metric
-            accuracy = metrics.get("accuracy")
+            accuracy = metrics.get("accuracy") if metrics.get("accuracy") != 0.0 else None
             
         else:
             # For clustering or unknown, copy all valid metrics
