@@ -17,6 +17,20 @@ class ModelService {
   }
 
   /**
+   * List model runs with optional filters
+   */
+  async listModelRuns(params?: {
+    experiment_id?: string;
+    status?: string;
+    model_type?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<any[]> {
+    const response = await api.get('/api/v1/models/runs', { params });
+    return response.data || response;
+  }
+
+  /**
    * Get model by ID
    */
   async getModel(id: string): Promise<Model> {

@@ -123,11 +123,11 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
     setError(null);
 
     try {
-      // Fetch from API
-      const response = await modelService.listModels();
+      // Fetch from API - use the correct /runs endpoint
+      const response = await modelService.listModelRuns({ status: 'completed', limit: 50 });
       const apiRuns: ModelRun[] = (Array.isArray(response) ? response : (response as any).items || []).map((model: any) => ({
-        id: model.id,
-        name: model.name || `Model ${model.id}`,
+        id: model.model_run_id || model.id,
+        name: model.name || `${model.model_type} (${new Date(model.created_at).toLocaleString()})`,
         taskType: (model.task_type || 'classification') as TaskType,
         modelType: model.model_type || 'unknown',
         createdAt: model.created_at,
