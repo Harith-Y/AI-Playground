@@ -1076,7 +1076,7 @@ async def get_model_metrics(
         GET /api/v1/models/train/abc-123/metrics?use_cache=false
     """
     # Try cache first
-    if use_cache:
+    if use_cache and cache_service is not None:
         cache_key = CacheKeys.model_metrics(model_run_id)
         cached_result = cache_service.get(cache_key)
         if cached_result:
@@ -1153,7 +1153,7 @@ async def get_model_metrics(
             response["training_metadata"]["n_features"] = model_run.run_metadata['n_features']
     
     # Cache the response for 1 hour
-    if use_cache:
+    if use_cache and cache_service is not None:
         cache_key = CacheKeys.model_metrics(model_run_id)
         cache_service.set(cache_key, response, CacheTTL.LONG)
         logger.info(f"Cached metrics for model {model_run_id}")
@@ -1294,7 +1294,7 @@ async def get_feature_importance(
     )
     
     # Check cache first
-    if use_cache:
+    if use_cache and cache_service is not None:
         cache_key = CacheKeys.feature_importance(model_run_id, top_n)
         cached_result = await cache_service.get(cache_key)
         if cached_result:
@@ -1432,7 +1432,7 @@ async def get_feature_importance(
     )
     
     # Cache the result
-    if use_cache:
+    if use_cache and cache_service is not None:
         cache_key = CacheKeys.feature_importance(model_run_id, top_n)
         await cache_service.set(cache_key, response, ttl=CacheTTL.MEDIUM)
     
@@ -1504,7 +1504,7 @@ async def compare_models(
         )
         
         # Cache the comparison result for 30 minutes
-        if use_cache:
+        if use_cache and cache_service is not None:
             cache_key = CacheKeys.model_comparison([str(mid) for mid in request.model_run_ids])
             # Convert to dict for caching
             result_dict = result.model_dump() if hasattr(result, 'model_dump') else result.dict()
@@ -1846,3 +1846,51 @@ async def clear_cache(
             detail=f"Failed to clear cache: {str(e)}"
         )
 
+
+# ============================================================================
+# Plot Endpoints (Stub - Not Yet Implemented)
+# ============================================================================
+
+@router.get("/train/{model_run_id}/plots/{plot_type}")
+async def get_plot_data(
+    model_run_id: str,
+    plot_type: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_or_guest)
+):
+    """
+    Get plot data for a model run.
+    
+    NOTE: This is a stub endpoint. Plot generation is not yet implemented.
+    Returns 501 Not Implemented for all plot types.
+    
+    Planned plot types:
+    - confusion_matrix (classification)
+    - roc_curve (classification)
+    - precision_recall_curve (classification)
+    - residual_plot (regression)
+    - prediction_error (regression)
+    - learning_curve (all tasks)
+    - feature_importance (tree-based models)
+    """
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail=f"Plot generation is not yet implemented. Plot type '{plot_type}' is not available."
+    )
+
+
+@router.get("/train/{model_run_id}/plots")
+async def get_all_plots(
+    model_run_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_or_guest)
+):
+    """
+    Get all available plots for a model run.
+    
+    NOTE: This is a stub endpoint. Plot generation is not yet implemented.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Plot generation is not yet implemented."
+    )

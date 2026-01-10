@@ -69,14 +69,9 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
     } catch (err: any) {
       console.error(`Error fetching ${plotType} plot:`, err);
       
-      // If backend doesn't have the plot, generate it locally
+      // If backend doesn't have the plot, show not implemented message
       if (err.response?.status === 404 || err.response?.status === 501) {
-        try {
-          const generatedData = await generatePlotLocally(plotType);
-          setPlotData(generatedData);
-        } catch (genErr) {
-          setError(`Plot data not available for this model`);
-        }
+        setError(`Plot generation is not yet implemented. This feature is coming soon.`);
       } else {
         setError(err.response?.data?.detail || 'Failed to load plot data');
       }
