@@ -119,7 +119,12 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
           mode: 'markers',
           type: 'scatter',
           name: 'Residuals',
-          marker: { color: '#ff9800', opacity: 0.7 }
+          marker: { 
+              color: '#ff9800', 
+              opacity: 0.8,
+              size: 10,  // Increased size for visibility
+              line: { color: 'white', width: 1 } // Add border to markers
+          }
         };
         
         // Calculate axis ranges properly to ensure data is visible
