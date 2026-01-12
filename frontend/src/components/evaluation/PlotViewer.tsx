@@ -77,7 +77,43 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
 
     try {
       const data = await evaluationService.getPlotData(modelRunId, plotType);
-      setPlotData(data);
+      
+      // Adaptation for simple structure { x: [], y: [] } returned by residuals logic in backend
+      // Cast to any to access potentially missing properties from strict interface
+      const rawData = data as any;
+      if (rawData.plot_type === 'residuals' && rawData.data && Array.isArray(rawData.data.x) && !Array.isArray(rawData.plot_data)) {
+        // Construct Plotly trace for residuals manually
+        const scatterTrace = {
+          x: rawData.data.x,
+          y: rawData.data.y,
+          mode: 'markers',
+          type: 'scatter',
+          name: 'Residuals',
+          marker: { color: '#ff9800', opacity: 0.7 }
+        };
+        const zeroLine = {
+            x: [Math.min(...rawData.data.x), Math.max(...rawData.data.x)],
+            y: [0, 0],
+            mode: 'lines',
+            type: 'scatter',
+            name: 'Zero Line',
+            line: { color: 'black', dash: 'dash' }
+        };
+        
+        setPlotData({
+          plot_type: 'residuals',
+          plot_data: [scatterTrace, zeroLine],
+          layout: {
+            title: 'Residuals vs Predicted',
+            xaxis: { title: 'Predicted Values' },
+            yaxis: { title: 'Residuals' },
+            hovermode: 'closest'
+          }
+        });
+      } else {
+        setPlotData(data);
+      }
+
     } catch (err: any) {
       console.error(`Error fetching ${plotType} plot:`, err);
       

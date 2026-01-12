@@ -919,20 +919,23 @@ def run_training_logic(
 
         # Log final memory usage (with safe handling if monitoring unavailable)
         try:
-            final_memory = memory_monitor.get_current_snapshot()
-            memory_delta = memory_monitor.get_memory_delta()
-            # Check if final_memory is valid before formatting
-            peak_mb = memory_monitor.get_peak_memory() if memory_monitor else 0.0
-            
-            if final_memory is not None:
-                rss_val = final_memory.rss_mb if final_memory.rss_mb is not None else 0.0
+            # Add strict None checks for memory_monitor itself
+            if memory_monitor:
+                final_memory = memory_monitor.get_current_snapshot()
+                memory_delta = memory_monitor.get_memory_delta()
+                peak_mb = memory_monitor.get_peak_memory()
+                
+                # Defensively handle None returns from methods
+                rss_val = final_memory.rss_mb if final_memory and final_memory.rss_mb is not None else 0.0
                 delta_val = memory_delta if memory_delta is not None else 0.0
+                peak_val = peak_mb if peak_mb is not None else 0.0
+                
                 logger.info(
                     f"Training completed - Final memory: {rss_val:.2f}MB, "
-                    f"Delta: {delta_val:+.2f}MB, Peak: {peak_mb:.2f}MB"
+                    f"Delta: {delta_val:+.2f}MB, Peak: {peak_val:.2f}MB"
                 )
             else:
-                logger.info("Training completed - Memory monitoring unavailable")
+                logger.info("Training completed - Memory monitoring unavailable (monitor is None)")
         except Exception as e:
             logger.warning(f"Failed to log memory stats: {e}")
 

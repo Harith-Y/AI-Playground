@@ -1132,6 +1132,8 @@ async def get_model_metrics(
     if 'r2' in metrics:
         metrics['r2_score'] = metrics.pop('r2')
     
+    run_metadata = model_run.run_metadata if model_run.run_metadata else {}
+    
     response = {
         "model_run_id": str(model_run.id),
         "model_type": model_run.model_type,
@@ -1140,7 +1142,10 @@ async def get_model_metrics(
         "training_metadata": {
             "training_time": model_run.training_time,
             "created_at": model_run.created_at.isoformat(),
-            "hyperparameters": model_run.hyperparameters
+            "hyperparameters": model_run.hyperparameters,
+            "train_samples": run_metadata.get("train_samples"),
+            "test_samples": run_metadata.get("test_samples"),
+            "n_features": run_metadata.get("n_features")
         }
     }
     
@@ -1300,11 +1305,15 @@ async def get_feature_importance(
     
     # Check cache first
     if use_cache and cache_service is not None:
-        cache_key = CacheKeys.feature_importance(model_run_id, top_n)
-        cached_result = cache_service.get(cache_key)
-        if cached_result:
-            logger.info(f"Cache hit for feature importance {model_run_id}")
-            return cached_result
+        try:
+            cache_key = CacheKeys.feature_importance(model_run_id, top_n)
+            # cache_service.get likely returns a dict, we need to return FeatureImportanceResponse
+            cached_result = cache_service.get(cache_key)
+            if cached_result:
+                logger.info(f"Cache hit for feature importance {model_run_id}")
+                return FeatureImportanceResponse(**cached_result)
+        except Exception as e:
+            logger.warning(f"Cache read error: {e}")
     
     # Fetch model run
     try:
@@ -1438,8 +1447,12 @@ async def get_feature_importance(
     
     # Cache the result
     if use_cache and cache_service is not None:
-        cache_key = CacheKeys.feature_importance(model_run_id, top_n)
-        cache_service.set(cache_key, response, ttl=CacheTTL.MEDIUM)
+        try:
+            cache_key = CacheKeys.feature_importance(model_run_id, top_n)
+            # Store as dict, not Pydantic model
+            cache_service.set(cache_key, response.dict(), ttl=CacheTTL.MEDIUM)
+        except Exception as e:
+            logger.warning(f"Cache write error for feature importance: {e}")
     
     return response
 
@@ -2015,7 +2028,18 @@ async def get_plot_data(
                 }
             }
         else:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Feature importance data not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Feature importance data not found in run_metadata")
+
+    # Learning Curve - Check if available
+    elif plot_type == 'learning_curve':
+        if 'learning_curve' in metrics:
+             return {
+                "plot_type": "learning_curve",
+                "data": metrics['learning_curve']
+            }
+        else:
+             # Just return a 404 for now if not computed, but with a specific message
+             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data for plot 'learning_curve' was not saved during training.")
 
     # Other plots - return 404 with message that data was not saved
     # This distinguishes from "endpoint not implemented" (501)
