@@ -1661,14 +1661,32 @@ async def list_model_runs(
         # Build response
         results = []
         for mr in model_runs:
+            # Transform metrics for API consistency (r2 -> r2_score)
+            metrics = mr.metrics.copy() if mr.metrics else {}
+            if 'r2' in metrics:
+                metrics['r2_score'] = metrics.pop('r2')
+            
+            # Extract training metadata from run_metadata
+            train_samples = None
+            test_samples = None
+            n_features = None
+            if mr.run_metadata:
+                train_samples = mr.run_metadata.get('train_samples')
+                test_samples = mr.run_metadata.get('test_samples')
+                n_features = mr.run_metadata.get('n_features')
+            
             results.append({
                 "model_run_id": str(mr.id),
                 "experiment_id": str(mr.experiment_id),
                 "model_type": mr.model_type,
+                "task_type": _get_task_type_from_model(mr.model_type),
                 "status": mr.status,
-                "metrics": mr.metrics,
+                "metrics": metrics,
                 "hyperparameters": mr.hyperparameters,
                 "training_time": mr.training_time,
+                "train_samples": train_samples,
+                "test_samples": test_samples,
+                "n_features": n_features,
                 "created_at": mr.created_at.isoformat() if mr.created_at else None
             })
         
