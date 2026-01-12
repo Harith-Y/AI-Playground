@@ -1884,21 +1884,102 @@ async def get_plot_data(
     """
     Get plot data for a model run.
     
-    NOTE: This is a stub endpoint. Plot generation is not yet implemented.
-    Returns 501 Not Implemented for all plot types.
-    
-    Planned plot types:
-    - confusion_matrix (classification)
-    - roc_curve (classification)
-    - precision_recall_curve (classification)
-    - residual_plot (regression)
-    - prediction_error (regression)
-    - learning_curve (all tasks)
-    - feature_importance (tree-based models)
+    Supported plot types:
+    - confusion_matrix (classification, if available)
+    - feature_importance (all models, if available)
+    - roc_curve (classification, if available) - Currently not stored
+    - residual_plot (regression, if available) - Currently not stored
     """
+    # 1. Fetch model run
+    try:
+        model_run = db.query(ModelRun).filter(
+            ModelRun.id == uuid.UUID(model_run_id)
+        ).first()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid model_run_id format: {model_run_id}"
+        )
+        
+    if not model_run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model run with id {model_run_id} not found"
+        )
+        
+    # 2. Verify permissions
+    # Check experiment ownership
+    experiment = db.query(Experiment).filter(
+        Experiment.id == model_run.experiment_id,
+        Experiment.user_id == uuid.UUID(user_id)
+    ).first()
+    
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access plot data for this model run"
+        )
+
+    # 3. Determine task type
+    task_type = _get_task_type_from_model(model_run.model_type)
+    
+    # 4. Check compatibility
+    classification_plots = ['confusion_matrix', 'roc_curve', 'precision_recall_curve']
+    regression_plots = ['residual_plot', 'prediction_error', 'residuals_vs_predicted']
+    
+    if plot_type in classification_plots and task_type != 'classification':
+         raise HTTPException(
+             status_code=status.HTTP_400_BAD_REQUEST, 
+             detail=f"Plot '{plot_type}' is only available for classification models. This is a {task_type} model."
+         )
+         
+    if plot_type in regression_plots and task_type != 'regression':
+         raise HTTPException(
+             status_code=status.HTTP_400_BAD_REQUEST, 
+             detail=f"Plot '{plot_type}' is only available for regression models. This is a {task_type} model."
+         )
+
+    # 5. Retrieve data
+    metrics = model_run.metrics or {}
+    run_metadata = model_run.run_metadata or {}
+    
+    # Confusion Matrix
+    if plot_type == 'confusion_matrix':
+        if 'confusion_matrix' in metrics:
+            return {
+                "plot_type": "confusion_matrix",
+                "data": metrics['confusion_matrix'],
+                # We could add class labels if we had them easily accessible
+                # For now, frontend likely uses indices or generic labels
+            }
+        else:
+             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Confusion matrix data not found in metrics")
+
+    # Feature Importance
+    elif plot_type == 'feature_importance':
+        if 'feature_importance' in run_metadata:
+            # Format as x (values) and y (names) for plotting
+            fi = run_metadata['feature_importance']
+            # Sort by importance
+            sorted_fi = sorted(fi.items(), key=lambda x: x[1], reverse=True)
+            # Take top 20
+            sorted_fi = sorted_fi[:20]
+            
+            return {
+                "plot_type": "feature_importance",
+                "data": {
+                    "features": [x[0] for x in sorted_fi],
+                    "importance": [x[1] for x in sorted_fi]
+                }
+            }
+        else:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Feature importance data not found")
+
+    # Other plots - return 404 with message that data was not saved
+    # This distinguishes from "endpoint not implemented" (501)
     raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail=f"Plot generation is not yet implemented. Plot type '{plot_type}' is not available."
+        status_code=status.HTTP_404_NOT_FOUND, 
+        detail=f"Data for plot '{plot_type}' was not saved during training."
     )
 
 
@@ -1910,10 +1991,56 @@ async def get_all_plots(
 ):
     """
     Get all available plots for a model run.
-    
-    NOTE: This is a stub endpoint. Plot generation is not yet implemented.
     """
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Plot generation is not yet implemented."
-    )
+    # 1. Fetch model run
+    try:
+        model_run = db.query(ModelRun).filter(
+            ModelRun.id == uuid.UUID(model_run_id)
+        ).first()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid model_run_id format: {model_run_id}"
+        )
+        
+    if not model_run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model run with id {model_run_id} not found"
+        )
+        
+    # 2. Verify permissions
+    # Check experiment ownership
+    experiment = db.query(Experiment).filter(
+        Experiment.id == model_run.experiment_id,
+        Experiment.user_id == uuid.UUID(user_id)
+    ).first()
+    
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access plot data for this model run"
+        )
+        
+    task_type = _get_task_type_from_model(model_run.model_type)
+    metrics = model_run.metrics or {}
+    run_metadata = model_run.run_metadata or {}
+    
+    available_plots = []
+    
+    # Check what data we have
+    if 'confusion_matrix' in metrics:
+        available_plots.append('confusion_matrix')
+        
+    if 'feature_importance' in run_metadata:
+        available_plots.append('feature_importance')
+        
+    # ROC curve etc. check (currently not stored)
+    
+    return {
+        "model_run_id": str(model_run.id),
+        "task_type": task_type,
+        "available_plots": available_plots,
+        # We could request individual plots or return them all here
+        # Returning list of available plots is safer and frontend can fetch what it needs
+    }
