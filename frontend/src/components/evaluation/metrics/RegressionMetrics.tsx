@@ -218,24 +218,24 @@ const RegressionMetrics: React.FC<RegressionMetricsProps> = ({
               </Box>
             )}
 
-            {metrics.residuals && (
+            {metrics.residual_plot && (
               <Box display="flex" justifyContent="space-between">
                 <Typography variant="body2" color="text.secondary">
                   Residuals Data:
                 </Typography>
                 <Typography variant="body2" fontWeight="500">
-                  {metrics.residuals.predicted.length} predictions
+                  {metrics.residual_plot.x.length} predictions
                 </Typography>
               </Box>
             )}
 
-            {metrics.actualVsPredicted && (
+            {metrics.prediction_error_plot && (
               <Box display="flex" justifyContent="space-between">
                 <Typography variant="body2" color="text.secondary">
                   Prediction Data:
                 </Typography>
                 <Typography variant="body2" fontWeight="500">
-                  {metrics.actualVsPredicted.actual.length} samples
+                  {metrics.prediction_error_plot.x.length} samples
                 </Typography>
               </Box>
             )}

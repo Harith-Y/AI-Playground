@@ -91,8 +91,24 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
           name: 'Residuals',
           marker: { color: '#ff9800', opacity: 0.7 }
         };
+        
+        // Calculate axis ranges properly to ensure data is visible
+        const xValues = rawData.data.x as number[];
+        const yValues = rawData.data.y as number[];
+        
+        // Handle empty array case defensively
+        let xMin = -1, xMax = 1;
+        if (xValues.length > 0) {
+            xMin = Math.min(...xValues);
+            xMax = Math.max(...xValues);
+        }
+        
+        // Add padding to range
+        const xRange = xMax - xMin;
+        const xBuffer = xRange > 0 ? xRange * 0.1 : 1;
+        
         const zeroLine = {
-            x: [Math.min(...rawData.data.x), Math.max(...rawData.data.x)],
+            x: [xMin - xBuffer, xMax + xBuffer],
             y: [0, 0],
             mode: 'lines',
             type: 'scatter',
@@ -105,9 +121,16 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
           plot_data: [scatterTrace, zeroLine],
           layout: {
             title: 'Residuals vs Predicted',
-            xaxis: { title: 'Predicted Values' },
-            yaxis: { title: 'Residuals' },
-            hovermode: 'closest'
+            xaxis: { 
+                title: 'Predicted Values', 
+                autorange: true 
+            },
+            yaxis: { 
+                title: 'Residuals', 
+                autorange: true 
+            },
+            hovermode: 'closest',
+            showlegend: true
           }
         });
       } else {
@@ -119,7 +142,14 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
       
       // If backend doesn't have the plot, show not implemented message
       if (err.response?.status === 404 || err.response?.status === 501) {
-        setError(`Plot generation is not yet implemented. This feature is coming soon.`);
+        // Special case for Learning Curve which might not be implemented yet
+        if (plotType === 'learning_curve') {
+             setError('Learning curve generation is currently in development.');
+        } else if (plotType === 'residuals') {
+             setError('Residuals data was not generated during training.');
+        } else {
+             setError(`Plot generation is not available. This feature is coming soon.`);
+        }
       } else {
         setError(err.response?.data?.detail || 'Failed to load plot data');
       }

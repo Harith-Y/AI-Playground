@@ -564,7 +564,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
             {selectedRunId && filteredRuns.length > 0 && (
               <Box mb={3}>
                 <Autocomplete
-                  value={filteredRuns.find((run) => run.id === selectedRunId) || null}
+                  value={filteredRuns.find((run) => run.id === selectedRunId) || undefined}
                   onChange={(_event, newValue) => {
                     setSelectedRunId(newValue?.id);
                   }}
@@ -578,7 +578,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                     />
                   )}
                   renderOption={(props, option) => (
-                    <li {...props}>
+                    <li {...props} key={option.id}>
                       <Box display="flex" flexDirection="column" width="100%">
                         <Box display="flex" alignItems="center" justifyContent="space-between">
                           <Typography variant="body2" fontWeight="medium">
@@ -598,6 +598,8 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                   )}
                   fullWidth
                   size="small"
+                  clearOnBlur={false}
+                  disableClearable
                 />
               </Box>
             )}

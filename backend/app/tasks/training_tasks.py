@@ -894,6 +894,9 @@ def run_training_logic(
         model_run.run_metadata['test_samples'] = len(X_test) if X_test is not None else 0
         model_run.run_metadata['n_features'] = X_train.shape[1]
 
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(model_run, 'run_metadata')
+
         db.commit()
         db.refresh(model_run)
 

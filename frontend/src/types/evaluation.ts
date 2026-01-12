@@ -103,6 +103,14 @@ export interface RegressionMetrics {
     actual: number[];
     predicted: number[];
   };
+  residual_plot?: {
+    x: number[];
+    y: number[];
+  };
+  prediction_error_plot?: {
+    x: number[];
+    y: number[];
+  };
 }
 
 /**
