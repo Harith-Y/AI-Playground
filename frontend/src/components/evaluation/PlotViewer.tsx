@@ -127,7 +127,8 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
             title: 'Residuals vs Predicted',
             xaxis: { 
                 title: 'Predicted Values', 
-                autorange: true 
+                autorange: true,
+                range: [xMin - xBuffer, xMax + xBuffer]
             },
             yaxis: { 
                 title: 'Residuals', 
