@@ -83,7 +83,10 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
       const rawData = data as any;
       console.log('PlotViewer: rawData received:', rawData);
 
-      if (rawData.plot_type === 'residuals' && 
+      // CRITICAL FIX: The check rawData.plot_type === 'residuals' was failing because backend 
+      // returns just { x: [...], y: [...] } without the type field.
+      // We rely on the requested plotType variable instead.
+      if (plotType === 'residuals' && 
           ((rawData.data && (Array.isArray(rawData.data.x) || rawData.data.data?.x)) || 
            (rawData.x && Array.isArray(rawData.x)))) {
         
@@ -92,14 +95,13 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
         // Normalize points data structure
         let pointsData;
         if (Array.isArray(rawData.x)) {
-            // Case where data is directly at root (unlikely but possible based on API wrapper)
+            // Case where data is directly at root: { x: [...], y: [...] }
             pointsData = rawData;
         } else if (rawData.data?.x) {
             // Standard Case: { plot_type: ..., data: { x: [], y: [] } }
             pointsData = rawData.data;
         } else if (rawData.data?.data?.x) {
              // Nested Case: { plot_type: ..., data: { data: { x: [], y: [] } } }
-             // This happens if API wrapper unwraps one layer but backend sends wrapper
             pointsData = rawData.data.data;
         }
 
