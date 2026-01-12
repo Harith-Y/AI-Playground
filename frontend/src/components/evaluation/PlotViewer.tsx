@@ -177,7 +177,16 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
         setPlotData(newPlotData as any);
       } else {
         console.log('PlotViewer: Using data as-is (not residuals special case)', data);
-        setPlotData(data);
+        
+        // Handle backend API mismatch where it returns 'data' instead of 'plot_data'
+        const castedData = data as any;
+        const normalizedData = {
+             ...castedData,
+             plot_data: castedData.plot_data || castedData.data,
+             layout: castedData.layout || {}
+        };
+        
+        setPlotData(normalizedData);
       }
 
     } catch (err: any) {

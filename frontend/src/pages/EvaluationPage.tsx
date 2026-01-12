@@ -692,7 +692,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                   <Box mt={4}>
                     <PlotViewer
                       modelRunId={selectedRunId}
-                      availablePlots={['residuals']}
+                      availablePlots={['residuals', 'learning_curve']}
                     />
                   </Box>
                 </>
