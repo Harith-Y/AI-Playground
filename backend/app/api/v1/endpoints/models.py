@@ -1301,7 +1301,7 @@ async def get_feature_importance(
     # Check cache first
     if use_cache and cache_service is not None:
         cache_key = CacheKeys.feature_importance(model_run_id, top_n)
-        cached_result = await cache_service.get(cache_key)
+        cached_result = cache_service.get(cache_key)
         if cached_result:
             logger.info(f"Cache hit for feature importance {model_run_id}")
             return cached_result
@@ -1439,7 +1439,7 @@ async def get_feature_importance(
     # Cache the result
     if use_cache and cache_service is not None:
         cache_key = CacheKeys.feature_importance(model_run_id, top_n)
-        await cache_service.set(cache_key, response, ttl=CacheTTL.MEDIUM)
+        cache_service.set(cache_key, response, ttl=CacheTTL.MEDIUM)
     
     return response
 
@@ -1763,7 +1763,7 @@ async def get_cache_stats(
         }
     
     try:
-        stats = await cache_service.get_stats()
+        stats = cache_service.get_stats()
         
         return {
             "available": True,
