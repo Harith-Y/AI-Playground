@@ -21,6 +21,8 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     roc_auc_score,
+    roc_curve,
+    precision_recall_curve,
     average_precision_score,
     confusion_matrix,
     classification_report,
@@ -46,6 +48,8 @@ class ClassificationMetrics:
         f1_score: F1 score (harmonic mean of precision and recall)
         auc_roc: Area Under ROC Curve (binary/multiclass)
         auc_pr: Area Under Precision-Recall Curve
+        roc_curve: calculated ROC curve points (FPR, TPR, thresholds) - downsampled
+        pr_curve: calculated Precision-Recall curve points - downsampled
         balanced_accuracy: Balanced accuracy (average of recall per class)
         matthews_corrcoef: Matthews Correlation Coefficient
         cohen_kappa: Cohen's Kappa score
@@ -62,6 +66,8 @@ class ClassificationMetrics:
     f1_score: float
     auc_roc: Optional[float] = None
     auc_pr: Optional[float] = None
+    roc_curve: Optional[Dict] = None
+    pr_curve: Optional[Dict] = None
     balanced_accuracy: Optional[float] = None
     matthews_corrcoef: Optional[float] = None
     cohen_kappa: Optional[float] = None
@@ -241,6 +247,8 @@ class ClassificationMetricsCalculator:
         auc_roc = None
         auc_pr = None
         logloss = None
+        roc_curve_data = None
+        pr_curve_data = None
         
         if y_proba is not None:
             try:
@@ -254,6 +262,15 @@ class ClassificationMetricsCalculator:
                     
                     auc_roc = roc_auc_score(y_true, y_proba_pos)
                     auc_pr = average_precision_score(y_true, y_proba_pos)
+                    
+                    # Generate ROC Curve data
+                    fpr, tpr, thresholds = roc_curve(y_true, y_proba_pos, pos_label=self.pos_label)
+                    roc_curve_data = self._downsample_curve(fpr, tpr, thresholds)
+                    
+                    # Generate PR Curve data
+                    precision_curve, recall_curve, thresholds_pr = precision_recall_curve(y_true, y_proba_pos, pos_label=self.pos_label)
+                    pr_curve_data = self._downsample_curve(recall_curve, precision_curve, thresholds_pr)
+                    
                 else:
                     # Multi-class classification (one-vs-rest)
                     auc_roc = roc_auc_score(
@@ -302,6 +319,8 @@ class ClassificationMetricsCalculator:
             f1_score=f1,
             auc_roc=auc_roc,
             auc_pr=auc_pr,
+            roc_curve=roc_curve_data,
+            pr_curve=pr_curve_data,
             balanced_accuracy=balanced_acc,
             matthews_corrcoef=mcc,
             cohen_kappa=kappa,
@@ -315,6 +334,43 @@ class ClassificationMetricsCalculator:
         
         logger.info(f"Metrics calculated: accuracy={accuracy:.4f}, f1={f1:.4f}")
         return metrics
+
+    def _downsample_curve(self, x, y, thresholds, max_points=1000):
+        """
+        Downsample curve points to reduce payload size.
+        """
+        if len(x) <= max_points:
+            # Handle thresholds if it's shorter (sometimes it diffs by 1)
+            t_list = thresholds.tolist() if hasattr(thresholds, 'tolist') else list(thresholds)
+            
+            return {
+                "x": x.tolist(), 
+                "y": y.tolist(), 
+                "thresholds": t_list
+            }
+        
+        # Uniform sampling
+        indices = np.linspace(0, len(x) - 1, max_points).astype(int)
+        
+        # Ensure we keep the last point
+        if indices[-1] != len(x) - 1:
+            indices[-1] = len(x) - 1
+            
+        x_down = x[indices]
+        y_down = y[indices]
+        
+        # Thresholds might have different length (e.g. for PR curve)
+        t_down = []
+        if len(thresholds) > 0:
+            # Map indices to thresholds length
+            t_indices = np.linspace(0, len(thresholds) - 1, max_points).astype(int)
+            t_down = thresholds[t_indices].tolist()
+
+        return {
+            "x": x_down.tolist(),
+            "y": y_down.tolist(),
+            "thresholds": t_down
+        }
     
     def _calculate_per_class_metrics(
         self,

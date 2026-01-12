@@ -69,6 +69,8 @@ class RegressionMetrics:
     std_residual: Optional[float] = None
     n_samples: Optional[int] = None
     n_features: Optional[int] = None
+    residual_plot: Optional[Dict] = None
+    prediction_error_plot: Optional[Dict] = None
     
     def to_dict(self) -> Dict:
         """Convert metrics to dictionary format (JSON-serializable)."""
@@ -266,6 +268,18 @@ class RegressionMetricsCalculator:
             except Exception as e:
                 logger.warning(f"Could not calculate advanced metrics: {e}")
         
+        # Calculate residuals if not already done
+        if mean_res is None:
+             residuals = y_true - y_pred
+             mean_res = float(np.mean(residuals))
+             std_res = float(np.std(residuals))
+        else:
+             residuals = y_true - y_pred
+
+        # Generate plot data (downsampled)
+        residual_plot_data = self._downsample_points(y_pred, residuals)
+        prediction_error_data = self._downsample_points(y_true, y_pred)
+        
         metrics = RegressionMetrics(
             mae=mae,
             mse=mse,
@@ -281,11 +295,33 @@ class RegressionMetricsCalculator:
             mean_residual=mean_res,
             std_residual=std_res,
             n_samples=n_samples,
-            n_features=n_features
+            n_features=n_features,
+            residual_plot=residual_plot_data,
+            prediction_error_plot=prediction_error_data
         )
         
         logger.info(f"Regression metrics computed: RMSE={rmse:.4f}, R²={r2:.4f}")
         return metrics
+
+    def _downsample_points(self, x: np.ndarray, y: np.ndarray, max_points=1000) -> Dict:
+        """
+        Downsample scatter plot points to reduce payload size.
+        """
+        n_points = len(x)
+        if n_points <= max_points:
+            return {
+                "x": x.tolist(), 
+                "y": y.tolist()
+            }
+        
+        # Random sampling for scatter plots is often better than uniform steps to avoid aliasing artifacts
+        # But for reproducibility we'll use uniform steps or fixed seed
+        indices = np.linspace(0, n_points - 1, max_points).astype(int)
+        
+        return {
+            "x": x[indices].tolist(),
+            "y": y[indices].tolist()
+        }
     
     def _calculate_adjusted_r2(
         self,

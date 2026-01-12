@@ -1955,6 +1955,48 @@ async def get_plot_data(
         else:
              raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Confusion matrix data not found in metrics")
 
+    # ROC Curve
+    elif plot_type == 'roc_curve':
+        if 'roc_curve' in metrics and metrics['roc_curve']:
+            return {
+                "plot_type": "roc_curve",
+                "data": metrics['roc_curve']
+            }
+        elif 'auc_roc' not in metrics or metrics['auc_roc'] is None:
+             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ROC curve data not available (model likely not trained with probability support)")
+        else:
+             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ROC curve data was not saved during training")
+
+    # Precision-Recall Curve (mapped to precision_recall_curve in frontend typically)
+    elif plot_type == 'precision_recall_curve':
+        if 'pr_curve' in metrics and metrics['pr_curve']:
+            return {
+                "plot_type": "precision_recall_curve",
+                "data": metrics['pr_curve']
+            }
+        else:
+             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Precision-Recall curve data not found")
+
+    # Residual Plot
+    elif plot_type == 'residual_plot':
+        if 'residual_plot' in metrics and metrics['residual_plot']:
+             return {
+                "plot_type": "residual_plot",
+                "data": metrics['residual_plot']
+            }
+        else:
+             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Residual plot data not found")
+             
+    # Prediction Error Plot
+    elif plot_type == 'prediction_error':
+        if 'prediction_error_plot' in metrics and metrics['prediction_error_plot']:
+             return {
+                "plot_type": "prediction_error",
+                "data": metrics['prediction_error_plot']
+            }
+        else:
+             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prediction error plot data not found")
+
     # Feature Importance
     elif plot_type == 'feature_importance':
         if 'feature_importance' in run_metadata:
@@ -2035,7 +2077,17 @@ async def get_all_plots(
     if 'feature_importance' in run_metadata:
         available_plots.append('feature_importance')
         
-    # ROC curve etc. check (currently not stored)
+    if 'roc_curve' in metrics:
+        available_plots.append('roc_curve')
+        
+    if 'pr_curve' in metrics:
+        available_plots.append('precision_recall_curve')
+        
+    if 'residual_plot' in metrics:
+        available_plots.append('residual_plot')
+        
+    if 'prediction_error_plot' in metrics:
+        available_plots.append('prediction_error')
     
     return {
         "model_run_id": str(model_run.id),
