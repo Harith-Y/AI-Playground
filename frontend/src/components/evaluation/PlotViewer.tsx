@@ -50,10 +50,22 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
   availablePlots = ['roc_curve', 'confusion_matrix', 'residuals'],
   defaultPlot = 'roc_curve',
 }) => {
-  const [selectedPlot, setSelectedPlot] = useState<PlotType>(defaultPlot);
+  // Ensure defaultPlot is valid given availablePlots
+  const effectiveDefaultPlot = availablePlots.includes(defaultPlot) 
+    ? defaultPlot 
+    : availablePlots[0] || 'roc_curve';
+
+  const [selectedPlot, setSelectedPlot] = useState<PlotType>(effectiveDefaultPlot);
   const [plotData, setPlotData] = useState<PlotDataResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Update selected plot if availablePlots changes and current selection is invalid
+  useEffect(() => {
+    if (!availablePlots.includes(selectedPlot)) {
+      setSelectedPlot(availablePlots[0] || 'roc_curve');
+    }
+  }, [availablePlots, selectedPlot]);
 
   useEffect(() => {
     fetchPlotData(selectedPlot);

@@ -807,6 +807,10 @@ def run_training_logic(
         # Store task type for frontend display
         model_run.run_metadata['task_type'] = task_type.value
         
+        # Store feature importance if available - CRITICAL FIX
+        if feature_importance:
+            model_run.run_metadata['feature_importance'] = feature_importance
+            
         # Commit metrics immediately
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(model_run, 'run_metadata')
@@ -909,10 +913,13 @@ def run_training_logic(
         try:
             final_memory = memory_monitor.get_current_snapshot()
             memory_delta = memory_monitor.get_memory_delta()
+            # Check if final_memory is valid before formatting
+            peak_mb = memory_monitor.get_peak_memory() if memory_monitor else 0.0
+            
             if final_memory is not None:
                 logger.info(
                     f"Training completed - Final memory: {final_memory.rss_mb:.2f}MB, "
-                    f"Delta: {memory_delta:+.2f}MB, Peak: {memory_monitor.get_peak_memory():.2f}MB"
+                    f"Delta: {memory_delta:+.2f}MB, Peak: {peak_mb:.2f}MB"
                 )
             else:
                 logger.info("Training completed - Memory monitoring unavailable")

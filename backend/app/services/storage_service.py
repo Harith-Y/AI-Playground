@@ -70,7 +70,7 @@ class ModelSerializationService:
         """
         self.base_dir = Path(base_dir) if base_dir else Path(settings.UPLOAD_DIR) / "models"
         
-        # Try to create directory, fallback to /tmp if permission denied (e.g., on Render)
+        # Try to create directory, fallback to /tmp or user home if permission denied
         try:
             self.base_dir.mkdir(parents=True, exist_ok=True)
             # Test write permission
@@ -80,10 +80,30 @@ class ModelSerializationService:
             logger.info(f"ModelSerializationService initialized with base_dir: {self.base_dir}")
         except (PermissionError, OSError) as e:
             logger.warning(f"Failed to initialize storage at {self.base_dir}: {e}")
-            logger.warning("Falling back to /tmp/models")
-            self.base_dir = Path("/tmp/models")
-            self.base_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"ModelSerializationService initialized with base_dir: {self.base_dir}")
+            
+            # Helper to try creating fallback dirs
+            def try_fallback(path: Path) -> bool:
+                try:
+                    path.mkdir(parents=True, exist_ok=True)
+                    t_file = path / ".test_write"
+                    t_file.touch()
+                    t_file.unlink()
+                    self.base_dir = path
+                    return True
+                except Exception:
+                    return False
+
+            # 1. Try local data dir in current working directory (e.g. ./data/models)
+            if try_fallback(Path.cwd() / "data" / "models"):
+                 logger.warning(f"Falling back to local data dir: {self.base_dir}")
+            # 2. Try temp dir
+            elif try_fallback(Path("/tmp/models")):
+                 logger.warning(f"Falling back to /tmp/models")
+            # 3. Last resort - just log error
+            else:
+                 logger.error("Could not find any writable storage directory!")
+                 # We don't raise here to allow read-only operations potentially, 
+                 # but writes will fail later.
     
     def save_model(
         self,

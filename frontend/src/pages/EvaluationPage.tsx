@@ -623,7 +623,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                     Start Training
                   </Button>
                 </Box>
-              ) : selectedRunId ? (
+              ) : selectedRunId && classificationRuns.some(r => r.id === selectedRunId) ? (
                 <>
                   <EvaluationDashboard
                     modelRunId={selectedRunId}
@@ -681,7 +681,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                     Start Training
                   </Button>
                 </Box>
-              ) : selectedRunId ? (
+              ) : selectedRunId && regressionRuns.some(r => r.id === selectedRunId) ? (
                 <>
                   <EvaluationDashboard
                     modelRunId={selectedRunId}
@@ -739,7 +739,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({
                     Start Training
                   </Button>
                 </Box>
-              ) : selectedRunId ? (
+              ) : selectedRunId && clusteringRuns.some(r => r.id === selectedRunId) ? (
                 <>
                   <EvaluationDashboard
                     modelRunId={selectedRunId}

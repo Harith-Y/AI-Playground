@@ -448,6 +448,11 @@ class TrainingConfigValidator:
         
         # Check for unexpected parameters
         unexpected_params = provided_params - expected_param_names
+        
+        # Ignored deprecated params (like normalize for LinearRegression in newer sklearn)
+        ignored_params = {'normalize'}
+        unexpected_params = unexpected_params - ignored_params
+        
         if unexpected_params:
             logger.warning(
                 f"Unexpected hyperparameters for {model_info.model_id}: {', '.join(unexpected_params)}. "
