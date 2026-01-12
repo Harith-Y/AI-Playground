@@ -81,11 +81,35 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
       // Adaptation for simple structure { x: [], y: [] } returned by residuals logic in backend
       // Cast to any to access potentially missing properties from strict interface
       const rawData = data as any;
-      if (rawData.plot_type === 'residuals' && (rawData.data?.x || rawData.data?.data?.x) && !Array.isArray(rawData.plot_data)) {
+      console.log('PlotViewer: rawData received:', rawData);
+
+      if (rawData.plot_type === 'residuals' && 
+          ((rawData.data && (Array.isArray(rawData.data.x) || rawData.data.data?.x)) || 
+           (rawData.x && Array.isArray(rawData.x)))) {
         
-        // Handle double nesting if backend returns { data: { x: ... } } instead of just { x: ... }
-        const pointsData = rawData.data.x ? rawData.data : rawData.data.data;
+        console.log('PlotViewer: Detected residuals plot structure');
+
+        // Normalize points data structure
+        let pointsData;
+        if (Array.isArray(rawData.x)) {
+            // Case where data is directly at root (unlikely but possible based on API wrapper)
+            pointsData = rawData;
+        } else if (rawData.data?.x) {
+            // Standard Case: { plot_type: ..., data: { x: [], y: [] } }
+            pointsData = rawData.data;
+        } else if (rawData.data?.data?.x) {
+             // Nested Case: { plot_type: ..., data: { data: { x: [], y: [] } } }
+             // This happens if API wrapper unwraps one layer but backend sends wrapper
+            pointsData = rawData.data.data;
+        }
+
+        console.log('PlotViewer: Extracted pointsData:', pointsData);
         
+        if (!pointsData || !pointsData.x || !pointsData.y) {
+            console.error('PlotViewer: missing points data', pointsData);
+            throw new Error('Invalid residuals data structure');
+        }
+
         // Construct Plotly trace for residuals manually
         const scatterTrace = {
           x: pointsData.x,
@@ -98,19 +122,22 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
         
         // Calculate axis ranges properly to ensure data is visible
         const xValues = pointsData.x as number[];
-        const yValues = pointsData.y as number[];
         
         // Handle empty array case defensively
         let xMin = -1, xMax = 1;
         if (xValues.length > 0) {
             xMin = Math.min(...xValues);
             xMax = Math.max(...xValues);
+        } else {
+             console.warn('PlotViewer: xValues empty');
         }
         
         // Add padding to range
         const xRange = xMax - xMin;
         const xBuffer = xRange > 0 ? xRange * 0.1 : 1;
         
+        console.log(`PlotViewer: Calculated Range: [${xMin}, ${xMax}], Buffer: ${xBuffer}`);
+
         const zeroLine = {
             x: [xMin - xBuffer, xMax + xBuffer],
             y: [0, 0],
@@ -120,14 +147,14 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
             line: { color: 'black', dash: 'dash' }
         };
         
-        setPlotData({
+        const newPlotData = {
           plot_type: 'residuals',
           plot_data: [scatterTrace, zeroLine],
           layout: {
             title: 'Residuals vs Predicted',
             xaxis: { 
                 title: 'Predicted Values', 
-                autorange: true,
+                autorange: false, // FORCE OFF to use range
                 range: [xMin - xBuffer, xMax + xBuffer]
             },
             yaxis: { 
@@ -138,8 +165,11 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
             showlegend: true,
             autosize: true
           }
-        });
+        };
+        console.log('PlotViewer: Setting plot data:', newPlotData);
+        setPlotData(newPlotData as any);
       } else {
+        console.log('PlotViewer: Using data as-is (not residuals special case)', data);
         setPlotData(data);
       }
 
