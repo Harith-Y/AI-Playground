@@ -790,8 +790,16 @@ def run_training_logic(
         # 9. Get feature importance if available
         feature_importance = None
         try:
-            feature_importance = model.get_feature_importance()
-            if feature_importance is not None:
+            raw_fi = model.get_feature_importance()
+            if raw_fi is not None:
+                # Ensure it's JSON serializable (dict)
+                if hasattr(raw_fi, 'dict'):
+                    feature_importance = raw_fi.dict()
+                elif hasattr(raw_fi, 'to_dict'):
+                    feature_importance = raw_fi.to_dict()
+                else:
+                    feature_importance = raw_fi
+                
                 logger.info(f"Feature importance calculated: {len(feature_importance)} features")
         except Exception as e:
             logger.warning(f"Could not calculate feature importance: {e}")
@@ -917,9 +925,11 @@ def run_training_logic(
             peak_mb = memory_monitor.get_peak_memory() if memory_monitor else 0.0
             
             if final_memory is not None:
+                rss_val = final_memory.rss_mb if final_memory.rss_mb is not None else 0.0
+                delta_val = memory_delta if memory_delta is not None else 0.0
                 logger.info(
-                    f"Training completed - Final memory: {final_memory.rss_mb:.2f}MB, "
-                    f"Delta: {memory_delta:+.2f}MB, Peak: {peak_mb:.2f}MB"
+                    f"Training completed - Final memory: {rss_val:.2f}MB, "
+                    f"Delta: {delta_val:+.2f}MB, Peak: {peak_mb:.2f}MB"
                 )
             else:
                 logger.info("Training completed - Memory monitoring unavailable")

@@ -1925,7 +1925,7 @@ async def get_plot_data(
     
     # 4. Check compatibility
     classification_plots = ['confusion_matrix', 'roc_curve', 'precision_recall_curve']
-    regression_plots = ['residual_plot', 'prediction_error', 'residuals_vs_predicted']
+    regression_plots = ['residual_plot', 'residuals', 'prediction_error', 'residuals_vs_predicted']
     
     if plot_type in classification_plots and task_type != 'classification':
          raise HTTPException(
@@ -1978,14 +1978,14 @@ async def get_plot_data(
              raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Precision-Recall curve data not found")
 
     # Residual Plot
-    elif plot_type == 'residual_plot':
+    elif plot_type == 'residual_plot' or plot_type == 'residuals':
         if 'residual_plot' in metrics and metrics['residual_plot']:
              return {
-                "plot_type": "residual_plot",
+                "plot_type": "residuals",
                 "data": metrics['residual_plot']
             }
         else:
-             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Residual plot data not found")
+             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Data for plot '{plot_type}' was not saved during training.")
              
     # Prediction Error Plot
     elif plot_type == 'prediction_error':
