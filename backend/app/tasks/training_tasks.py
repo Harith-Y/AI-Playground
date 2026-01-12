@@ -43,6 +43,7 @@ def deserialize_transformer(binary_data):
 from app.ml_engine.evaluation.classification_metrics import calculate_classification_metrics
 from app.ml_engine.evaluation.regression_metrics import calculate_regression_metrics
 from app.ml_engine.evaluation.clustering_metrics import calculate_clustering_metrics
+from app.ml_engine.evaluation.learning_curve import calculate_learning_curve
 from app.core.config import settings
 from app.utils.logger import get_logger
 from app.utils.cache import invalidate_model_cache, invalidate_comparison_cache
@@ -787,6 +788,19 @@ def run_training_logic(
             )
             # Convert to dict if it's a dataclass
             metrics = metrics_obj.to_dict() if hasattr(metrics_obj, 'to_dict') else metrics_obj
+
+        # 8.5. Calculate Learning Curve (Optional)
+        # Only for classification and regression, and only if dataset is large enough
+        if task_type.value in ['classification', 'regression'] and len(X_train) >= 20: 
+             logger.info("Computing learning curve...")
+             try:
+                 # Use a smaller CV for speed (3 folds)
+                 lc_data = calculate_learning_curve(model, X_train, y_train, cv=3)
+                 if lc_data:
+                     metrics['learning_curve'] = lc_data
+                     logger.info("Learning curve computed successfully")
+             except Exception as e:
+                 logger.warning(f"Skipping learning curve calculation: {e}")
 
         # 9. Get feature importance if available
         feature_importance = None
