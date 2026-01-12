@@ -771,7 +771,8 @@ def run_training_logic(
 
             metrics_obj = calculate_regression_metrics(
                 y_true=y_test,
-                y_pred=y_pred
+                y_pred=y_pred,
+                n_features=X_train.shape[1] if hasattr(X_train, 'shape') else None
             )
             # Convert to dict if it's a dataclass
             metrics = metrics_obj.to_dict() if hasattr(metrics_obj, 'to_dict') else metrics_obj

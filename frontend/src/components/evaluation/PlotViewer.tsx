@@ -130,7 +130,8 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
                 autorange: true 
             },
             hovermode: 'closest',
-            showlegend: true
+            showlegend: true,
+            autosize: true
           }
         });
       } else {

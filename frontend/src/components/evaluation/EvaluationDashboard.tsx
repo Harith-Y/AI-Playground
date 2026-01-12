@@ -342,7 +342,14 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
     if (!metricsData) return null;
 
     const metrics = metricsData.metrics;
-    const entries = Object.entries(metrics);
+    const entries = Object.entries(metrics).filter(([key, value]) => {
+      // Filter out non-scalar values like plot data objects
+      return (
+        typeof value !== 'object' || 
+        value === null || 
+        key === 'confusion_matrix' // keep specific objects if handled (though string(value) might still be ugly)
+      );
+    });
 
     return (
       <Box>
@@ -350,7 +357,11 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
           All Metrics
         </Typography>
         <Box display="flex" flexWrap="wrap" gap={1}>
-          {entries.map(([key, value]) => (
+          {entries.map(([key, value]) => {
+             // Skip complex objects that don't display well
+             if (typeof value === 'object' && value !== null && key !== 'confusion_matrix') return null;
+
+             return (
             <Box key={key} sx={{ flex: '1 1 calc(33.333% - 8px)', minWidth: '200px' }}>
               <Card variant="outlined" sx={{ height: '100%' }}>
                 <CardContent sx={{ py: 1.5 }}>
@@ -363,7 +374,7 @@ const EvaluationDashboard: React.FC<EvaluationDashboardProps> = ({
                 </CardContent>
               </Card>
             </Box>
-          ))}
+          )})}
         </Box>
       </Box>
     );
