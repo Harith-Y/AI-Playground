@@ -1127,11 +1127,16 @@ async def get_model_metrics(
         )
     
     # Build comprehensive metrics response
+    # Transform metrics for API consistency (r2 -> r2_score)
+    metrics = model_run.metrics.copy() if model_run.metrics else {}
+    if 'r2' in metrics:
+        metrics['r2_score'] = metrics.pop('r2')
+    
     response = {
         "model_run_id": str(model_run.id),
         "model_type": model_run.model_type,
         "task_type": _get_task_type_from_model(model_run.model_type),
-        "metrics": model_run.metrics,
+        "metrics": metrics,
         "training_metadata": {
             "training_time": model_run.training_time,
             "created_at": model_run.created_at.isoformat(),
