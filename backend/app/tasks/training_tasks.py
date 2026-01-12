@@ -876,6 +876,11 @@ def run_training_logic(
         # Store feature importance if available
         if feature_importance is not None:
             model_run.run_metadata['feature_importance'] = feature_importance
+        
+        # Store training metadata
+        model_run.run_metadata['train_samples'] = len(X_train)
+        model_run.run_metadata['test_samples'] = len(X_test) if X_test is not None else 0
+        model_run.run_metadata['n_features'] = X_train.shape[1]
 
         db.commit()
         db.refresh(model_run)
