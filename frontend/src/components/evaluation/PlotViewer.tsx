@@ -81,11 +81,15 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
       // Adaptation for simple structure { x: [], y: [] } returned by residuals logic in backend
       // Cast to any to access potentially missing properties from strict interface
       const rawData = data as any;
-      if (rawData.plot_type === 'residuals' && rawData.data && Array.isArray(rawData.data.x) && !Array.isArray(rawData.plot_data)) {
+      if (rawData.plot_type === 'residuals' && (rawData.data?.x || rawData.data?.data?.x) && !Array.isArray(rawData.plot_data)) {
+        
+        // Handle double nesting if backend returns { data: { x: ... } } instead of just { x: ... }
+        const pointsData = rawData.data.x ? rawData.data : rawData.data.data;
+        
         // Construct Plotly trace for residuals manually
         const scatterTrace = {
-          x: rawData.data.x,
-          y: rawData.data.y,
+          x: pointsData.x,
+          y: pointsData.y,
           mode: 'markers',
           type: 'scatter',
           name: 'Residuals',
@@ -93,8 +97,8 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
         };
         
         // Calculate axis ranges properly to ensure data is visible
-        const xValues = rawData.data.x as number[];
-        const yValues = rawData.data.y as number[];
+        const xValues = pointsData.x as number[];
+        const yValues = pointsData.y as number[];
         
         // Handle empty array case defensively
         let xMin = -1, xMax = 1;
