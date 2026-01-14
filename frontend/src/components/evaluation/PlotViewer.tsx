@@ -175,6 +175,81 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
         };
         console.log('PlotViewer: Setting plot data:', newPlotData);
         setPlotData(newPlotData as any);
+      } else if (plotType === 'learning_curve' && rawData.data) {
+        // Handle learning curve plot: transform statistics into Plotly traces
+        console.log('PlotViewer: Detected learning_curve plot structure');
+        
+        const lcData = rawData.data as any;
+        const trainSizes = lcData.train_sizes || [];
+        const trainMean = lcData.train_mean || [];
+        const trainStd = lcData.train_std || [];
+        const testMean = lcData.test_mean || [];
+        const testStd = lcData.test_std || [];
+        
+        console.log('PlotViewer: Learning curve stats:', {
+          trainSizes,
+          trainMean,
+          testMean
+        });
+        
+        if (trainSizes.length === 0 || trainMean.length === 0) {
+          throw new Error('Invalid learning curve data structure');
+        }
+        
+        // Create traces for training and validation scores
+        const trainTrace = {
+          x: trainSizes,
+          y: trainMean,
+          error_y: {
+            type: 'data',
+            array: trainStd,
+            visible: true,
+            opacity: 0.3
+          },
+          mode: 'lines+markers',
+          type: 'scatter',
+          name: 'Training Score',
+          line: { color: '#4caf50', width: 2 },
+          marker: { size: 8 }
+        };
+        
+        const validationTrace = {
+          x: trainSizes,
+          y: testMean,
+          error_y: {
+            type: 'data',
+            array: testStd,
+            visible: true,
+            opacity: 0.3
+          },
+          mode: 'lines+markers',
+          type: 'scatter',
+          name: 'Validation Score',
+          line: { color: '#ff9800', width: 2 },
+          marker: { size: 8 }
+        };
+        
+        const newPlotData = {
+          plot_type: 'learning_curve',
+          plot_data: [trainTrace, validationTrace],
+          layout: {
+            title: 'Learning Curve',
+            xaxis: { 
+              title: 'Training Set Size',
+              type: 'log'
+            },
+            yaxis: { 
+              title: 'Score',
+              range: [0, 1]
+            },
+            hovermode: 'closest',
+            showlegend: true,
+            autosize: true
+          }
+        };
+        
+        console.log('PlotViewer: Learning curve plot data prepared:', newPlotData);
+        setPlotData(newPlotData as any);
       } else {
         console.log('PlotViewer: Using data as-is (not residuals special case)', data);
         
