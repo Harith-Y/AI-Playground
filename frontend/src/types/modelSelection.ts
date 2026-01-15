@@ -26,6 +26,8 @@ export const ModelCategory = {
   NEURAL_NETWORK: 'neural_network',
   CLUSTERING: 'clustering',
   ANOMALY: 'anomaly',
+  SUPPORT_VECTOR: 'support_vector',
+  INSTANCE_BASED: 'instance_based',
 } as const;
 
 export type ModelCategory = (typeof ModelCategory)[keyof typeof ModelCategory];
@@ -1036,6 +1038,8 @@ export function getCategoryDisplayName(category: ModelCategory): string {
     neural_network: 'Neural Networks',
     clustering: 'Clustering Algorithms',
     anomaly: 'Anomaly Detection',
+    support_vector: 'Support Vector Machines',
+    instance_based: 'Instance-Based Models',
   };
   return names[category] || category;
 }
