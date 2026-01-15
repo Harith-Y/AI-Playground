@@ -349,7 +349,7 @@ async def list_datasets(
     datasets = db.query(Dataset).filter(
         Dataset.user_id == user_id
     ).order_by(
-        Dataset.created_at.desc()
+        Dataset.uploaded_at.desc()
     ).offset(skip).limit(limit).all()
 
     return datasets
