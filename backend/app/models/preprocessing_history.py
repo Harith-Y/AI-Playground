@@ -3,7 +3,7 @@ PreprocessingHistory database model
 """
 from sqlalchemy import Column, String, DateTime, Float, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import func
 import uuid
 
@@ -37,7 +37,7 @@ class PreprocessingHistory(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
     # Relationships
-    dataset = relationship("Dataset", foreign_keys=[dataset_id], backref="preprocessing_history")
+    dataset = relationship("Dataset", foreign_keys=[dataset_id], backref=backref("preprocessing_history", cascade="all, delete-orphan"))
     user = relationship("User", backref="preprocessing_operations")
     output_dataset = relationship("Dataset", foreign_keys=[output_dataset_id])
 
