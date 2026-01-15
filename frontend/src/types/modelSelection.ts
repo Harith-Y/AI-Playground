@@ -185,8 +185,8 @@ export const MODEL_REGISTRY: Record<string, ModelDefinition> = {
     ],
   },
 
-  ridge_regression: {
-    id: 'ridge_regression',
+  ridge: {
+    id: 'ridge',
     name: 'Ridge',
     displayName: 'Ridge Regression (L2)',
     description: 'Linear regression with L2 regularization to prevent overfitting',
