@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import Layout from './components/common/Layout'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import HomePage from './pages/HomePage'
+import DatasetsPage from './pages/DatasetsPage'
 import DatasetUploadPage from './pages/DatasetUploadPage'
 import PreprocessingPage from './pages/PreprocessingPage'
 import FeatureEngineeringPage from './pages/FeatureEngineeringPage'
@@ -20,6 +21,7 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/datasets" element={<DatasetsPage />} />
           <Route path="/dataset-upload" element={<DatasetUploadPage />} />
           <Route path="/exploration" element={<ExplorationPage />} />
           <Route path="/preprocessing" element={<PreprocessingPage />} />

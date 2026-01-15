@@ -174,6 +174,20 @@ const DatasetUploadPage: React.FC = () => {
       dispatch(clearDatasetError());
     };
   }, [dispatch]);
+  
+  // Auto-load details if dataset is already selected (e.g. from Datasets page)
+  useEffect(() => {
+    if (currentDataset?.id) {
+       // Only fetch if we don't have them yet or if the ID changed (though redux usually handles state consistency)
+       // Checking length of columns/preview is a simple heuristic
+       if (!stats && !isLoading) {
+           dispatch(fetchDatasetStats(currentDataset.id));
+       }
+       if ((!preview || preview.length === 0) && !isLoading) {
+           dispatch(fetchDatasetPreview(currentDataset.id));
+       }
+    }
+  }, [currentDataset, dispatch, stats, preview, isLoading]);
 
   const handleSnackbarClose = () => {
     setSnackbarOpen(false);
