@@ -44,8 +44,8 @@ from .clustering import (
 MODEL_WRAPPER_REGISTRY: Dict[str, Type[BaseModelWrapper]] = {
     # Regression models
     "linear_regression": LinearRegressionWrapper,
-    "ridge_regression": RidgeRegressionWrapper,
-    "lasso_regression": LassoRegressionWrapper,
+    "ridge": RidgeRegressionWrapper,
+    "lasso": LassoRegressionWrapper,
     "elastic_net": ElasticNetWrapper,
     "decision_tree_regressor": DecisionTreeRegressorWrapper,
     "random_forest_regressor": RandomForestRegressorWrapper,
@@ -62,14 +62,14 @@ MODEL_WRAPPER_REGISTRY: Dict[str, Type[BaseModelWrapper]] = {
     "extra_trees_classifier": ExtraTreesClassifierWrapper,
     "gradient_boosting_classifier": GradientBoostingClassifierWrapper,
     "adaboost_classifier": AdaBoostClassifierWrapper,
-    "svm_classifier": SVMClassifierWrapper,
+    "svm": SVMClassifierWrapper,
     "knn_classifier": KNeighborsClassifierWrapper,
-    "gaussian_nb": GaussianNBWrapper,
+    "naive_bayes_gaussian": GaussianNBWrapper,
 
     # Clustering models
     "kmeans": KMeansWrapper,
     "dbscan": DBSCANWrapper,
-    "agglomerative_clustering": AgglomerativeClusteringWrapper,
+    "hierarchical_agglomerative": AgglomerativeClusteringWrapper,
     "gaussian_mixture": GaussianMixtureWrapper,
 }
 

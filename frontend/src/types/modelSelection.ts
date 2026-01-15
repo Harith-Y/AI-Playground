@@ -257,6 +257,227 @@ export const MODEL_REGISTRY: Record<string, ModelDefinition> = {
     ],
   },
 
+  lasso: {
+    id: 'lasso',
+    name: 'Lasso',
+    displayName: 'Lasso Regression (L1)',
+    description: 'Linear regression with L1 regularization for feature selection',
+    category: ModelCategory.LINEAR,
+    taskTypes: [TaskType.REGRESSION],
+    complexity: 'low',
+    trainingSpeed: 'fast',
+    interpretability: 'high',
+    pros: [
+      'Performs automatic feature selection',
+      'Produces sparse models',
+      'Good for high-dimensional data',
+      'Prevents overfitting'
+    ],
+    cons: [
+      'Cannot learn complex patterns',
+      'May exclude useful correlated features',
+      'Sensitive to outliers',
+      'Requires feature scaling'
+    ],
+    useCases: [
+      'Feature selection',
+      'Sparse modeling',
+      'High-dimensional datasets',
+      'Baseline regression'
+    ],
+    hyperparameters: [
+      {
+        name: 'alpha',
+        displayName: 'Alpha',
+        type: HyperparamType.FLOAT,
+        default: 1.0,
+        min: 0.0001,
+        max: 100,
+        step: 0.1,
+        description: 'Constant that multiplies the L1 term',
+        required: true,
+      },
+    ],
+    presets: [
+      {
+        id: 'default',
+        name: 'Default',
+        description: 'Standard Lasso',
+        values: { alpha: 1.0 },
+        isDefault: true,
+      },
+    ],
+  },
+
+  decision_tree_regressor: {
+    id: 'decision_tree_regressor',
+    name: 'DecisionTreeRegressor',
+    displayName: 'Decision Tree Regressor',
+    description: 'Tree-based model that learns simple decision rules',
+    category: ModelCategory.TREE_BASED,
+    taskTypes: [TaskType.REGRESSION],
+    complexity: 'medium',
+    trainingSpeed: 'fast',
+    interpretability: 'high',
+    pros: [
+      'Easy to visualize and interpret',
+      'Handles non-linear data',
+      'No scaling required',
+      'Fast training'
+    ],
+    cons: [
+      'Prone to overfitting',
+      'Instable (high variance)',
+      'Cannot extrapolate',
+      'Biased to dominant classes'
+    ],
+    useCases: [
+      'Non-linear regression',
+      'When interpretation is key',
+      'Baseline for ensembles',
+      'Mixed data types'
+    ],
+    hyperparameters: [
+      {
+        name: 'max_depth',
+        displayName: 'Max Depth',
+        type: HyperparamType.INTEGER,
+        default: 5,
+        min: 1,
+        max: 50,
+        step: 1,
+        description: 'Maximum depth of the tree',
+        required: false,
+      },
+    ],
+    presets: [
+      {
+        id: 'default',
+        name: 'Default',
+        description: 'Standard Tree',
+        values: { max_depth: 5 },
+        isDefault: true,
+      },
+    ],
+  },
+
+  svr: {
+    id: 'svr',
+    name: 'SVR',
+    displayName: 'Support Vector Regression',
+    description: 'Epsilon-Support Vector Regression',
+    category: ModelCategory.SUPPORT_VECTOR,
+    taskTypes: [TaskType.REGRESSION],
+    complexity: 'high',
+    trainingSpeed: 'medium',
+    interpretability: 'low',
+    pros: [
+      'Effective in high dimensions',
+      'Robust to outliers (with correct kernel)',
+      'Versatile kernels',
+      'Memory efficient'
+    ],
+    cons: [
+      'Hard to tune',
+      'No probabilistic interpretation',
+      'Sensitive to scaling',
+      'Slow on large datasets'
+    ],
+    useCases: [
+      'High-dimensional regression',
+      'Financial prediction',
+      'Complex non-linear bounds',
+      'Small to medium datasets'
+    ],
+    hyperparameters: [
+      {
+        name: 'C',
+        displayName: 'Regularization (C)',
+        type: HyperparamType.FLOAT,
+        default: 1.0,
+        min: 0.01,
+        max: 100,
+        step: 0.1,
+        description: 'Regularization parameter',
+        required: true,
+      },
+      {
+        name: 'kernel',
+        displayName: 'Kernel',
+        type: HyperparamType.CATEGORICAL,
+        default: 'rbf',
+        options: [
+          { value: 'linear', label: 'Linear' },
+          { value: 'rbf', label: 'RBF' },
+          { value: 'poly', label: 'Polynomial' },
+        ],
+        description: 'Kernel type',
+        required: true,
+      },
+    ],
+    presets: [
+      {
+        id: 'default',
+        name: 'Default',
+        description: 'Standard SVR',
+        values: { C: 1.0, kernel: 'rbf' },
+        isDefault: true,
+      },
+    ],
+  },
+  
+  knn_regressor: {
+    id: 'knn_regressor',
+    name: 'KNNRegressor',
+    displayName: 'K-Nearest Neighbors Regressor',
+    description: 'Regression based on k-nearest neighbors',
+    category: ModelCategory.INSTANCE_BASED,
+    taskTypes: [TaskType.REGRESSION],
+    complexity: 'low',
+    trainingSpeed: 'fast',
+    interpretability: 'medium',
+    pros: [
+      'Simple and intuitive',
+      'No training phase (lazy)',
+      'Adapts to local structure',
+      'Non-parametric'
+    ],
+    cons: [
+      'Slow prediction on large data',
+      'Sensitive to noise',
+      'Requires scaling',
+      'Curse of dimensionality'
+    ],
+    useCases: [
+      'Spatial regression',
+      'Recommendation systems',
+      'Baseline comparison',
+      'Small datasets'
+    ],
+    hyperparameters: [
+      {
+        name: 'n_neighbors',
+        displayName: 'Neighbors (K)',
+        type: HyperparamType.INTEGER,
+        default: 5,
+        min: 1,
+        max: 50,
+        step: 1,
+        description: 'Number of neighbors',
+        required: true,
+      },
+    ],
+    presets: [
+      {
+        id: 'default',
+        name: 'Default',
+        description: '5 Neighbors',
+        values: { n_neighbors: 5 },
+        isDefault: true,
+      },
+    ],
+  },
+
   random_forest_regressor: {
     id: 'random_forest_regressor',
     name: 'RandomForestRegressor',
@@ -418,6 +639,187 @@ export const MODEL_REGISTRY: Record<string, ModelDefinition> = {
         name: 'Weak Regularization',
         description: 'More flexible model (C=10.0)',
         values: { C: 10.0, max_iter: 200 },
+      },
+    ],
+  },
+
+  decision_tree_classifier: {
+    id: 'decision_tree_classifier',
+    name: 'DecisionTreeClassifier',
+    displayName: 'Decision Tree Classifier',
+    description: 'Tree-based classifier using simple decision rules',
+    category: ModelCategory.TREE_BASED,
+    taskTypes: [TaskType.CLASSIFICATION],
+    complexity: 'medium',
+    trainingSpeed: 'fast',
+    interpretability: 'high',
+    pros: [
+      'Easy to interpret/visualize',
+      'Non-parametric',
+      'No scaling needed',
+      'Handles multi-output'
+    ],
+    cons: [
+      'Overfitting',
+      'Sensitive to small data changes',
+      'Biased to dominant classes',
+      'Not smooth boundaries'
+    ],
+    useCases: [
+      'Medical diagnosis',
+      'Credit scoring',
+      'Customer churn',
+      'Rule generation'
+    ],
+    hyperparameters: [
+      {
+        name: 'max_depth',
+        displayName: 'Max Depth',
+        type: HyperparamType.INTEGER,
+        default: 5,
+        min: 1,
+        max: 50,
+        step: 1,
+        description: 'Global tree depth limit',
+        required: false,
+      },
+      {
+        name: 'criterion',
+        displayName: 'Criterion',
+        type: HyperparamType.CATEGORICAL,
+        default: 'gini',
+        options: [
+            { value: 'gini', label: 'Gini Impurity' },
+            { value: 'entropy', label: 'Entropy' }
+        ],
+        description: 'Split quality measure',
+        required: true,
+      },
+    ],
+    presets: [
+      {
+        id: 'default',
+        name: 'Default',
+        description: 'Standard Tree',
+        values: { max_depth: 5, criterion: 'gini' },
+        isDefault: true,
+      },
+    ],
+  },
+
+  svm: {
+    id: 'svm',
+    name: 'SVC',
+    displayName: 'Support Vector Machine (SVC)',
+    description: 'C-Support Vector Classification',
+    category: ModelCategory.SUPPORT_VECTOR,
+    taskTypes: [TaskType.CLASSIFICATION],
+    complexity: 'high',
+    trainingSpeed: 'medium',
+    interpretability: 'low',
+    pros: [
+      'Effective in high dimensions',
+      'Versatile kernels',
+      'Memory efficient',
+      'Robust'
+    ],
+    cons: [
+      'Slow on large data',
+      'Noise sensitive',
+      'Probability estimates are slow',
+      'Hard parameter tuning'
+    ],
+    useCases: [
+      'Image classification',
+      'Text categorization',
+      'Bioinformatics',
+      'Handwriting recognition'
+    ],
+    hyperparameters: [
+      {
+        name: 'C',
+        displayName: 'Regularization (C)',
+        type: HyperparamType.FLOAT,
+        default: 1.0,
+        min: 0.01,
+        max: 100,
+        step: 0.1,
+        description: 'Regularization strength',
+        required: true,
+      },
+      {
+        name: 'kernel',
+        displayName: 'Kernel',
+        type: HyperparamType.CATEGORICAL,
+        default: 'rbf',
+        options: [
+            { value: 'linear', label: 'Linear' },
+            { value: 'rbf', label: 'RBF' },
+            { value: 'poly', label: 'Polynomial' }
+        ],
+        description: 'Kernel type',
+        required: true,
+      },
+    ],
+    presets: [
+      {
+        id: 'default',
+        name: 'Default',
+        description: 'Standard SVM',
+        values: { C: 1.0, kernel: 'rbf' },
+        isDefault: true,
+      },
+    ],
+  },
+
+  knn_classifier: {
+    id: 'knn_classifier',
+    name: 'KNNClassifier',
+    displayName: 'K-Nearest Neighbors Classifier',
+    description: 'Classifier implementing the k-nearest neighbors vote',
+    category: ModelCategory.INSTANCE_BASED,
+    taskTypes: [TaskType.CLASSIFICATION],
+    complexity: 'low',
+    trainingSpeed: 'fast',
+    interpretability: 'medium',
+    pros: [
+      'Simple to understand',
+      'No assumption about data',
+      'Versatile (binary/multiclass)',
+      'Constantly evolving (lazy)'
+    ],
+    cons: [
+      'Computationally expensive prediction',
+      'High memory usage',
+      'Sensitive to unrelated features',
+      'Needs scaling'
+    ],
+    useCases: [
+      'Pattern recognition',
+      'Data mining',
+      'Intrusion detection',
+      'Recommendation'
+    ],
+    hyperparameters: [
+      {
+        name: 'n_neighbors',
+        displayName: 'Neighbors (K)',
+        type: HyperparamType.INTEGER,
+        default: 5,
+        min: 1,
+        max: 50,
+        step: 1,
+        description: 'Number of neighbors',
+        required: true,
+      },
+    ],
+    presets: [
+      {
+        id: 'default',
+        name: 'Default',
+        description: '5 Neighbors',
+        values: { n_neighbors: 5 },
+        isDefault: true,
       },
     ],
   },
