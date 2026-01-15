@@ -175,11 +175,11 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
         };
         console.log('PlotViewer: Setting plot data:', newPlotData);
         setPlotData(newPlotData as any);
-      } else if (plotType === 'learning_curve' && rawData.data) {
+      } else if (plotType === 'learning_curve' && (rawData.data || rawData.train_sizes)) {
         // Handle learning curve plot: transform statistics into Plotly traces
         console.log('PlotViewer: Detected learning_curve plot structure');
         
-        const lcData = rawData.data as any;
+        const lcData = rawData.data || rawData;
         const trainSizes = lcData.train_sizes || [];
         const trainMean = lcData.train_mean || [];
         const trainStd = lcData.train_std || [];
@@ -229,6 +229,8 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
           marker: { size: 8 }
         };
         
+        console.log('PlotViewer: Learning curve traces:', { trainTrace, validationTrace });
+        
         const newPlotData = {
           plot_type: 'learning_curve',
           plot_data: [trainTrace, validationTrace],
@@ -236,11 +238,10 @@ const PlotViewer: React.FC<PlotViewerProps> = ({
             title: 'Learning Curve',
             xaxis: { 
               title: 'Training Set Size',
-              type: 'log'
             },
             yaxis: { 
               title: 'Score',
-              range: [0, 1]
+              autorange: true
             },
             hovermode: 'closest',
             showlegend: true,
