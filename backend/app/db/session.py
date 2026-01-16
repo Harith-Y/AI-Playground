@@ -26,8 +26,7 @@ if is_postgres:
         "pool_timeout": 10,  # Only wait 10 seconds for a connection (fail fast)
         "pool_pre_ping": True,  # Always verify connections before using
         "connect_args": {
-            "connect_timeout": 5,  # Fast connection timeout
-            "options": "-c statement_timeout=25000"  # 25 second query timeout
+            "connect_timeout": 5  # Fast connection timeout
         }
     })
 elif is_sqlite:
