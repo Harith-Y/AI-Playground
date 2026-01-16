@@ -20,13 +20,13 @@ engine_config = {}
 if is_postgres:
     # PostgreSQL-specific configuration (optimized for NeonDB serverless)
     engine_config.update({
-        "pool_size": 2,  # Minimal pool for serverless (Neon autoscales)
-        "max_overflow": 3,  # Limited overflow to prevent queue buildup
+        "pool_size": 3,  # Small pool for serverless (Neon autoscales)
+        "max_overflow": 7,  # Allow burst traffic (total 10 connections max)
         "pool_recycle": 60,  # Recycle connections after 1 minute (Neon hibernates quickly)
-        "pool_timeout": 10,  # Only wait 10 seconds for a connection (fail fast)
+        "pool_timeout": 15,  # Wait up to 15 seconds for a connection
         "pool_pre_ping": True,  # Always verify connections before using
         "connect_args": {
-            "connect_timeout": 5  # Fast connection timeout
+            "connect_timeout": 10  # Connection timeout
         }
     })
 elif is_sqlite:
