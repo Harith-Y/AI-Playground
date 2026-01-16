@@ -203,27 +203,28 @@ const datasetSlice = createSlice({
         state.error = action.payload as string;
       })
       // Delete dataset
-      .addCase(deleteDataset.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(deleteDataset.fulfilled, (state, action) => {
-        state.isLoading = false;
-
-        // Remove from datasets array
-        state.datasets = state.datasets.filter(d => d.id !== action.payload);
-
+      .addCase(deleteDataset.pending, (state, action) => {
+        // Don't set isLoading to avoid UI freeze
+        // Optimistically remove from UI immediately
+        const datasetId = action.meta.arg;
+        state.datasets = state.datasets.filter(d => d.id !== datasetId);
+        
         // Clear current dataset if it was deleted
-        if (state.currentDataset?.id === action.payload) {
+        if (state.currentDataset?.id === datasetId) {
           state.currentDataset = null;
           state.stats = null;
           state.columns = [];
           state.preview = [];
         }
+        state.error = null;
+      })
+      .addCase(deleteDataset.fulfilled, (state, action) => {
+        // Already removed in pending, nothing more to do
       })
       .addCase(deleteDataset.rejected, (state, action) => {
-        state.isLoading = false;
         state.error = action.payload as string;
+        // Optionally refetch datasets to restore state if delete failed
+        // For now, just show error - user can refresh if needed
       });
   },
 });
