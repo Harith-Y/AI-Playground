@@ -30,9 +30,10 @@ async def fix_dataset_metadata(db: Session = Depends(get_db)) -> Dict[str, Any]:
     try:
         storage_service = get_storage_service()
         
-        # Get all datasets with missing metadata
+        # Get all datasets with missing metadata (NULL or 0)
         datasets = db.query(Dataset).filter(
-            (Dataset.rows == None) | (Dataset.cols == None)
+            (Dataset.rows == None) | (Dataset.cols == None) | 
+            (Dataset.rows == 0) | (Dataset.cols == 0)
         ).all()
         
         if not datasets:
