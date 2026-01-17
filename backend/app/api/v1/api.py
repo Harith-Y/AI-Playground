@@ -13,7 +13,8 @@ from app.api.v1.endpoints import (
     experiment_config,
     inference,
     celery_monitoring,
-    visualizations
+    visualizations,
+    admin
 )
 
 api_router = APIRouter()
@@ -91,4 +92,11 @@ api_router.include_router(
     visualizations.router,
     prefix="/visualizations",
     tags=["visualizations"]
+)
+
+# Admin utilities
+api_router.include_router(
+    admin.router,
+    prefix="/admin",
+    tags=["admin"]
 )
