@@ -17,11 +17,11 @@ AI-Playground is an end-to-end ML platform that enables:
 - ✅ **Exploratory Data Analysis** - Statistical summaries, correlation analysis, distribution plots, heatmaps
 - ✅ **Automated Preprocessing** - Customizable pipeline with imputation, scaling, encoding, outlier detection
 - ✅ **Feature Engineering** - Feature selection via variance, correlation, and mutual information
-- 🚧 **Model Training** - Support for regression, classification, and clustering (Coming Soon)
-- 🚧 **Hyperparameter Tuning** - Grid search, random search, and Bayesian optimization (Coming Soon)
-- 🚧 **Model Evaluation** - Comprehensive metrics and visualizations (Coming Soon)
-- 🚧 **Code Generation** - Export production-ready ML pipeline code (Coming Soon)
-- 🚧 **Experiment Tracking** - Track and compare model experiments (Coming Soon)
+- ✅ **Model Training** - Support for regression, classification, and clustering with async Celery tasks
+- ✅ **Hyperparameter Tuning** - Grid search, random search, and Bayesian optimization
+- ✅ **Model Evaluation** - Comprehensive metrics, visualizations, and feature importance analysis
+- ✅ **Code Generation** - Export production-ready ML pipeline code (Python, Jupyter, requirements)
+- ✅ **Experiment Tracking** - Track and compare model experiments with full history
 
 ## ✨ Key Features
 
@@ -61,9 +61,9 @@ AI-Playground is an end-to-end ML platform that enables:
 - ✅ **Z-Score Outlier Detector** - Detect outliers using standard deviation method
 - ✅ **Standard/MinMax/Robust Scalers** - Feature normalization and standardization
 - ✅ **OneHot/Label Encoders** - Categorical variable encoding
-- 🚧 **Model Registry** - Regression, classification, clustering models (Placeholder)
-- 🚧 **Training Pipeline** - Cross-validation, train/test split (Placeholder)
-- 🚧 **Hyperparameter Tuning** - Grid search, random search, Bayesian optimization (Placeholder)
+- ✅ **Model Registry** - 25+ models including Linear, Ridge, Lasso, Random Forest, XGBoost, LightGBM, CatBoost
+- ✅ **Training Pipeline** - K-fold cross-validation, stratified CV, train/test split with configurable ratios
+- ✅ **Hyperparameter Tuning** - Grid search, random search, Bayesian optimization with parallel execution
 
 ### 🎨 Frontend Features (✅ Implemented)
 
@@ -77,8 +77,10 @@ AI-Playground is an end-to-end ML platform that enables:
 - ✅ **Search & Filter** - Find visualizations by name or type
 - ✅ **Fullscreen Mode** - Expand charts for detailed analysis
 - ✅ **Data Download** - Export visualization data as JSON
-- 🚧 **Preprocessing UI** - Step builder with drag-and-drop (Coming Soon)
-- 🚧 **Model Training UI** - Model selection and configuration (Coming Soon)
+- ✅ **Preprocessing UI** - Step builder for creating custom preprocessing pipelines
+- ✅ **Model Training UI** - Model selection, hyperparameter configuration, and training progress tracking
+- ✅ **Evaluation Dashboard** - Interactive metrics display with charts and model insights
+- ✅ **Code Export UI** - Generate and download complete ML pipeline code
 
 ### 🔌 Backend API (✅ Core Endpoints)
 
@@ -95,9 +97,11 @@ AI-Playground is an end-to-end ML platform that enables:
 - ✅ **Input Validation** - Pydantic schemas for all API payloads
 - ✅ **Error Handling** - Structured error responses with detailed messages
 - ✅ **File Storage** - Organized uploads with user/dataset hierarchy, supports R2 and local storage
-- 🚧 **Model Training Endpoints** - Train, status, results (Placeholder)
-- 🚧 **Tuning Endpoints** - Optimize, status, results (Placeholder)
-- 🚧 **Code Generation Endpoints** - Python, notebook, FastAPI export (Placeholder)
+- ✅ **Model Training Endpoints** - Train models, check status, retrieve results and metrics
+- ✅ **Tuning Endpoints** - Optimize hyperparameters, track progress, compare results
+- ✅ **Evaluation Endpoints** - Compute metrics, generate visualizations, feature importance
+- ✅ **Code Generation Endpoints** - Export Python scripts, Jupyter notebooks, requirements.txt, and FastAPI inference code
+- ✅ **Experiment Management** - Full CRUD operations for tracking ML experiments
 
 ## 🏗️ Complete Project Structure
 
@@ -554,8 +558,11 @@ For issues and questions, please open an issue on GitHub.
 
 ---
 
-**Last updated:** 2026-01-17 14:45:00  
+**Last updated:** 2026-01-17 16:30:00  
 **Recent Changes:**
+- ✅ Updated README to reflect all implemented features (no longer "Coming Soon")
 - ✅ Fixed dataset preview/stats endpoints to use R2 storage service
 - ✅ Added automatic URL-to-key conversion for R2 file access
 - ✅ Enhanced storage service to handle both cloud and local files seamlessly
+- ✅ Complete ML pipeline: Training, Tuning, Evaluation, and Code Generation
+- ✅ 25+ ML models with async Celery task execution
