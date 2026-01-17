@@ -148,15 +148,49 @@ class R2StorageService:
         Download file from R2 or local storage
         
         Args:
-            file_path: Relative path to the file
+            file_path: Relative path to the file, or full URL for R2 files
         
         Returns:
             bytes: File content
         """
+        # If file_path is a URL and we're using R2, extract the key
+        if self.use_r2 and (file_path.startswith('http://') or file_path.startswith('https://')):
+            file_path = self._extract_r2_key_from_url(file_path)
+        
         if self.use_r2:
             return self._download_from_r2(file_path)
         else:
             return self._download_from_local(file_path)
+    
+    def _extract_r2_key_from_url(self, url: str) -> str:
+        """
+        Extract R2 key from a URL
+        
+        Examples:
+            https://custom-domain.com/user_id/dataset_id/file.csv -> user_id/dataset_id/file.csv
+            https://account.r2.cloudflarestorage.com/bucket/user_id/dataset_id/file.csv -> user_id/dataset_id/file.csv
+        """
+        try:
+            if settings.R2_PUBLIC_URL and url.startswith(settings.R2_PUBLIC_URL):
+                # Custom domain URL: remove the domain part
+                key = url[len(settings.R2_PUBLIC_URL):].lstrip('/')
+                logger.debug(f"Extracted R2 key from custom URL: {key}")
+                return key
+            else:
+                # Standard R2 URL format: https://account.r2.cloudflarestorage.com/bucket/path/to/file
+                # Split and take everything after the bucket name
+                parts = url.split('/', 5)  # https: / / domain / bucket / path
+                if len(parts) > 5:
+                    key = parts[5]
+                    logger.debug(f"Extracted R2 key from standard URL: {key}")
+                    return key
+                else:
+                    # Fallback: return the URL as-is (might be a relative path)
+                    logger.warning(f"Could not parse R2 URL, using as-is: {url}")
+                    return url
+        except Exception as e:
+            logger.error(f"Failed to extract R2 key from URL {url}: {e}")
+            return url
     
     def _download_from_r2(self, file_path: str) -> bytes:
         """Download file from R2 bucket"""
@@ -194,11 +228,15 @@ class R2StorageService:
         Delete file from R2 or local storage
         
         Args:
-            file_path: Relative path to the file
+            file_path: Relative path to the file, or full URL for R2 files
         
         Returns:
             bool: True if successful
         """
+        # If file_path is a URL and we're using R2, extract the key
+        if self.use_r2 and (file_path.startswith('http://') or file_path.startswith('https://')):
+            file_path = self._extract_r2_key_from_url(file_path)
+        
         if self.use_r2:
             return self._delete_from_r2(file_path)
         else:

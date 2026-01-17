@@ -650,32 +650,60 @@ async def get_dataset_preview(
     # Verify ownership (allows admins to access any dataset)
     verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
-    # Load file
-    file_path = Path(dataset.file_path)
-    if not file_path.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Dataset file not found on disk"
-        )
-
+    # Load file from storage (R2 or local)
     try:
-        # Read file based on extension
-        file_ext = file_path.suffix.lower()
-        if file_ext == ".csv":
-            df = pd.read_csv(file_path, nrows=rows)
-            df_full = pd.read_csv(file_path)
-        elif file_ext in [".xlsx", ".xls"]:
-            df = pd.read_excel(file_path, nrows=rows)
-            df_full = pd.read_excel(file_path)
-        elif file_ext == ".json":
-            df = pd.read_json(file_path)
-            df_full = df.copy()
-            df = df.head(rows)
+        storage_service = get_storage_service()
+        
+        # Check if file_path is URL or local path
+        is_url = dataset.file_path.startswith('http://') or dataset.file_path.startswith('https://')
+        
+        if is_url or storage_service.use_r2:
+            # Download file from R2 storage
+            file_content = storage_service.download_file(dataset.file_path)
+            file_ext = Path(dataset.name).suffix.lower()
+            
+            # Read file from bytes
+            if file_ext == ".csv":
+                df = pd.read_csv(io.BytesIO(file_content), nrows=rows)
+                df_full = pd.read_csv(io.BytesIO(file_content))
+            elif file_ext in [".xlsx", ".xls"]:
+                df = pd.read_excel(io.BytesIO(file_content), nrows=rows)
+                df_full = pd.read_excel(io.BytesIO(file_content))
+            elif file_ext == ".json":
+                df = pd.read_json(io.BytesIO(file_content))
+                df_full = df.copy()
+                df = df.head(rows)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported file format: {file_ext}"
+                )
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file format: {file_ext}"
-            )
+            # Local file path
+            file_path = Path(dataset.file_path)
+            if not file_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Dataset file not found on disk"
+                )
+            
+            # Read file based on extension
+            file_ext = file_path.suffix.lower()
+            if file_ext == ".csv":
+                df = pd.read_csv(file_path, nrows=rows)
+                df_full = pd.read_csv(file_path)
+            elif file_ext in [".xlsx", ".xls"]:
+                df = pd.read_excel(file_path, nrows=rows)
+                df_full = pd.read_excel(file_path)
+            elif file_ext == ".json":
+                df = pd.read_json(file_path)
+                df_full = df.copy()
+                df = df.head(rows)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported file format: {file_ext}"
+                )
 
         # Extract column information
         columns = []
@@ -812,44 +840,51 @@ async def get_dataset_stats(
     # Verify ownership (allows admins to access any dataset)
     verify_resource_ownership(dataset.user_id, user_id, allow_admin=True, db=db)
 
-    # Load file
-    file_path_str = str(dataset.file_path)
-    is_url = file_path_str.startswith("http://") or file_path_str.startswith("https://")
-    
-    if not is_url and not Path(file_path_str).exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset file not found on disk: {file_path_str}"
-        )
-
+    # Load file from storage (R2 or local)
     try:
-        # Read file based on extension
-        if is_url:
-            file_path = file_path_str
-            file_ext = Path(file_path_str).suffix.lower()
+        storage_service = get_storage_service()
+        
+        # Check if file_path is URL or local path
+        is_url = dataset.file_path.startswith('http://') or dataset.file_path.startswith('https://')
+        
+        if is_url or storage_service.use_r2:
+            # Download file from R2 storage
+            file_content = storage_service.download_file(dataset.file_path)
+            file_ext = Path(dataset.name).suffix.lower()
+            
+            # Read file from bytes
+            if file_ext == ".csv":
+                df = pd.read_csv(io.BytesIO(file_content))
+            elif file_ext in [".xlsx", ".xls"]:
+                df = pd.read_excel(io.BytesIO(file_content))
+            elif file_ext == ".json":
+                df = pd.read_json(io.BytesIO(file_content))
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported file format: {file_ext}"
+                )
         else:
-            file_path = Path(file_path_str)
+            # Local file path
+            file_path = Path(dataset.file_path)
+            if not file_path.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Dataset file not found on disk: {dataset.file_path}"
+                )
+            
             file_ext = file_path.suffix.lower()
-
-        # Read file based on extension
-        if is_url:
-            file_path = file_path_str
-            file_ext = Path(file_path_str).suffix.lower()
-        else:
-            file_path = Path(file_path_str)
-            file_ext = file_path.suffix.lower()
-
-        if file_ext == ".csv":
-            df = pd.read_csv(file_path)
-        elif file_ext in [".xlsx", ".xls"]:
-            df = pd.read_excel(file_path)
-        elif file_ext == ".json":
-            df = pd.read_json(file_path)
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file format: {file_ext}"
-            )
+            if file_ext == ".csv":
+                df = pd.read_csv(file_path)
+            elif file_ext in [".xlsx", ".xls"]:
+                df = pd.read_excel(file_path)
+            elif file_ext == ".json":
+                df = pd.read_json(file_path)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported file format: {file_ext}"
+                )
 
         # Calculate statistics
         row_count = len(df)
