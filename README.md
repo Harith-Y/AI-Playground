@@ -28,7 +28,8 @@ AI-Playground is an end-to-end ML platform that enables:
 ### 📊 Data Management & EDA (✅ Implemented)
 
 - ✅ **Multi-format Upload** - Support for CSV, Excel (XLSX, XLS), JSON
-- ✅ **Dataset Preview** - Interactive data table with 10+ rows preview
+- ✅ **Cloud Storage Integration** - Cloudflare R2 storage for production, local filesystem for development
+- ✅ **Dataset Preview** - Interactive data table with 10+ rows preview (supports both R2 and local files)
 - ✅ **Comprehensive Statistics** - Row/column counts, dtypes, missing values, duplicates, memory usage
 - ✅ **Column-level Analysis** - Data types, unique counts, null counts, min/max/mean/median for each column
 - ✅ **EDA Statistics Module** - 10+ analysis methods including distribution, correlation, skewness, kurtosis
@@ -83,6 +84,7 @@ AI-Playground is an end-to-end ML platform that enables:
 
 - ✅ **RESTful API** - Clean, documented endpoints with OpenAPI/Swagger
 - ✅ **Dataset Endpoints** - Upload, preview, stats, delete with full CRUD
+- ✅ **R2 Storage Service** - Seamless cloud storage integration with automatic URL-to-key conversion
 - ✅ **Preprocessing Endpoints** - Step management (create, read, update, delete, reorder) with authorization
 - ✅ **NeonDB Optimized** - Serverless PostgreSQL with connection pooling
 - ✅ **Redis Caching** - Fast data access with 40-133x faster response times (see [CACHING_GUIDE.md](CACHING_GUIDE.md))
@@ -92,7 +94,7 @@ AI-Playground is an end-to-end ML platform that enables:
 - ✅ **Comprehensive Tests** - 80+ unit tests with pytest
 - ✅ **Input Validation** - Pydantic schemas for all API payloads
 - ✅ **Error Handling** - Structured error responses with detailed messages
-- ✅ **File Storage** - Organized uploads with user/dataset hierarchy
+- ✅ **File Storage** - Organized uploads with user/dataset hierarchy, supports R2 and local storage
 - 🚧 **Model Training Endpoints** - Train, status, results (Placeholder)
 - 🚧 **Tuning Endpoints** - Optimize, status, results (Placeholder)
 - 🚧 **Code Generation Endpoints** - Python, notebook, FastAPI export (Placeholder)
@@ -549,5 +551,13 @@ See [SETUP.md](SETUP.md) for common issues and solutions.
 ## 📧 Support
 
 For issues and questions, please open an issue on GitHub.
-#   L a s t   u p d a t e d :   2 0 2 6 - 0 1 - 1 2   2 3 : 2 8 : 4 1  
+
+---
+
+**Last updated:** 2026-01-17 14:45:00  
+**Recent Changes:**
+- ✅ Fixed dataset preview/stats endpoints to use R2 storage service
+- ✅ Added automatic URL-to-key conversion for R2 file access
+- ✅ Enhanced storage service to handle both cloud and local files seamlessly
+ 
  
