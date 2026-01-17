@@ -225,118 +225,182 @@ const ModelingPage: React.FC = () => {
                   />
                 )}
               </CardContent>
+              {/* Navigation Buttons for Step 0 */}
+              {activeStep === 0 && (
+                <Box sx={{ px: 2, pb: 2, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                  <Button
+                    onClick={handleNextStep}
+                    disabled={!canProceedToNextStep() || isTraining}
+                    variant="contained"
+                  >
+                    Next
+                  </Button>
+                </Box>
+              )}
             </Card>
 
             {/* Section 2: Model Selection */}
-            <Card
-              sx={{
-                border: activeStep === 1 ? '2px solid' : '1px solid #e2e8f0',
-                borderColor: activeStep === 1 ? 'primary.main' : 'divider',
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                  <Psychology color={activeStep === 1 ? 'primary' : 'action'} />
-                  <Typography variant="h6" fontWeight={600}>
-                    2. Model Selection
-                  </Typography>
-                  {selectedModel && (
-                    <Chip label="Selected" color="success" size="small" />
-                  )}
-                </Box>
-                <Divider sx={{ mb: 2 }} />
-                
-                <ModelSelector
-                  taskType={(taskType as any) || 'classification'}
-                  selectedModel={selectedModel ? { 
-                    modelId: selectedModel, 
-                    taskType: (taskType as any) || 'classification', 
-                    hyperparameters: {} 
-                  } : null}
-                  onModelSelect={handleModelSelect}
-                  disabled={!currentDataset} // Always enable model selection if we have a dataset
-                />
-              </CardContent>
-            </Card>
+            {activeStep >= 1 && (
+              <Card
+                sx={{
+                  border: activeStep === 1 ? '2px solid' : '1px solid #e2e8f0',
+                  borderColor: activeStep === 1 ? 'primary.main' : 'divider',
+                }}
+              >
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Psychology color={activeStep === 1 ? 'primary' : 'action'} />
+                    <Typography variant="h6" fontWeight={600}>
+                      2. Model Selection
+                    </Typography>
+                    {selectedModel && (
+                      <Chip label="Selected" color="success" size="small" />
+                    )}
+                  </Box>
+                  <Divider sx={{ mb: 2 }} />
+
+                  <ModelSelector
+                    taskType={(taskType as any) || 'classification'}
+                    selectedModel={selectedModel ? {
+                      modelId: selectedModel,
+                      taskType: (taskType as any) || 'classification',
+                      hyperparameters: {}
+                    } : null}
+                    onModelSelect={handleModelSelect}
+                    disabled={!currentDataset} // Always enable model selection if we have a dataset
+                  />
+                </CardContent>
+                {/* Navigation Buttons for Step 1 */}
+                {activeStep === 1 && (
+                  <Box sx={{ px: 2, pb: 2, display: 'flex', gap: 2, justifyContent: 'space-between' }}>
+                    <Button
+                      onClick={handlePreviousStep}
+                      disabled={isTraining}
+                      variant="outlined"
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      onClick={handleNextStep}
+                      disabled={!canProceedToNextStep() || isTraining}
+                      variant="contained"
+                    >
+                      Next
+                    </Button>
+                  </Box>
+                )}
+              </Card>
+            )}
 
             {/* Section 3: Hyperparameters */}
-            <Card
-              sx={{
-                border: activeStep === 2 ? '2px solid' : '1px solid #e2e8f0',
-                borderColor: activeStep === 2 ? 'primary.main' : 'divider',
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                  <Tune color={activeStep === 2 ? 'primary' : 'action'} />
-                  <Typography variant="h6" fontWeight={600}>
-                    3. Hyperparameters
-                  </Typography>
-                </Box>
-                <Divider sx={{ mb: 2 }} />
-                {selectedModel ? (
-                  MODEL_REGISTRY[selectedModel] ? (
-                    <HyperparameterEditor
-                      model={MODEL_REGISTRY[selectedModel]}
-                      values={hyperparameters}
-                      onChange={(values) => dispatch(setHyperparameters(values))}
-                    />
+            {activeStep >= 2 && (
+              <Card
+                sx={{
+                  border: activeStep === 2 ? '2px solid' : '1px solid #e2e8f0',
+                  borderColor: activeStep === 2 ? 'primary.main' : 'divider',
+                }}
+              >
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Tune color={activeStep === 2 ? 'primary' : 'action'} />
+                    <Typography variant="h6" fontWeight={600}>
+                      3. Hyperparameters
+                    </Typography>
+                  </Box>
+                  <Divider sx={{ mb: 2 }} />
+                  {selectedModel ? (
+                    MODEL_REGISTRY[selectedModel] ? (
+                      <HyperparameterEditor
+                        model={MODEL_REGISTRY[selectedModel]}
+                        values={hyperparameters}
+                        onChange={(values) => dispatch(setHyperparameters(values))}
+                      />
+                    ) : (
+                      <Alert severity="warning">
+                        Model definition not found for {selectedModel}
+                      </Alert>
+                    )
                   ) : (
-                    <Alert severity="warning">
-                      Model definition not found for {selectedModel}
-                    </Alert>
-                  )
-                ) : (
-                  <EmptyState
-                    title="No Model Selected"
-                    message="Select a model first to configure hyperparameters"
-                    icon={<Tune sx={{ fontSize: 48 }} />}
-                  />
+                    <EmptyState
+                      title="No Model Selected"
+                      message="Select a model first to configure hyperparameters"
+                      icon={<Tune sx={{ fontSize: 48 }} />}
+                    />
+                  )}
+                </CardContent>
+                {/* Navigation Buttons for Step 2 */}
+                {activeStep === 2 && (
+                  <Box sx={{ px: 2, pb: 2, display: 'flex', gap: 2, justifyContent: 'space-between' }}>
+                    <Button
+                      onClick={handlePreviousStep}
+                      disabled={isTraining}
+                      variant="outlined"
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      onClick={handleNextStep}
+                      disabled={isTraining}
+                      variant="contained"
+                    >
+                      Next
+                    </Button>
+                  </Box>
                 )}
-              </CardContent>
-            </Card>
-          </Stack>
+              </Card>
+            )}
 
-          {/* Navigation Buttons */}
-          <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'space-between' }}>
-            <Button
-              onClick={handlePreviousStep}
-              disabled={activeStep === 0 || isTraining}
-              variant="outlined"
-            >
-              Previous
-            </Button>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              {activeStep < workflowSteps.length - 1 ? (
-                <Button
-                  onClick={handleNextStep}
-                  disabled={!canProceedToNextStep() || isTraining}
-                  variant="contained"
-                >
-                  Next
-                </Button>
-              ) : (
-                <>
+            {/* Section 4: Train & Evaluate */}
+            {activeStep >= 3 && (
+              <Card
+                sx={{
+                  border: '2px solid',
+                  borderColor: 'primary.main',
+                }}
+              >
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <PlayArrow color="primary" />
+                    <Typography variant="h6" fontWeight={600}>
+                      4. Train & Evaluate
+                    </Typography>
+                  </Box>
+                  <Divider sx={{ mb: 2 }} />
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Ready to train your model with the selected configuration.
+                  </Typography>
+                </CardContent>
+                {/* Navigation Buttons for Step 3 */}
+                <Box sx={{ px: 2, pb: 2, display: 'flex', gap: 2, justifyContent: 'space-between' }}>
                   <Button
-                    variant="contained"
-                    startIcon={<PlayArrow />}
-                    disabled={!selectedModel || isTraining || !selectedDatasetId}
-                    onClick={handleStartTraining}
-                  >
-                    Start Training
-                  </Button>
-                  <Button
+                    onClick={handlePreviousStep}
+                    disabled={isTraining}
                     variant="outlined"
-                    color="error"
-                    startIcon={<Stop />}
-                    disabled={!isTraining}
                   >
-                    Stop Training
+                    Previous
                   </Button>
-                </>
-              )}
-            </Box>
-          </Box>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button
+                      variant="contained"
+                      startIcon={<PlayArrow />}
+                      disabled={!selectedModel || isTraining || !selectedDatasetId}
+                      onClick={handleStartTraining}
+                    >
+                      Start Training
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<Stop />}
+                      disabled={!isTraining}
+                    >
+                      Stop Training
+                    </Button>
+                  </Box>
+                </Box>
+              </Card>
+            )}
+          </Stack>
         </Grid>
 
         {/* Right Column: Run Status & Progress */}
