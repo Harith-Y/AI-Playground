@@ -27,19 +27,23 @@ class DatasetService {
   }
 
   private mapBackendDatasetToFrontend(backendData: any, fileSize?: number): Dataset {
+    // Support both shape object and direct rows/cols fields
+    const rows = backendData.rows ?? backendData.shape?.rows ?? 0;
+    const cols = backendData.cols ?? backendData.shape?.cols ?? 0;
+    
     return {
       id: backendData.id,
       name: backendData.name,
       filename: backendData.name, // Assuming name is filename
       size: fileSize || 0, // Backend doesn't return size yet
-      rowCount: backendData.shape?.rows || 0,
-      columnCount: backendData.shape?.cols || 0,
+      rowCount: rows,
+      columnCount: cols,
       createdAt: backendData.uploaded_at || new Date().toISOString(),
       updatedAt: backendData.uploaded_at || new Date().toISOString(),
       status: 'uploaded', // Default status
-      rows: backendData.shape?.rows,
-      columns: backendData.shape?.cols,
-      shape: [backendData.shape?.rows || 0, backendData.shape?.cols || 0]
+      rows: rows,
+      columns: cols,
+      shape: [rows, cols]
     };
   }
 
