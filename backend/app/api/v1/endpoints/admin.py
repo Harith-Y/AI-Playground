@@ -17,6 +17,38 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@router.get(
+    "/debug-datasets",
+    summary="Debug dataset metadata",
+    description="Show all datasets with their current metadata values"
+)
+async def debug_datasets(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Debug endpoint to see all dataset metadata"""
+    try:
+        datasets = db.query(Dataset).all()
+        
+        result = []
+        for d in datasets:
+            result.append({
+                "id": str(d.id),
+                "name": d.name,
+                "rows": d.rows,
+                "cols": d.cols,
+                "file_path": d.file_path,
+                "missing_values": d.missing_values
+            })
+        
+        return {
+            "total": len(datasets),
+            "datasets": result
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
 @router.post(
     "/fix-metadata",
     summary="Fix missing dataset metadata",
