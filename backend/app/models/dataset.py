@@ -17,6 +17,7 @@ class Dataset(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
+    file_size = Column(Integer, nullable=True)  # File size in bytes
     
     # Dataset metadata
     rows = Column(Integer, nullable=True)

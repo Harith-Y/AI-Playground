@@ -35,7 +35,7 @@ class DatasetService {
       id: backendData.id,
       name: backendData.name,
       filename: backendData.name, // Assuming name is filename
-      size: fileSize || 0, // Backend doesn't return size yet
+      size: backendData.file_size || fileSize || 0, // Use backend file_size or uploaded file size
       rowCount: rows,
       columnCount: cols,
       createdAt: backendData.uploaded_at || new Date().toISOString(),

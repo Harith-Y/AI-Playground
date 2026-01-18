@@ -264,6 +264,7 @@ async def upload_dataset(
                 user_id=user_id,
                 name=Path(file.filename).stem,  # filename without extension
                 file_path=file_url,  # Store absolute path or URL
+                file_size=file_size,  # Store file size in bytes
                 rows=row_count,
                 cols=column_count,
                 dtypes=dtypes,

@@ -42,6 +42,7 @@ class DatasetRead(DatasetBase):
 	uploaded_at: Optional[datetime] = None
 	rows: Optional[int] = None
 	cols: Optional[int] = None
+	file_size: Optional[int] = None  # File size in bytes
 
 	class Config:
 		from_attributes = True
