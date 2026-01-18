@@ -816,6 +816,9 @@ def run_training_logic(
                     feature_importance = raw_fi
                 
                 logger.info(f"Feature importance calculated: {len(feature_importance)} features")
+                # Log if all features have zero importance (can happen with Lasso)
+                if feature_importance and all(abs(v) < 1e-10 for v in feature_importance.values()):
+                    logger.warning("All feature importances are zero or near-zero (possible with aggressive regularization)")
         except Exception as e:
             logger.warning(f"Could not calculate feature importance: {e}")
 
@@ -830,8 +833,8 @@ def run_training_logic(
         # Store task type for frontend display
         model_run.run_metadata['task_type'] = task_type.value
         
-        # Store feature importance if available - CRITICAL FIX
-        if feature_importance:
+        # Store feature importance if available (even if empty dict - means model supports it but all zeros)
+        if feature_importance is not None:
             model_run.run_metadata['feature_importance'] = feature_importance
             
         # Commit metrics immediately

@@ -2015,8 +2015,19 @@ async def get_plot_data(
         if 'feature_importance' in run_metadata:
             # Format as x (values) and y (names) for plotting
             fi = run_metadata['feature_importance']
+            
+            # Filter out exactly zero values (but keep small non-zero values)
+            # This is important for Lasso regression which can zero out features
+            non_zero_fi = {k: v for k, v in fi.items() if abs(v) > 1e-10}
+            
+            # If all features are zeroed out (unlikely but possible with aggressive regularization)
+            # show all features anyway so the user knows what happened
+            if not non_zero_fi and fi:
+                logger.warning("All feature importances are zero or near-zero. Showing all features.")
+                non_zero_fi = fi
+            
             # Sort by importance
-            sorted_fi = sorted(fi.items(), key=lambda x: x[1], reverse=True)
+            sorted_fi = sorted(non_zero_fi.items(), key=lambda x: abs(x[1]), reverse=True)
             # Take top 20
             sorted_fi = sorted_fi[:20]
             
@@ -2024,7 +2035,7 @@ async def get_plot_data(
                 "plot_type": "feature_importance",
                 "data": {
                     "features": [x[0] for x in sorted_fi],
-                    "importance": [x[1] for x in sorted_fi]
+                    "importance": [float(x[1]) for x in sorted_fi]
                 }
             }
         else:
