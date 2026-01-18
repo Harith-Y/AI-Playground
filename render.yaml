@@ -6,7 +6,7 @@ services:
   - type: web
     name: aiplayground-backend
     env: docker
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: Dockerfile
     dockerContext: ./backend
     plan: free
     region: oregon
